@@ -6,10 +6,16 @@ import authRoutes from './routes/authRoutes.js';
 import containerRoutes from './routes/containerRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import { setupSockets } from './websockets.js';
+import { createServer } from 'http';
 
 dotenv.config();
 
 const app = express();
+const server = createServer(app);
+
+// Initialize WebSockets for real-time Terminal
+setupSockets(server);
 
 // Middleware
 app.use(cors());
@@ -27,6 +33,6 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanag
     .catch((err) => console.error('Error connecting to MongoDB:', err));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });

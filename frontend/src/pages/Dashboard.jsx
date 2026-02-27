@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Activity, Server, Cpu, Navigation, ArrowRight } from 'lucide-react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
+import { io } from 'socket.io-client';
 
 const Dashboard = () => {
     const [stats, setStats] = useState({ total: 0, running: 0, stopped: 0 });
@@ -30,6 +31,18 @@ const Dashboard = () => {
         };
 
         fetchSummary();
+        const interval = setInterval(fetchSummary, 30000);
+
+        // Setup Real-time Docker events socket
+        const socket = io('http://localhost:5000');
+        socket.on('container:status_change', () => {
+            fetchSummary(); // Just refetch numbers when any container changes state globally
+        });
+
+        return () => {
+            clearInterval(interval);
+            socket.disconnect();
+        };
     }, []);
 
     return (

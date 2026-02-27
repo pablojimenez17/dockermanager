@@ -1,6 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay } from 'lucide-react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
+import TerminalModal from '../components/TerminalModal';
+import { useToast } from '../components/ToastContext';
 
 const ViewContainers = () => {
     const [containers, setContainers] = useState([]);
@@ -8,6 +11,12 @@ const ViewContainers = () => {
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [selectedLogs, setSelectedLogs] = useState(null);
+    const [activeTerminal, setActiveTerminal] = useState(null);
+    const { addToast } = useToast();
+
+    // We use a ref to hold the latest containers so socket closures can read it
+    const containersRef = useRef([]);
+    useEffect(() => { containersRef.current = containers; }, [containers]);
 
     const fetchContainers = async () => {
         try {
@@ -29,12 +38,53 @@ const ViewContainers = () => {
     useEffect(() => {
         fetchContainers();
         const interval = setInterval(fetchContainers, 30000); // Poll every 30s
-        return () => clearInterval(interval);
+
+        // Setup Real-time Docker events socket
+        const socket = io('http://localhost:5000');
+
+        socket.on('container:status_change', ({ dockerId, status }) => {
+            console.log('[React Socket] Received container event:', dockerId, status);
+            const currentContainers = containersRef.current;
+            const target = currentContainers.find(c => dockerId.includes(c.dockerId) || c.dockerId.includes(dockerId));
+
+            if (target) {
+                if (status === 'die') {
+                    addToast(
+                        'Container Crashed',
+                        `Container ${target.name} stopped unexpectedly.`,
+                        'error',
+                        'View Crash Logs',
+                        () => fetchLogs(target._id, target.name)
+                    );
+                } else if (status === 'stop') {
+                    addToast('Container Stopped', `${target.name} has been stopped.`, 'warning');
+                } else if (status === 'start' || status === 'unpause') {
+                    addToast('Container Running', `${target.name} is now online.`, 'success');
+                }
+
+                setContainers(prevContainers =>
+                    prevContainers.map(c => {
+                        if (c.dockerId === target.dockerId) {
+                            return { ...c, state: status === 'die' || status === 'stop' ? 'stopped' : 'running' };
+                        }
+                        return c;
+                    })
+                );
+            }
+        });
+
+        return () => {
+            clearInterval(interval);
+            socket.disconnect();
+        };
     }, []);
 
     const handleAction = async (id, action) => {
         try {
             const token = localStorage.getItem('token');
+            const targetContainer = containers.find(c => c._id === id);
+            const cName = targetContainer ? targetContainer.name : 'Container';
+
             const endpoint = action === 'delete'
                 ? `http://localhost:5000/api/containers/${id}`
                 : `http://localhost:5000/api/containers/${id}/${action}`; // action 'stop'
@@ -45,9 +95,18 @@ const ViewContainers = () => {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
+            if (action === 'start') {
+                addToast('Container Started', `${cName} successfully started.`, 'success');
+            } else if (action === 'stop') {
+                addToast('Container Stopped', `${cName} successfully stopped.`, 'warning');
+            } else if (action === 'delete') {
+                addToast('Container Deleted', `${cName} has been permanently deleted.`, 'error');
+            }
+
             fetchContainers();
         } catch (err) {
             console.error(`Error performing ${action} on container ${id}`, err);
+            addToast('Action Failed', `Could not ${action} container.`, 'error');
         }
     };
 
@@ -70,13 +129,21 @@ const ViewContainers = () => {
                     <h1 className="text-4xl font-extrabold tracking-tight mb-2">My Containers</h1>
                     <p className="text-slate-400 text-lg">Manage and monitor your deployed instances.</p>
                 </div>
-                <button
-                    onClick={fetchContainers}
-                    disabled={refreshing}
-                    className="bg-slate-800 hover:bg-slate-700 border border-slate-700 p-3 rounded-xl transition-all"
-                >
-                    <RefreshCw size={24} className={`text-slate-300 ${refreshing ? 'animate-spin' : ''}`} />
-                </button>
+                <div className="flex space-x-3">
+                    <button
+                        onClick={() => addToast('Test System', 'If you see this, Toast CSS works', 'success')}
+                        className="bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-xl transition-all font-bold"
+                    >
+                        Test Notification
+                    </button>
+                    <button
+                        onClick={fetchContainers}
+                        disabled={refreshing}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 p-3 rounded-xl transition-all"
+                    >
+                        <RefreshCw size={24} className={`text-slate-300 ${refreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -135,12 +202,28 @@ const ViewContainers = () => {
                             </div>
 
                             <div className="flex items-center space-x-3 pt-6 border-t border-slate-700/50">
-                                {container.state === 'running' && (
+                                {container.state === 'running' ? (
+                                    <>
+                                        <button
+                                            onClick={() => handleAction(container._id, 'stop')}
+                                            className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        >
+                                            <Square size={16} /> <span>Stop</span>
+                                        </button>
+
+                                        <button
+                                            onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
+                                            className="flex-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        >
+                                            <MonitorPlay size={16} /> <span>Console</span>
+                                        </button>
+                                    </>
+                                ) : (
                                     <button
-                                        onClick={() => handleAction(container._id, 'stop')}
-                                        className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        onClick={() => handleAction(container._id, 'start')}
+                                        className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                     >
-                                        <Square size={16} /> <span>Stop</span>
+                                        <Play size={16} /> <span>Start</span>
                                     </button>
                                 )}
 
@@ -178,6 +261,15 @@ const ViewContainers = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Terminal Modal */}
+            {activeTerminal && (
+                <TerminalModal
+                    containerId={activeTerminal.id}
+                    containerName={activeTerminal.name}
+                    onClose={() => setActiveTerminal(null)}
+                />
             )}
         </div>
     );

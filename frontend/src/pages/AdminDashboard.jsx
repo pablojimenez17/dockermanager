@@ -1,12 +1,22 @@
-import React, { useEffect, useState } from 'react';
-import { Users, Server, ShieldAlert, Trash2 } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal } from 'lucide-react';
 import axios from 'axios';
+import { io } from 'socket.io-client';
+import TerminalModal from '../components/TerminalModal';
+import { useToast } from '../components/ToastContext';
 
 const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [containers, setContainers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
+    const [activeTerminal, setActiveTerminal] = useState(null);
+    const { addToast } = useToast();
+    const [selectedLogs, setSelectedLogs] = useState(null);
+
+    // Keep ref to latest containers for socket closure
+    const containersRef = useRef([]);
+    useEffect(() => { containersRef.current = containers; }, [containers]);
 
     const fetchData = async () => {
         try {
@@ -27,19 +37,74 @@ const AdminDashboard = () => {
     useEffect(() => {
         fetchData();
         const interval = setInterval(fetchData, 30000);
-        return () => clearInterval(interval);
+
+        // Setup Real-time Docker events socket
+        const socket = io('http://localhost:5000');
+
+        socket.on('container:status_change', ({ dockerId, status }) => {
+            const currentContainers = containersRef.current;
+            const target = currentContainers.find(c => dockerId.includes(c.dockerId) || c.dockerId.includes(dockerId));
+
+            if (target) {
+                if (status === 'die') {
+                    addToast(
+                        'Container Crashed',
+                        `Container ${target.name} stopped unexpectedly.`,
+                        'error',
+                        'View Crash Logs',
+                        () => fetchLogs(target._id, target.name)
+                    );
+                } else if (status === 'stop') {
+                    addToast('Container Stopped', `${target.name} has been stopped.`, 'warning');
+                } else if (status === 'start' || status === 'unpause') {
+                    addToast('Container Running', `${target.name} is now online.`, 'success');
+                }
+
+                setContainers(prevContainers =>
+                    prevContainers.map(c => {
+                        if (c.dockerId === target.dockerId) {
+                            return { ...c, state: status === 'die' || status === 'stop' ? 'stopped' : 'running' };
+                        }
+                        return c;
+                    })
+                );
+            }
+        });
+
+        return () => {
+            clearInterval(interval);
+            socket.disconnect();
+        };
     }, []);
+
+    const fetchLogs = async (id, name) => {
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setSelectedLogs({ name, content: res.data });
+        } catch (err) {
+            setSelectedLogs({ name, content: "Error fetching logs or container not running." });
+        }
+    };
 
     const handleForceDelete = async (id) => {
         if (!window.confirm("Are you sure you want to forcibly remove this container for this user?")) return;
         try {
             const token = localStorage.getItem('token');
+            const targetContainer = containers.find(c => c._id === id);
+            const cName = targetContainer ? targetContainer.name : 'Container';
+
             await axios.delete(`http://localhost:5000/api/admin/containers/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
+
+            addToast('Container Deleted', `Forcefully unlinked and removed ${cName}`, 'error');
             fetchData();
         } catch (err) {
             alert(err.response?.data?.message || 'Error deleting container');
+            addToast('Delete Failed', 'Admin override failed to remove container.', 'error');
         }
     };
 
@@ -135,7 +200,16 @@ const AdminDashboard = () => {
                                             {c.state ? c.state.toUpperCase() : 'UNKNOWN'}
                                         </span>
                                     </td>
-                                    <td className="p-4">
+                                    <td className="p-4 flex space-x-2">
+                                        {c.state === 'running' && (
+                                            <button
+                                                onClick={() => setActiveTerminal({ id: c.dockerId, name: c.name })}
+                                                className="p-2 bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 rounded-lg transition-colors border border-brand-500/20"
+                                                title="Open Terminal"
+                                            >
+                                                <MonitorPlay size={16} />
+                                            </button>
+                                        )}
                                         <button
                                             onClick={() => handleForceDelete(c._id)}
                                             className="p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors border border-rose-500/20"
@@ -155,6 +229,32 @@ const AdminDashboard = () => {
                     </table>
                 </div>
             </div>
+
+            {/* Terminal Modal */}
+            {activeTerminal && (
+                <TerminalModal
+                    containerId={activeTerminal.id}
+                    containerName={activeTerminal.name}
+                    onClose={() => setActiveTerminal(null)}
+                />
+            )}
+
+            {/* Logs Modal */}
+            {selectedLogs && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+                        <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                            <h3 className="font-bold flex items-center text-lg"><Terminal className="mr-2 text-brand-400" /> Logs: {selectedLogs.name}</h3>
+                            <button onClick={() => setSelectedLogs(null)} className="text-slate-400 hover:text-white transition-colors">
+                                Close
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1 font-mono text-sm text-green-400 whitespace-pre-wrap leading-relaxed">
+                            {selectedLogs.content || 'No logs available.'}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

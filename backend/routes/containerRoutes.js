@@ -35,129 +35,139 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create a new container
+// Create a new container stack
 router.post('/', async (req, res) => {
     try {
-        const { name, image, env, ports } = req.body;
+        const { stack } = req.body;
 
-        // Ensure image exists or pull it
-        // Note: for simplicity in this example, we assume the frontend sends a request, we try to create. 
-        // In production, you'd want to pull the image first if missing.
-        try {
-            await docker.pull(image);
-        } catch (err) {
-            console.log("Pull error or image exists, trying to create anyway", err.message);
+        if (!stack || !Array.isArray(stack) || stack.length === 0) {
+            return res.status(400).json({ message: 'A valid stack array is required' });
         }
 
-        // Prepare port bindings
-        const PortBindings = {};
-        const ExposedPorts = {};
-        if (ports && ports.length > 0) {
-            ports.forEach(p => {
-                // p format: "80:80" (host:container)
-                const [hostPort, containerPort] = p.split(':');
-                if (hostPort && containerPort) {
-                    PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
-                    ExposedPorts[`${containerPort}/tcp`] = {};
-                }
+        // Create a custom bridge network for this stack deployment 
+        // if there's more than one container, so they can talk to each other
+        let networkName = null;
+        if (stack.length > 1) {
+            networkName = `stack_net_${Math.random().toString(36).substring(7)}`;
+            await docker.createNetwork({
+                Name: networkName,
+                Driver: 'bridge'
             });
         }
 
-        // Handle Template: WordPress + MySQL
-        if (image.includes('wordpress')) {
-            const dbName = `${name}-db`;
+        const createdRecords = [];
+
+        console.log(`[DEBUG] Attempting to create stack of length ${stack.length}`);
+
+        // Deploy sequentially to respect implicit dependencies 
+        for (const config of stack) {
+            console.log(`[DEBUG] Processing config for image: ${config.image}`);
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode } = config;
+
+            // Ensure image exists or pull it
             try {
-                await docker.pull('mysql:5.7');
-            } catch (e) { }
+                await docker.pull(image);
+            } catch (err) {
+                console.log(`Pull error or image exists for ${image}, trying to create anyway`, err.message);
+            }
 
-            const dbContainer = await docker.createContainer({
-                Image: 'mysql:5.7',
-                name: dbName,
-                Env: [
-                    'MYSQL_ROOT_PASSWORD=somewordpress',
-                    'MYSQL_DATABASE=wordpress',
-                    'MYSQL_USER=wordpress',
-                    'MYSQL_PASSWORD=somewordpress'
-                ]
-            });
-            await dbContainer.start();
+            // Prepare port bindings
+            const PortBindings = {};
+            const ExposedPorts = {};
+            if (ports && ports.length > 0) {
+                ports.forEach(p => {
+                    const [hostPort, containerPort] = p.split(':');
+                    if (hostPort && containerPort) {
+                        PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
+                        ExposedPorts[`${containerPort}/tcp`] = {};
+                    }
+                });
+            }
 
-            // Create a record for the DB container so the user sees it
-            const dbRecord = new Container({
-                name: dbName,
-                image: 'mysql:5.7',
-                dockerId: dbContainer.id,
-                userId: req.user.userId,
-                status: 'running'
-            });
-            await dbRecord.save();
+            // Secure network mode and apply stack bridge if applicable
+            let safeNetworkMode = (networkMode === 'bridge' || networkMode === 'none') ? networkMode : 'bridge';
 
-            // Create the WP container linked to the DB
-            const wpContainer = await docker.createContainer({
+            // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
+            if (networkName && safeNetworkMode === 'bridge') {
+                safeNetworkMode = networkName;
+            }
+
+            // Build Advanced Host Configuration
+            const baseHostConfig = {
+                PortBindings,
+                ...(memory && { Memory: parseInt(memory) * 1024 * 1024 }),
+                ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
+                ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
+                NetworkMode: safeNetworkMode
+            };
+
+            const containerConfig = {
                 Image: image,
                 name: name,
-                Env: [
-                    'WORDPRESS_DB_HOST=db:3306',
-                    'WORDPRESS_DB_USER=wordpress',
-                    'WORDPRESS_DB_PASSWORD=somewordpress',
-                    'WORDPRESS_DB_NAME=wordpress',
-                    ...(env || [])
-                ],
+                Env: env || [],
                 ExposedPorts,
-                HostConfig: {
-                    PortBindings,
-                    Links: [`${dbName}:db`]
-                }
-            });
-            await wpContainer.start();
+                HostConfig: baseHostConfig
+            };
 
-            const wpRecord = new Container({
+            // WordPress Template specific environment injection (if they used the preset)
+            // If the user deployed WordPress and MySQL together via the preset:
+            if (image.includes('wordpress')) {
+                // Find DB in stack
+                const dbConfig = stack.find(c => c.image.includes('mysql') || c.image.includes('mariadb'));
+                if (dbConfig) {
+                    containerConfig.Env = [
+                        ...containerConfig.Env,
+                        `WORDPRESS_DB_HOST=${dbConfig.name}:3306`,
+                        `WORDPRESS_DB_USER=wordpress`,
+                        `WORDPRESS_DB_PASSWORD=somewordpress`,
+                        `WORDPRESS_DB_NAME=wordpress`
+                    ];
+                }
+            }
+
+            if (image.includes('mysql') && stack.some(c => c.image.includes('wordpress'))) {
+                containerConfig.Env = [
+                    ...containerConfig.Env,
+                    `MYSQL_ROOT_PASSWORD=somewordpress`,
+                    `MYSQL_DATABASE=wordpress`,
+                    `MYSQL_USER=wordpress`,
+                    `MYSQL_PASSWORD=somewordpress`
+                ];
+            }
+
+            // Keep OS base images alive so they don't appear as "exited" instantly
+            const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos'];
+            if (keepsAlive.some(img => image.includes(img))) {
+                containerConfig.Cmd = ['tail', '-f', '/dev/null'];
+            }
+
+            console.log(`[DEBUG] Pulling ${image}...`);
+            // Create and start container
+            const container = await docker.createContainer(containerConfig);
+            console.log(`[DEBUG] Container created ID: ${container.id}`);
+
+            await container.start();
+            console.log(`[DEBUG] Container ${container.id} started successfully`);
+
+            // Save to database
+            const dbContainer = new Container({
                 name,
                 image,
-                dockerId: wpContainer.id,
+                dockerId: container.id,
                 userId: req.user.userId,
                 status: 'running'
             });
-            await wpRecord.save();
 
-            return res.status(201).json(wpRecord);
+            await dbContainer.save();
+            createdRecords.push(dbContainer);
+            console.log(`[DEBUG] Record saved to DB for ${name}`);
         }
 
-        // Standard containers
-        const containerConfig = {
-            Image: image,
-            name: name,
-            Env: env || [],
-            ExposedPorts,
-            HostConfig: {
-                PortBindings
-            }
-        };
-
-        // Keep OS base images alive so they don't appear as "exited" instantly
-        const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos'];
-        if (keepsAlive.some(img => image.includes(img))) {
-            containerConfig.Cmd = ['tail', '-f', '/dev/null'];
-        }
-
-        const container = await docker.createContainer(containerConfig);
-
-        await container.start();
-
-        // Save to database
-        const newDbContainer = new Container({
-            name,
-            image,
-            dockerId: container.id,
-            userId: req.user.userId,
-            status: 'running'
-        });
-
-        await newDbContainer.save();
-
-        res.status(201).json(newDbContainer);
+        console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
+        res.status(201).json(createdRecords);
     } catch (error) {
-        res.status(500).json({ message: 'Error creating container', error: error.message });
+        console.error(`[ERROR] API Exception during stack creation:`, error);
+        res.status(500).json({ message: 'Error creating stack', error: error.message, stack: error.stack });
     }
 });
 
@@ -176,6 +186,24 @@ router.post('/:id/stop', async (req, res) => {
         res.json({ message: 'Container stopped successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error stopping container', error: error.message });
+    }
+});
+
+// Start a mapped container
+router.post('/:id/start', async (req, res) => {
+    try {
+        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
+
+        const container = docker.getContainer(dbContainer.dockerId);
+        await container.start();
+
+        dbContainer.status = 'running';
+        await dbContainer.save();
+
+        res.json({ message: 'Container started successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error starting container', error: error.message });
     }
 });
 
