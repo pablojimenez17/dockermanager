@@ -241,6 +241,7 @@ const AdminDashboard = () => {
 
             {/* Logs Modal */}
             {selectedLogs && (
+<<<<<<< HEAD
                 <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
                         <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
@@ -250,6 +251,17 @@ const AdminDashboard = () => {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1 font-mono text-sm bg-slate-50 text-slate-800 dark:bg-transparent dark:text-green-400 whitespace-pre-wrap leading-relaxed">
+=======
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
+                    <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+                        <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
+                            <h3 className="font-bold flex items-center text-lg"><Terminal className="mr-2 text-brand-400" /> Logs: {selectedLogs.name}</h3>
+                            <button onClick={() => setSelectedLogs(null)} className="text-slate-400 hover:text-white transition-colors">
+                                Close
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto flex-1 font-mono text-sm text-green-400 whitespace-pre-wrap leading-relaxed">
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             {selectedLogs.content || 'No logs available.'}
                         </div>
                     </div>

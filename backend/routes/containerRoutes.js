@@ -67,7 +67,11 @@ router.post('/', async (req, res) => {
         // Deploy sequentially to respect implicit dependencies 
         for (const config of stack) {
             console.log(`[DEBUG] Processing config for image: ${config.image}`);
+<<<<<<< HEAD
             const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address } = config;
+=======
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode } = config;
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 
             // Ensure image exists or pull it
             try {
@@ -89,8 +93,13 @@ router.post('/', async (req, res) => {
                 });
             }
 
+<<<<<<< HEAD
             // Apply network settings
             let safeNetworkMode = networkMode || 'bridge';
+=======
+            // Secure network mode and apply stack bridge if applicable
+            let safeNetworkMode = (networkMode === 'bridge' || networkMode === 'none') ? networkMode : 'bridge';
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 
             // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
             if (networkName && safeNetworkMode === 'bridge') {
@@ -114,6 +123,7 @@ router.post('/', async (req, res) => {
                 HostConfig: baseHostConfig
             };
 
+<<<<<<< HEAD
             // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
             if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
                 containerConfig.NetworkingConfig = {
@@ -128,6 +138,8 @@ router.post('/', async (req, res) => {
             }
 
 
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
             // WordPress Template specific environment injection (if they used the preset)
             // If the user deployed WordPress and MySQL together via the preset:
             if (image.includes('wordpress')) {
@@ -162,6 +174,7 @@ router.post('/', async (req, res) => {
 
             console.log(`[DEBUG] Pulling ${image}...`);
             // Create and start container
+<<<<<<< HEAD
             let container;
             try {
                 container = await docker.createContainer(containerConfig);
@@ -193,6 +206,26 @@ router.post('/', async (req, res) => {
                 }
                 throw err;
             }
+=======
+            const container = await docker.createContainer(containerConfig);
+            console.log(`[DEBUG] Container created ID: ${container.id}`);
+
+            await container.start();
+            console.log(`[DEBUG] Container ${container.id} started successfully`);
+
+            // Save to database
+            const dbContainer = new Container({
+                name,
+                image,
+                dockerId: container.id,
+                userId: req.user.userId,
+                status: 'running'
+            });
+
+            await dbContainer.save();
+            createdRecords.push(dbContainer);
+            console.log(`[DEBUG] Record saved to DB for ${name}`);
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
         }
 
         console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);

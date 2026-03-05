@@ -144,6 +144,24 @@ const ViewContainers = () => {
                         <RefreshCw size={24} className={refreshing ? 'animate-spin' : ''} />
                     </button>
                 </div>
+<<<<<<< HEAD
+=======
+                <div className="flex space-x-3">
+                    <button
+                        onClick={() => addToast('Test System', 'If you see this, Toast CSS works', 'success')}
+                        className="bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-xl transition-all font-bold"
+                    >
+                        Test Notification
+                    </button>
+                    <button
+                        onClick={fetchContainers}
+                        disabled={refreshing}
+                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 p-3 rounded-xl transition-all"
+                    >
+                        <RefreshCw size={24} className={`text-slate-300 ${refreshing ? 'animate-spin' : ''}`} />
+                    </button>
+                </div>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
             </div>
 
             {error && (
@@ -201,19 +219,31 @@ const ViewContainers = () => {
                                 </div>
                             </div>
 
+<<<<<<< HEAD
                             <div className="flex flex-wrap gap-3 pt-6 border-t border-slate-200 dark:border-slate-700/50">
+=======
+                            <div className="flex items-center space-x-3 pt-6 border-t border-slate-700/50">
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                 {container.state === 'running' ? (
                                     <>
                                         <button
                                             onClick={() => handleAction(container._id, 'stop')}
+<<<<<<< HEAD
                                             className="flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+=======
+                                            className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         >
                                             <Square size={16} /> <span>Stop</span>
                                         </button>
 
                                         <button
                                             onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
+<<<<<<< HEAD
                                             className="flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+=======
+                                            className="flex-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         >
                                             <MonitorPlay size={16} /> <span>Console</span>
                                         </button>
@@ -221,7 +251,11 @@ const ViewContainers = () => {
                                 ) : (
                                     <button
                                         onClick={() => handleAction(container._id, 'start')}
+<<<<<<< HEAD
                                         className="flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+=======
+                                        className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                     >
                                         <Play size={16} /> <span>Start</span>
                                     </button>

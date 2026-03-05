@@ -1,5 +1,10 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
 import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
+=======
+import React, { useState } from 'react';
+import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers } from 'lucide-react';
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,6 +16,7 @@ const predefinedImages = [
     { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
 ];
 
+<<<<<<< HEAD
 const APP_ENV_PRESETS = {
     mysql: [
         { key: 'MYSQL_ROOT_PASSWORD', value: 'secret' },
@@ -45,6 +51,8 @@ const getSuggestedEnvVars = (imageStr) => {
     return null;
 };
 
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 const getEmptyContainer = () => ({
     id: crypto.randomUUID(),
     name: '',
@@ -54,7 +62,10 @@ const getEmptyContainer = () => ({
     cpu: '1',
     restartPolicy: 'no',
     networkMode: 'bridge',
+<<<<<<< HEAD
     ipv4Address: '',
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     envVars: [{ key: '', value: '' }],
     showAdvanced: false
 });
@@ -69,6 +80,7 @@ const CreateContainer = () => {
 
     const navigate = useNavigate();
 
+<<<<<<< HEAD
     useEffect(() => {
         const fetchNetworks = async () => {
             try {
@@ -85,6 +97,8 @@ const CreateContainer = () => {
         fetchNetworks();
     }, []);
 
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     const handleSelectPredefined = (preset) => {
         setActivePreset(preset.id);
 
@@ -172,13 +186,17 @@ const CreateContainer = () => {
         setContainers(containers.map(c => {
             if (c.id === containerId) {
                 const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
+<<<<<<< HEAD
                 // Ensure at least one empty box
                 if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                 return { ...c, envVars: newEnvVars };
             }
             return c;
         }));
     };
+<<<<<<< HEAD
 
     const injectEnvVars = (containerId, suggestedVars) => {
         const allPresetKeys = new Set(Object.values(APP_ENV_PRESETS).flat().map(v => v.key));
@@ -198,6 +216,8 @@ const CreateContainer = () => {
             return c;
         }));
     };
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     // -------------------------------------
 
     const handleSubmit = async (e) => {
@@ -222,8 +242,12 @@ const CreateContainer = () => {
                     memory: c.memory,
                     cpu: c.cpu,
                     restartPolicy: c.restartPolicy,
+<<<<<<< HEAD
                     networkMode: c.networkMode,
                     ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
+=======
+                    networkMode: c.networkMode
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                 };
             });
 
@@ -235,14 +259,19 @@ const CreateContainer = () => {
 
             navigate('/app/containers');
         } catch (err) {
+<<<<<<< HEAD
             const specificError = err.response?.data?.error;
             const generalMessage = err.response?.data?.message;
             setError(specificError || generalMessage || 'Error deploying stack');
+=======
+            setError(err.response?.data?.message || 'Error deploying stack');
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
             setLoading(false);
         }
     };
 
     return (
+<<<<<<< HEAD
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
             <div className="mb-10">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
@@ -255,6 +284,20 @@ const CreateContainer = () => {
                 <div className="lg:col-span-4 space-y-4">
                     <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 text-slate-900 dark:text-white">
                         <Server className="text-purple-600 dark:text-purple-400" />
+=======
+        <div className="p-8 pb-20 text-white max-w-7xl mx-auto">
+            <div className="mb-10">
+                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
+                <p className="text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+
+                {/* Left Side: Presets (Moved to left for natural flow) */}
+                <div className="lg:col-span-4 space-y-4">
+                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+                        <Server className="text-purple-400" />
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                         <span>Quick Presets</span>
                     </h3>
 
@@ -265,6 +308,7 @@ const CreateContainer = () => {
                                 onClick={() => handleSelectPredefined(img)}
                                 className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
                                     ${activePreset === img.id
+<<<<<<< HEAD
                                         ? 'bg-brand-50 border-brand-300 shadow-[0_0_15px_rgba(14,165,233,0.05)] dark:bg-brand-500/10 dark:border-brand-500 dark:shadow-[0_0_15px_rgba(14,165,233,0.15)]'
                                         : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-500'}
                                 `}
@@ -276,6 +320,19 @@ const CreateContainer = () => {
                                     <h4 className="font-bold text-slate-900 dark:text-white text-lg">{img.name}</h4>
                                     {img.image !== 'custom' && <p className="text-sm font-mono text-brand-600 dark:text-brand-300 my-1">{img.image}</p>}
                                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{img.desc}</p>
+=======
+                                        ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
+                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
+                                `}
+                            >
+                                <div className={`p-3 rounded-xl shrink-0 ${activePreset === img.id ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                    {img.icon}
+                                </div>
+                                <div>
+                                    <h4 className="font-bold text-white text-lg">{img.name}</h4>
+                                    {img.image !== 'custom' && <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>}
+                                    <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                 </div>
                             </div>
                         ))}
@@ -285,11 +342,19 @@ const CreateContainer = () => {
                 {/* Right Side: Stack Builder */}
                 <div className="lg:col-span-8">
                     <div className="flex justify-between items-center mb-6">
+<<<<<<< HEAD
                         <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
                             <Layers className="text-brand-500 dark:text-brand-400" />
                             <span>Stack Builder</span>
                         </h3>
                         <div className="text-sm text-slate-600 bg-white border-slate-200 dark:text-slate-400 dark:bg-slate-800 px-4 py-2 rounded-xl border dark:border-slate-700">
+=======
+                        <h3 className="text-xl font-bold flex items-center space-x-2">
+                            <Layers className="text-brand-400" />
+                            <span>Stack Builder</span>
+                        </h3>
+                        <div className="text-sm text-slate-400 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             {containers.length} Container{containers.length !== 1 ? 's' : ''} Selected
                         </div>
                     </div>
@@ -304,6 +369,7 @@ const CreateContainer = () => {
 
                         <div className="space-y-6">
                             {containers.map((c, index) => (
+<<<<<<< HEAD
                                 <div key={c.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
                                     {/* Sub-header for Container index */}
                                     <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-700/50">
@@ -312,6 +378,16 @@ const CreateContainer = () => {
                                                 {index + 1}
                                             </div>
                                             <h4 className="text-lg font-bold text-slate-900 dark:text-white">Container Configuration</h4>
+=======
+                                <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
+                                    {/* Sub-header for Container index */}
+                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
+                                                {index + 1}
+                                            </div>
+                                            <h4 className="text-lg font-bold text-white">Container Configuration</h4>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         </div>
                                         {containers.length > 1 && (
                                             <button
@@ -327,42 +403,67 @@ const CreateContainer = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                         <div>
+<<<<<<< HEAD
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Container Name</label>
+=======
+                                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             <input
                                                 type="text"
                                                 required
                                                 value={c.name}
                                                 onChange={(e) => updateContainer(c.id, 'name', e.target.value)}
                                                 placeholder="e.g., frontend-app"
+<<<<<<< HEAD
                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white transition-shadow"
+=======
+                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             />
                                         </div>
 
                                         <div>
+<<<<<<< HEAD
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Docker Image</label>
+=======
+                                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             <input
                                                 type="text"
                                                 required
                                                 value={c.image}
                                                 onChange={(e) => updateContainer(c.id, 'image', e.target.value)}
                                                 placeholder="e.g., nginx:alpine"
+<<<<<<< HEAD
                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
+=======
+                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             />
                                         </div>
                                     </div>
 
                                     <div className="mb-6">
+<<<<<<< HEAD
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
+=======
+                                        <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         <input
                                             type="text"
                                             value={c.portBinding}
                                             onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
                                             placeholder="Host_Port:Container_Port (e.g., 8080:80)"
+<<<<<<< HEAD
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
+=======
+                                            className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         />
                                     </div>
 
                                     {/* Advanced Options Accordion for this specific container */}
+<<<<<<< HEAD
                                     <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
                                         <button
                                             type="button"
@@ -382,6 +483,27 @@ const CreateContainer = () => {
                                                     <div>
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
+=======
+                                    <div className="border border-slate-700 bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleAdvanced(c.id)}
+                                            className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700/50 transition-colors"
+                                        >
+                                            <div className="flex items-center space-x-2">
+                                                <Settings2 size={18} className={c.showAdvanced ? "text-brand-400" : "text-slate-400"} />
+                                                <span className={`font-semibold ${c.showAdvanced ? 'text-white' : 'text-slate-300'}`}>Advanced Configuration</span>
+                                            </div>
+                                            {c.showAdvanced ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                                        </button>
+
+                                        {c.showAdvanced && (
+                                            <div className="p-6 space-y-6 border-t border-slate-700 bg-slate-900/30">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+                                                            <HardDrive size={16} className="text-slate-400" />
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Memory Limit (MB)</span>
                                                         </label>
                                                         <input
@@ -389,13 +511,22 @@ const CreateContainer = () => {
                                                             value={c.memory}
                                                             onChange={(e) => updateContainer(c.id, 'memory', e.target.value)}
                                                             placeholder="Base: 512"
+<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+=======
+                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         />
                                                     </div>
 
                                                     <div>
+<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Cpu size={16} className="text-slate-500 dark:text-slate-400" />
+=======
+                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+                                                            <Cpu size={16} className="text-slate-400" />
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>CPU Limit (Cores)</span>
                                                         </label>
                                                         <input
@@ -404,21 +535,34 @@ const CreateContainer = () => {
                                                             value={c.cpu}
                                                             onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)}
                                                             placeholder="Base: 1"
+<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+=======
+                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         />
                                                     </div>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                     <div>
+<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Settings2 size={16} className="text-slate-500 dark:text-slate-400" />
+=======
+                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+                                                            <Settings2 size={16} className="text-slate-400" />
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Restart Policy</span>
                                                         </label>
                                                         <select
                                                             value={c.restartPolicy}
                                                             onChange={(e) => updateContainer(c.id, 'restartPolicy', e.target.value)}
+<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+=======
+                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         >
                                                             <option value="no">No (Default)</option>
                                                             <option value="always">Always</option>
@@ -428,13 +572,19 @@ const CreateContainer = () => {
                                                     </div>
 
                                                     <div>
+<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Network size={16} className="text-slate-500 dark:text-slate-400" />
+=======
+                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+                                                            <Network size={16} className="text-slate-400" />
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Network Mode</span>
                                                         </label>
                                                         <select
                                                             value={c.networkMode}
                                                             onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
+<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
                                                         >
                                                             <option value="bridge">Bridge (Secure)</option>
@@ -492,25 +642,59 @@ const CreateContainer = () => {
                                                     <div className="space-y-3 mb-3">
                                                         {c.envVars.map((env, eIdx) => (
                                                             <div key={eIdx} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
+=======
+                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
+                                                        >
+                                                            <option value="bridge">Bridge (Secure)</option>
+                                                            <option value="none">None (Isolated)</option>
+                                                        </select>
+                                                    </div>
+                                                </div>
+
+                                                {/* Environment Variables Section */}
+                                                <div className="pt-4 border-t border-slate-700/50">
+                                                    <label className="flex flex-col mb-4">
+                                                        <span className="text-sm font-medium text-slate-300">Environment Variables</span>
+                                                        <span className="text-xs text-slate-500">Add custom KEY=VALUE pairs injected on runtime.</span>
+                                                    </label>
+
+                                                    <div className="space-y-3 mb-3">
+                                                        {c.envVars.map((env, eIdx) => (
+                                                            <div key={eIdx} className="flex items-center space-x-3">
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 <input
                                                                     type="text"
                                                                     placeholder="e.g. NODE_ENV"
                                                                     value={env.key}
                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)}
+<<<<<<< HEAD
                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
                                                                 />
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
+=======
+                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
+                                                                />
+                                                                <span className="text-slate-500 font-bold">=</span>
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 <input
                                                                     type="text"
                                                                     placeholder="e.g. production"
                                                                     value={env.value}
                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
+<<<<<<< HEAD
                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
+=======
+                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeEnvVar(c.id, eIdx)}
+<<<<<<< HEAD
                                                                     className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+=======
+                                                                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </button>
@@ -536,11 +720,19 @@ const CreateContainer = () => {
                         </div>
 
                         {/* Actions */}
+<<<<<<< HEAD
                         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
                             <button
                                 type="button"
                                 onClick={handleAddContainer}
                                 className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/5 focus:outline-none text-brand-500 dark:text-brand-400 font-semibold transition-all"
+=======
+                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-700/50">
+                            <button
+                                type="button"
+                                onClick={handleAddContainer}
+                                className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-600 hover:border-brand-500 hover:bg-brand-500/5 focus:outline-none text-brand-400 font-semibold transition-all"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             >
                                 <Plus size={20} />
                                 <span>Add Another Container</span>

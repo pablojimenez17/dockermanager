@@ -6,8 +6,11 @@ import authRoutes from './routes/authRoutes.js';
 import containerRoutes from './routes/containerRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+<<<<<<< HEAD
 import aiRoutes from './routes/aiRoutes.js';
 import networkRoutes from './routes/networkRoutes.js';
+=======
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 import { setupSockets } from './websockets.js';
 import { createServer } from 'http';
 

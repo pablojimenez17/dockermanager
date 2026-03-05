@@ -84,6 +84,7 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
     }, [containerId, containerName]);
 
     return (
+<<<<<<< HEAD
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
             <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[80vh] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
 
@@ -92,12 +93,26 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
                     <div className="flex items-center space-x-3">
                         <div className="w-3 h-3 rounded-full bg-brand-500 animate-pulse"></div>
                         <h3 className="text-slate-900 dark:text-white font-mono font-bold tracking-wide">
+=======
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-slate-900 w-full max-w-5xl h-[80vh] rounded-2xl shadow-2xl border border-slate-700 flex flex-col overflow-hidden">
+
+                {/* Header */}
+                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+                    <div className="flex items-center space-x-3">
+                        <div className="w-3 h-3 rounded-full bg-brand-500 animate-pulse"></div>
+                        <h3 className="text-white font-mono font-bold tracking-wide">
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             {containerName} terminal session
                         </h3>
                     </div>
                     <button
                         onClick={onClose}
+<<<<<<< HEAD
                         className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"
+=======
+                        className="text-slate-400 hover:text-white transition-colors p-2 hover:bg-slate-800 rounded-lg"
+>>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                     >
                         <X size={20} />
                     </button>
