@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal } from 'lucide-react';
+import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -8,6 +8,7 @@ import { useToast } from '../components/ToastContext';
 const AdminDashboard = () => {
     const [users, setUsers] = useState([]);
     const [containers, setContainers] = useState([]);
+    const [auditLogs, setAuditLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [activeTerminal, setActiveTerminal] = useState(null);
@@ -21,12 +22,14 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             const token = localStorage.getItem('token');
-            const [usersRes, containersRes] = await Promise.all([
+            const [usersRes, containersRes, auditRes] = await Promise.all([
                 axios.get('http://localhost:5000/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('http://localhost:5000/api/admin/containers', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('http://localhost:5000/api/admin/containers', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('http://localhost:5000/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] }))
             ]);
             setUsers(usersRes.data);
             setContainers(containersRes.data);
+            setAuditLogs(auditRes.data);
         } catch (err) {
             setError(err.response?.data?.message || 'Error fetching admin data');
         } finally {
@@ -172,6 +175,61 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
+            {/* Audit Logs Section */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl mb-12">
+                <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-900 dark:text-white">
+                    <FileText className="text-brand-500 dark:text-brand-400" />
+                    <span>System Audit Logs</span>
+                </h3>
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-xl">
+                    <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
+                        <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 shadow-sm border-b border-slate-200 dark:border-slate-700">
+                            <tr className="text-slate-500 dark:text-slate-400">
+                                <th className="p-4 rounded-tl-xl w-1/4">User</th>
+                                <th className="p-4 w-1/4">Action</th>
+                                <th className="p-4 w-1/4">Resource</th>
+                                <th className="p-4 rounded-tr-xl w-1/4">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {auditLogs.map(log => (
+                                <tr key={log._id} className="border-b border-slate-200 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
+                                    <td className="p-4 font-medium text-slate-900 dark:text-white flex items-center space-x-2">
+                                        <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-500 dark:text-slate-400">
+                                            {log.userId?.name?.charAt(0).toUpperCase() || '?'}
+                                        </div>
+                                        <span>{log.userId?.name || 'Unknown'} <span className="text-xs text-slate-500 font-normal">({log.userId?.email || 'N/A'})</span></span>
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-semibold ${log.action.includes('DELETE') ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/30 dark:text-rose-400' :
+                                                log.action.includes('START') ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' :
+                                                    log.action.includes('STOP') ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                        'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400'
+                                            }`}>
+                                            {log.action.replace('_CONTAINER', '')}
+                                        </span>
+                                    </td>
+                                    <td className="p-4 text-slate-600 dark:text-slate-300 font-mono text-sm max-w-xs truncate" title={log.resourceName}>
+                                        {log.resourceName}
+                                    </td>
+                                    <td className="p-4 text-slate-500 dark:text-slate-400 flex items-center whitespace-nowrap">
+                                        <Clock size={14} className="mr-2 opacity-70" />
+                                        {new Date(log.createdAt).toLocaleString()}
+                                    </td>
+                                </tr>
+                            ))}
+                            {auditLogs.length === 0 && (
+                                <tr>
+                                    <td colSpan="4" className="p-8 text-center text-slate-400">
+                                        No recent actions logged.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-900 dark:text-white">
                     <Server className="text-brand-500 dark:text-brand-400" />
@@ -241,7 +299,6 @@ const AdminDashboard = () => {
 
             {/* Logs Modal */}
             {selectedLogs && (
-<<<<<<< HEAD
                 <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
                     <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
                         <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
@@ -251,17 +308,6 @@ const AdminDashboard = () => {
                             </button>
                         </div>
                         <div className="p-6 overflow-y-auto flex-1 font-mono text-sm bg-slate-50 text-slate-800 dark:bg-transparent dark:text-green-400 whitespace-pre-wrap leading-relaxed">
-=======
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                    <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
-                        <div className="p-4 bg-slate-800 border-b border-slate-700 flex justify-between items-center">
-                            <h3 className="font-bold flex items-center text-lg"><Terminal className="mr-2 text-brand-400" /> Logs: {selectedLogs.name}</h3>
-                            <button onClick={() => setSelectedLogs(null)} className="text-slate-400 hover:text-white transition-colors">
-                                Close
-                            </button>
-                        </div>
-                        <div className="p-6 overflow-y-auto flex-1 font-mono text-sm text-green-400 whitespace-pre-wrap leading-relaxed">
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             {selectedLogs.content || 'No logs available.'}
                         </div>
                     </div>

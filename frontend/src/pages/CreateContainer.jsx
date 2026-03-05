@@ -1,10 +1,5 @@
-<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
-=======
-import React, { useState } from 'react';
-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers } from 'lucide-react';
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,10 +8,12 @@ const predefinedImages = [
     { id: 'ubuntu', name: 'Ubuntu Latest', image: 'ubuntu:latest', icon: <Server size={24} />, desc: 'Base Ubuntu OS image for raw Linux setup' },
     { id: 'node', name: 'Node.js', image: 'node:18-alpine', icon: <Code size={24} />, desc: 'Lightweight Node 18 environment' },
     { id: 'nginx', name: 'Nginx', image: 'nginx:alpine', icon: <Globe size={24} />, desc: 'High-performance web server & reverse proxy' },
-    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
+    { id: 'postgres', name: 'PostgreSQL', image: 'postgres:15-alpine', icon: <Database size={24} />, desc: 'Advanced open source relational database' },
+    { id: 'redis', name: 'Redis', image: 'redis:alpine', icon: <Zap size={24} />, desc: 'In-memory data structure store, used as a database, cache, and message broker' },
+    { id: 'minecraft', name: 'Minecraft Server', image: 'itzg/minecraft-server', icon: <Box size={24} />, desc: 'Ready-to-play Minecraft Java Server' },
+    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Globe size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
 ];
 
-<<<<<<< HEAD
 const APP_ENV_PRESETS = {
     mysql: [
         { key: 'MYSQL_ROOT_PASSWORD', value: 'secret' },
@@ -38,6 +35,11 @@ const APP_ENV_PRESETS = {
     mongo: [
         { key: 'MONGO_INITDB_ROOT_USERNAME', value: 'root' },
         { key: 'MONGO_INITDB_ROOT_PASSWORD', value: 'secret' }
+    ],
+    minecraft: [
+        { key: 'EULA', value: 'TRUE' },
+        { key: 'VERSION', value: 'LATEST' },
+        { key: 'MEMORY', value: '1G' }
     ]
 };
 
@@ -48,11 +50,10 @@ const getSuggestedEnvVars = (imageStr) => {
     if (lower.includes('postgres')) return { label: 'PostgreSQL', vars: APP_ENV_PRESETS.postgres };
     if (lower.includes('wordpress')) return { label: 'WordPress', vars: APP_ENV_PRESETS.wordpress };
     if (lower.includes('mongo')) return { label: 'MongoDB', vars: APP_ENV_PRESETS.mongo };
+    if (lower.includes('minecraft')) return { label: 'Minecraft', vars: APP_ENV_PRESETS.minecraft };
     return null;
 };
 
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 const getEmptyContainer = () => ({
     id: crypto.randomUUID(),
     name: '',
@@ -62,10 +63,7 @@ const getEmptyContainer = () => ({
     cpu: '1',
     restartPolicy: 'no',
     networkMode: 'bridge',
-<<<<<<< HEAD
     ipv4Address: '',
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     envVars: [{ key: '', value: '' }],
     showAdvanced: false
 });
@@ -77,28 +75,31 @@ const CreateContainer = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [availableNetworks, setAvailableNetworks] = useState([]);
+    const [limits, setLimits] = useState({ maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
+    const [currentContainerCount, setCurrentContainerCount] = useState(0);
 
     const navigate = useNavigate();
 
-<<<<<<< HEAD
     useEffect(() => {
-        const fetchNetworks = async () => {
+        const fetchContext = async () => {
             try {
                 const token = localStorage.getItem('token');
                 if (!token) return;
-                const res = await axios.get('http://localhost:5000/api/networks', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-                setAvailableNetworks(res.data);
+                const [netRes, meRes, myContainersRes] = await Promise.all([
+                    axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } })
+                ]);
+                setAvailableNetworks(netRes.data);
+                if (meRes.data.limits) setLimits(meRes.data.limits);
+                setCurrentContainerCount(myContainersRes.data.length);
             } catch (err) {
-                console.error("Failed to fetch networks:", err);
+                console.error("Failed to fetch context:", err);
             }
         };
-        fetchNetworks();
+        fetchContext();
     }, []);
 
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     const handleSelectPredefined = (preset) => {
         setActivePreset(preset.id);
 
@@ -134,7 +135,15 @@ const CreateContainer = () => {
         const single = getEmptyContainer();
         single.image = preset.image;
         single.name = '';
+
         if (preset.id === 'nginx') single.portBinding = '8080:80';
+        if (preset.id === 'postgres') single.portBinding = '5432:5432';
+        if (preset.id === 'redis') single.portBinding = '6379:6379';
+        if (preset.id === 'minecraft') {
+            single.portBinding = '25565:25565';
+            single.memory = '2048'; // Minecraft needs more RAM
+        }
+
         setContainers([single]);
     };
 
@@ -186,17 +195,13 @@ const CreateContainer = () => {
         setContainers(containers.map(c => {
             if (c.id === containerId) {
                 const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
-<<<<<<< HEAD
                 // Ensure at least one empty box
                 if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                 return { ...c, envVars: newEnvVars };
             }
             return c;
         }));
     };
-<<<<<<< HEAD
 
     const injectEnvVars = (containerId, suggestedVars) => {
         const allPresetKeys = new Set(Object.values(APP_ENV_PRESETS).flat().map(v => v.key));
@@ -216,8 +221,6 @@ const CreateContainer = () => {
             return c;
         }));
     };
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
     // -------------------------------------
 
     const handleSubmit = async (e) => {
@@ -242,12 +245,8 @@ const CreateContainer = () => {
                     memory: c.memory,
                     cpu: c.cpu,
                     restartPolicy: c.restartPolicy,
-<<<<<<< HEAD
                     networkMode: c.networkMode,
                     ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
-=======
-                    networkMode: c.networkMode
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                 };
             });
 
@@ -259,19 +258,23 @@ const CreateContainer = () => {
 
             navigate('/app/containers');
         } catch (err) {
-<<<<<<< HEAD
             const specificError = err.response?.data?.error;
             const generalMessage = err.response?.data?.message;
             setError(specificError || generalMessage || 'Error deploying stack');
-=======
-            setError(err.response?.data?.message || 'Error deploying stack');
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
             setLoading(false);
         }
     };
 
+    // Calculate quotas needed for this stack
+    const requestedContainers = containers.length;
+    const requestedRamMb = containers.reduce((acc, curr) => acc + (curr.memory ? parseInt(curr.memory) : 512), 0);
+    const requestedCpu = containers.reduce((acc, curr) => acc + (curr.cpu ? parseFloat(curr.cpu) : 1), 0);
+
+    const isExceedingLimits = (currentContainerCount + requestedContainers > limits.maxContainers) ||
+        (requestedRamMb > limits.maxRamMb) ||
+        (requestedCpu > limits.maxCpuCores);
+
     return (
-<<<<<<< HEAD
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
             <div className="mb-10">
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
@@ -284,20 +287,6 @@ const CreateContainer = () => {
                 <div className="lg:col-span-4 space-y-4">
                     <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 text-slate-900 dark:text-white">
                         <Server className="text-purple-600 dark:text-purple-400" />
-=======
-        <div className="p-8 pb-20 text-white max-w-7xl mx-auto">
-            <div className="mb-10">
-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
-                <p className="text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-
-                {/* Left Side: Presets (Moved to left for natural flow) */}
-                <div className="lg:col-span-4 space-y-4">
-                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
-                        <Server className="text-purple-400" />
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                         <span>Quick Presets</span>
                     </h3>
 
@@ -308,7 +297,6 @@ const CreateContainer = () => {
                                 onClick={() => handleSelectPredefined(img)}
                                 className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
                                     ${activePreset === img.id
-<<<<<<< HEAD
                                         ? 'bg-brand-50 border-brand-300 shadow-[0_0_15px_rgba(14,165,233,0.05)] dark:bg-brand-500/10 dark:border-brand-500 dark:shadow-[0_0_15px_rgba(14,165,233,0.15)]'
                                         : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-500'}
                                 `}
@@ -320,19 +308,6 @@ const CreateContainer = () => {
                                     <h4 className="font-bold text-slate-900 dark:text-white text-lg">{img.name}</h4>
                                     {img.image !== 'custom' && <p className="text-sm font-mono text-brand-600 dark:text-brand-300 my-1">{img.image}</p>}
                                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{img.desc}</p>
-=======
-                                        ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
-                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
-                                `}
-                            >
-                                <div className={`p-3 rounded-xl shrink-0 ${activePreset === img.id ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
-                                    {img.icon}
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-white text-lg">{img.name}</h4>
-                                    {img.image !== 'custom' && <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>}
-                                    <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                 </div>
                             </div>
                         ))}
@@ -342,19 +317,11 @@ const CreateContainer = () => {
                 {/* Right Side: Stack Builder */}
                 <div className="lg:col-span-8">
                     <div className="flex justify-between items-center mb-6">
-<<<<<<< HEAD
                         <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
                             <Layers className="text-brand-500 dark:text-brand-400" />
                             <span>Stack Builder</span>
                         </h3>
                         <div className="text-sm text-slate-600 bg-white border-slate-200 dark:text-slate-400 dark:bg-slate-800 px-4 py-2 rounded-xl border dark:border-slate-700">
-=======
-                        <h3 className="text-xl font-bold flex items-center space-x-2">
-                            <Layers className="text-brand-400" />
-                            <span>Stack Builder</span>
-                        </h3>
-                        <div className="text-sm text-slate-400 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             {containers.length} Container{containers.length !== 1 ? 's' : ''} Selected
                         </div>
                     </div>
@@ -367,9 +334,55 @@ const CreateContainer = () => {
                             </div>
                         )}
 
+                        {/* Quotas Visualization */}
+                        <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-sm">
+                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
+                                <ShieldAlert size={18} className="mr-2 text-brand-500" /> Plan Resource Quotas
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-500">Containers</span>
+                                        <span className={`font-bold ${currentContainerCount + requestedContainers > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {currentContainerCount + requestedContainers} / {limits.maxContainers}
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+                                        <div className={`h-1.5 rounded-full ${currentContainerCount + requestedContainers > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(((currentContainerCount + requestedContainers) / limits.maxContainers) * 100, 100)}%` }}></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-500">Est. RAM</span>
+                                        <span className={`font-bold ${requestedRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {requestedRamMb}MB / {limits.maxRamMb}MB
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+                                        <div className={`h-1.5 rounded-full ${requestedRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((requestedRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="flex justify-between text-xs mb-1">
+                                        <span className="text-slate-500">Est. CPU</span>
+                                        <span className={`font-bold ${requestedCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {requestedCpu} / {limits.maxCpuCores} vCPU
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+                                        <div className={`h-1.5 rounded-full ${requestedCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((requestedCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
+                                    </div>
+                                </div>
+                            </div>
+                            {isExceedingLimits && (
+                                <p className="text-xs text-red-500 mt-4 flex items-center">
+                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! You must upgrade your plan or reduce the resources.
+                                </p>
+                            )}
+                        </div>
+
                         <div className="space-y-6">
                             {containers.map((c, index) => (
-<<<<<<< HEAD
                                 <div key={c.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
                                     {/* Sub-header for Container index */}
                                     <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-700/50">
@@ -378,16 +391,6 @@ const CreateContainer = () => {
                                                 {index + 1}
                                             </div>
                                             <h4 className="text-lg font-bold text-slate-900 dark:text-white">Container Configuration</h4>
-=======
-                                <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
-                                    {/* Sub-header for Container index */}
-                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
-                                        <div className="flex items-center space-x-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
-                                                {index + 1}
-                                            </div>
-                                            <h4 className="text-lg font-bold text-white">Container Configuration</h4>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         </div>
                                         {containers.length > 1 && (
                                             <button
@@ -403,67 +406,42 @@ const CreateContainer = () => {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                                         <div>
-<<<<<<< HEAD
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Container Name</label>
-=======
-                                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             <input
                                                 type="text"
                                                 required
                                                 value={c.name}
                                                 onChange={(e) => updateContainer(c.id, 'name', e.target.value)}
                                                 placeholder="e.g., frontend-app"
-<<<<<<< HEAD
                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white transition-shadow"
-=======
-                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             />
                                         </div>
 
                                         <div>
-<<<<<<< HEAD
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Docker Image</label>
-=======
-                                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             <input
                                                 type="text"
                                                 required
                                                 value={c.image}
                                                 onChange={(e) => updateContainer(c.id, 'image', e.target.value)}
                                                 placeholder="e.g., nginx:alpine"
-<<<<<<< HEAD
                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
-=======
-                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                             />
                                         </div>
                                     </div>
 
                                     <div className="mb-6">
-<<<<<<< HEAD
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
-=======
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         <input
                                             type="text"
                                             value={c.portBinding}
                                             onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
                                             placeholder="Host_Port:Container_Port (e.g., 8080:80)"
-<<<<<<< HEAD
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
-=======
-                                            className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         />
                                     </div>
 
                                     {/* Advanced Options Accordion for this specific container */}
-<<<<<<< HEAD
                                     <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
                                         <button
                                             type="button"
@@ -483,27 +461,6 @@ const CreateContainer = () => {
                                                     <div>
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
-=======
-                                    <div className="border border-slate-700 bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
-                                        <button
-                                            type="button"
-                                            onClick={() => toggleAdvanced(c.id)}
-                                            className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700/50 transition-colors"
-                                        >
-                                            <div className="flex items-center space-x-2">
-                                                <Settings2 size={18} className={c.showAdvanced ? "text-brand-400" : "text-slate-400"} />
-                                                <span className={`font-semibold ${c.showAdvanced ? 'text-white' : 'text-slate-300'}`}>Advanced Configuration</span>
-                                            </div>
-                                            {c.showAdvanced ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
-                                        </button>
-
-                                        {c.showAdvanced && (
-                                            <div className="p-6 space-y-6 border-t border-slate-700 bg-slate-900/30">
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                    <div>
-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
-                                                            <HardDrive size={16} className="text-slate-400" />
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Memory Limit (MB)</span>
                                                         </label>
                                                         <input
@@ -511,22 +468,13 @@ const CreateContainer = () => {
                                                             value={c.memory}
                                                             onChange={(e) => updateContainer(c.id, 'memory', e.target.value)}
                                                             placeholder="Base: 512"
-<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
-=======
-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         />
                                                     </div>
 
                                                     <div>
-<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Cpu size={16} className="text-slate-500 dark:text-slate-400" />
-=======
-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
-                                                            <Cpu size={16} className="text-slate-400" />
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>CPU Limit (Cores)</span>
                                                         </label>
                                                         <input
@@ -535,34 +483,21 @@ const CreateContainer = () => {
                                                             value={c.cpu}
                                                             onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)}
                                                             placeholder="Base: 1"
-<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
-=======
-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         />
                                                     </div>
                                                 </div>
 
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                     <div>
-<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Settings2 size={16} className="text-slate-500 dark:text-slate-400" />
-=======
-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
-                                                            <Settings2 size={16} className="text-slate-400" />
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Restart Policy</span>
                                                         </label>
                                                         <select
                                                             value={c.restartPolicy}
                                                             onChange={(e) => updateContainer(c.id, 'restartPolicy', e.target.value)}
-<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
-=======
-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                         >
                                                             <option value="no">No (Default)</option>
                                                             <option value="always">Always</option>
@@ -572,19 +507,13 @@ const CreateContainer = () => {
                                                     </div>
 
                                                     <div>
-<<<<<<< HEAD
                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                             <Network size={16} className="text-slate-500 dark:text-slate-400" />
-=======
-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
-                                                            <Network size={16} className="text-slate-400" />
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                             <span>Network Mode</span>
                                                         </label>
                                                         <select
                                                             value={c.networkMode}
                                                             onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
-<<<<<<< HEAD
                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
                                                         >
                                                             <option value="bridge">Bridge (Secure)</option>
@@ -642,59 +571,25 @@ const CreateContainer = () => {
                                                     <div className="space-y-3 mb-3">
                                                         {c.envVars.map((env, eIdx) => (
                                                             <div key={eIdx} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
-=======
-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
-                                                        >
-                                                            <option value="bridge">Bridge (Secure)</option>
-                                                            <option value="none">None (Isolated)</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-
-                                                {/* Environment Variables Section */}
-                                                <div className="pt-4 border-t border-slate-700/50">
-                                                    <label className="flex flex-col mb-4">
-                                                        <span className="text-sm font-medium text-slate-300">Environment Variables</span>
-                                                        <span className="text-xs text-slate-500">Add custom KEY=VALUE pairs injected on runtime.</span>
-                                                    </label>
-
-                                                    <div className="space-y-3 mb-3">
-                                                        {c.envVars.map((env, eIdx) => (
-                                                            <div key={eIdx} className="flex items-center space-x-3">
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 <input
                                                                     type="text"
                                                                     placeholder="e.g. NODE_ENV"
                                                                     value={env.key}
                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)}
-<<<<<<< HEAD
                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
                                                                 />
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
-=======
-                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
-                                                                />
-                                                                <span className="text-slate-500 font-bold">=</span>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 <input
                                                                     type="text"
                                                                     placeholder="e.g. production"
                                                                     value={env.value}
                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
-<<<<<<< HEAD
                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
-=======
-                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 />
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeEnvVar(c.id, eIdx)}
-<<<<<<< HEAD
                                                                     className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
-=======
-                                                                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                                                 >
                                                                     <Trash2 size={16} />
                                                                 </button>
@@ -720,19 +615,11 @@ const CreateContainer = () => {
                         </div>
 
                         {/* Actions */}
-<<<<<<< HEAD
                         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
                             <button
                                 type="button"
                                 onClick={handleAddContainer}
                                 className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/5 focus:outline-none text-brand-500 dark:text-brand-400 font-semibold transition-all"
-=======
-                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-700/50">
-                            <button
-                                type="button"
-                                onClick={handleAddContainer}
-                                className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-600 hover:border-brand-500 hover:bg-brand-500/5 focus:outline-none text-brand-400 font-semibold transition-all"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                             >
                                 <Plus size={20} />
                                 <span>Add Another Container</span>
@@ -740,9 +627,9 @@ const CreateContainer = () => {
 
                             <button
                                 type="submit"
-                                disabled={loading}
+                                disabled={loading || isExceedingLimits}
                                 className={`flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
-                                    ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
+                                    ${(loading || isExceedingLimits) ? 'bg-slate-600 cursor-not-allowed opacity-70' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
                                 `}
                             >
                                 {loading ? (

@@ -1,6 +1,7 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
+import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -14,8 +15,7 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        // Assign admin role if name is pablo (case insensitive for safety)
-        const role = name.toLowerCase() === 'pablo' ? 'admin' : 'user';
+        const role = 'user';
 
         const user = new User({ name, email, password, role });
         await user.save();
@@ -41,9 +41,28 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
-        res.json({ token, name: user.name, email: user.email, role: user.role });
+        res.json({
+            token,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            planType: user.planType,
+            limits: user.limits
+        });
     } catch (error) {
         res.status(500).json({ message: 'Error logging in', error: error.message });
+    }
+});
+
+router.get('/me', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('-password');
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+        res.json(user);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching user profile', error: error.message });
     }
 });
 

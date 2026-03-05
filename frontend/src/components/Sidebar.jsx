@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 
 const Sidebar = () => {
@@ -18,6 +18,7 @@ const Sidebar = () => {
         { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={20} /> },
         { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
         { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
+        { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={20} /> },
     ];
 
     if (role === 'admin') {

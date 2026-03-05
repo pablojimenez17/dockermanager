@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay } from 'lucide-react';
+import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -11,7 +11,10 @@ const ViewContainers = () => {
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
     const [selectedLogs, setSelectedLogs] = useState(null);
+    const [logSearchQuery, setLogSearchQuery] = useState('');
     const [activeTerminal, setActiveTerminal] = useState(null);
+    const [expandedContainers, setExpandedContainers] = useState({});
+    const [containerStats, setContainerStats] = useState({});
     const { addToast } = useToast();
 
     // We use a ref to hold the latest containers so socket closures can read it
@@ -122,6 +125,48 @@ const ViewContainers = () => {
         }
     };
 
+    const toggleExpand = async (container) => {
+        const isExpanded = expandedContainers[container._id];
+        setExpandedContainers(prev => ({ ...prev, [container._id]: !isExpanded }));
+
+        if (!isExpanded && container.state === 'running') {
+            try {
+                const token = localStorage.getItem('token');
+                const res = await axios.get(`http://localhost:5000/api/stats/${container._id}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setContainerStats(prev => ({ ...prev, [container._id]: res.data }));
+            } catch (err) {
+                console.error("Failed to fetch stats for", container.name);
+            }
+        }
+    };
+
+    const renderLogLine = (line, index) => {
+        if (logSearchQuery && !line.toLowerCase().includes(logSearchQuery.toLowerCase())) {
+            return null;
+        }
+
+        let textColorClass = 'text-slate-800 dark:text-slate-300';
+        const lowerLine = line.toLowerCase();
+
+        if (lowerLine.includes('error') || lowerLine.includes('exception') || lowerLine.includes('fail')) {
+            textColorClass = 'text-red-600 dark:text-red-400 font-semibold bg-red-500/10';
+        } else if (lowerLine.includes('warn')) {
+            textColorClass = 'text-yellow-600 dark:text-yellow-400 font-semibold bg-yellow-500/10';
+        } else if (lowerLine.includes('info')) {
+            textColorClass = 'text-blue-600 dark:text-blue-400';
+        } else if (lowerLine.includes('debug')) {
+            textColorClass = 'text-slate-500 dark:text-slate-500';
+        }
+
+        return (
+            <div key={index} className={`px-2 py-0.5 rounded ${textColorClass} break-words`}>
+                {line}
+            </div>
+        );
+    };
+
     return (
         <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 space-y-4 sm:space-y-0">
@@ -144,24 +189,7 @@ const ViewContainers = () => {
                         <RefreshCw size={24} className={refreshing ? 'animate-spin' : ''} />
                     </button>
                 </div>
-<<<<<<< HEAD
-=======
-                <div className="flex space-x-3">
-                    <button
-                        onClick={() => addToast('Test System', 'If you see this, Toast CSS works', 'success')}
-                        className="bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-xl transition-all font-bold"
-                    >
-                        Test Notification
-                    </button>
-                    <button
-                        onClick={fetchContainers}
-                        disabled={refreshing}
-                        className="bg-slate-800 hover:bg-slate-700 border border-slate-700 p-3 rounded-xl transition-all"
-                    >
-                        <RefreshCw size={24} className={`text-slate-300 ${refreshing ? 'animate-spin' : ''}`} />
-                    </button>
-                </div>
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+
             </div>
 
             {error && (
@@ -219,31 +247,92 @@ const ViewContainers = () => {
                                 </div>
                             </div>
 
-<<<<<<< HEAD
+                            {/* Expandable Details Section */}
+                            {expandedContainers[container._id] && (
+                                <div className="mt-4 mb-6 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] transition-all animate-in fade-in slide-in-from-top-4 duration-300">
+                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-200 dark:border-slate-700/50 pb-2">Advanced Instance Details</h4>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <p className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2"><Network size={14} className="mr-1.5" /> Networking</p>
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-600 dark:text-slate-400">Internal IP / v4:</span>
+                                                    <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300">
+                                                        {containerStats[container._id]?.ipv4Address || container.ipv4Address || 'N/A'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-sm">
+                                                    <span className="text-slate-600 dark:text-slate-400">Network Mode:</span>
+                                                    <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300">
+                                                        {containerStats[container._id]?.networkMode || container.networkMode || 'bridge'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <p className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2"><HardDrive size={14} className="mr-1.5" /> Hardware Usage</p>
+                                            {container.state === 'running' ? (
+                                                containerStats[container._id] ? (
+                                                    <div className="space-y-3">
+                                                        <div>
+                                                            <div className="flex justify-between items-center text-xs mb-1">
+                                                                <span className="text-slate-600 dark:text-slate-400">CPU</span>
+                                                                <span className="font-semibold text-indigo-600 dark:text-indigo-400">{containerStats[container._id].cpuPercent}%</span>
+                                                            </div>
+                                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                                                                <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${Math.min(containerStats[container._id].cpuPercent, 100)}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                        <div>
+                                                            <div className="flex justify-between items-center text-xs mb-1">
+                                                                <span className="text-slate-600 dark:text-slate-400">Memory</span>
+                                                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                                    {(containerStats[container._id].memUsage / 1024 / 1024).toFixed(1)} MB / {(containerStats[container._id].memLimit / 1024 / 1024).toFixed(0)} MB
+                                                                </span>
+                                                            </div>
+                                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
+                                                                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${containerStats[container._id].memPercent}%` }}></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-sm text-slate-500 flex items-center h-full">
+                                                        <RefreshCw className="animate-spin mr-2" size={14} /> Loading metrics...
+                                                    </div>
+                                                )
+                                            ) : (
+                                                <div className="text-sm text-slate-400 dark:text-slate-500 h-full flex items-center italic">
+                                                    Container is not running.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="flex flex-wrap gap-3 pt-6 border-t border-slate-200 dark:border-slate-700/50">
-=======
-                            <div className="flex items-center space-x-3 pt-6 border-t border-slate-700/50">
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                <button
+                                    onClick={() => toggleExpand(container)}
+                                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 rounded-xl transition-colors shrink-0"
+                                    title="View Details"
+                                >
+                                    {expandedContainers[container._id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                </button>
+
                                 {container.state === 'running' ? (
                                     <>
                                         <button
                                             onClick={() => handleAction(container._id, 'stop')}
-<<<<<<< HEAD
                                             className="flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-=======
-                                            className="flex-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         >
                                             <Square size={16} /> <span>Stop</span>
                                         </button>
 
                                         <button
                                             onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
-<<<<<<< HEAD
                                             className="flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-=======
-                                            className="flex-1 bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                         >
                                             <MonitorPlay size={16} /> <span>Console</span>
                                         </button>
@@ -251,11 +340,7 @@ const ViewContainers = () => {
                                 ) : (
                                     <button
                                         onClick={() => handleAction(container._id, 'start')}
-<<<<<<< HEAD
                                         className="flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-=======
-                                        className="flex-1 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                                     >
                                         <Play size={16} /> <span>Start</span>
                                     </button>
@@ -283,15 +368,26 @@ const ViewContainers = () => {
             {/* Logs Modal */}
             {selectedLogs && (
                 <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                            <h3 className="font-bold flex items-center text-lg text-slate-900 dark:text-white"><Terminal className="mr-2 text-brand-500 dark:text-brand-400" /> Logs: {selectedLogs.name}</h3>
-                            <button onClick={() => setSelectedLogs(null)} className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
-                                Close
-                            </button>
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh]">
+                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <h3 className="font-bold flex items-center text-lg text-slate-900 dark:text-white shrink-0">
+                                <Terminal className="mr-2 text-brand-500 dark:text-brand-400" /> Logs: {selectedLogs.name}
+                            </h3>
+                            <div className="flex items-center space-x-3 w-full sm:w-auto">
+                                <input
+                                    type="text"
+                                    placeholder="Filter logs..."
+                                    value={logSearchQuery}
+                                    onChange={(e) => setLogSearchQuery(e.target.value)}
+                                    className="w-full sm:w-64 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none dark:text-white transition-shadow"
+                                />
+                                <button onClick={() => { setSelectedLogs(null); setLogSearchQuery(''); }} className="shrink-0 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
+                                    Close
+                                </button>
+                            </div>
                         </div>
-                        <div className="p-6 overflow-y-auto flex-1 font-mono text-sm bg-slate-50 text-slate-800 dark:bg-transparent dark:text-green-400 whitespace-pre-wrap leading-relaxed">
-                            {selectedLogs.content || 'No logs available.'}
+                        <div className="p-4 overflow-y-auto flex-1 font-mono text-sm bg-slate-50 text-slate-800 dark:bg-[#0f172a] dark:text-slate-300 leading-relaxed">
+                            {selectedLogs.content ? selectedLogs.content.split('\n').map((line, i) => renderLogLine(line, i)) : 'No logs available.'}
                         </div>
                     </div>
                 </div>

@@ -1,7 +1,11 @@
 import express from 'express';
 import Docker from 'dockerode';
 import Container from '../models/Container.js';
+import User from '../models/User.js';
+import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
+import path from 'path';
+import fs from 'fs';
 
 const router = express.Router();
 // Use Dockerode connected to local socket
@@ -49,11 +53,50 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: 'A valid stack array is required' });
         }
 
-        // Create a custom bridge network for this stack deployment 
-        // if there's more than one container, so they can talk to each other
+        // ==========================================
+        // QUOTA VALIDATION
+        // ==========================================
+        const user = await User.findById(req.user.userId);
+        const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 };
+
+        // 1. Check Container Count Limits
+        const currentContainersDb = await Container.find({ userId: req.user.userId });
+        if (currentContainersDb.length + stack.length > limits.maxContainers) {
+            return res.status(403).json({
+                message: `Quota Exceeded: Your plan limits you to ${limits.maxContainers} containers. You currently have ${currentContainersDb.length} and are trying to add ${stack.length}.`
+            });
+        }
+
+        // 2. Assess requested RAM vs Limit
+        let requestedRamMb = 0;
+        stack.forEach(c => {
+            // If they don't specify, we assume 512MB default allocation per container for counting purposes
+            requestedRamMb += c.memory ? parseInt(c.memory) : 512;
+        });
+
+        // Sum current allocated RAM across running/existing containers
+        let currentAllocatedRamBytes = 0;
+        for (const c of currentContainersDb) {
+            try {
+                const info = await docker.getContainer(c.dockerId).inspect();
+                currentAllocatedRamBytes += info.HostConfig.Memory || 0;
+            } catch (e) {
+                // container might be missing, ignore
+            }
+        }
+
+        const currentAllocatedRamMb = currentAllocatedRamBytes / (1024 * 1024);
+        if (currentAllocatedRamMb + requestedRamMb > limits.maxRamMb) {
+            return res.status(403).json({
+                message: `Quota Exceeded: Your plan limits you to ${limits.maxRamMb} MB of RAM. You have ${currentAllocatedRamMb} MB allocated, and this deployment requires ${requestedRamMb} MB.`
+            });
+        }
+        // ==========================================
+
+        // Create a custom bridge network for this stack deployment
         let networkName = null;
         if (stack.length > 1) {
-            networkName = `stack_net_${Math.random().toString(36).substring(7)}`;
+            networkName = `stack_net_${Math.random().toString(36).substring(7)} `;
             await docker.createNetwork({
                 Name: networkName,
                 Driver: 'bridge'
@@ -62,16 +105,12 @@ router.post('/', async (req, res) => {
 
         const createdRecords = [];
 
-        console.log(`[DEBUG] Attempting to create stack of length ${stack.length}`);
+        console.log(`[DEBUG] Attempting to create stack of length ${stack.length} `);
 
         // Deploy sequentially to respect implicit dependencies 
         for (const config of stack) {
-            console.log(`[DEBUG] Processing config for image: ${config.image}`);
-<<<<<<< HEAD
+            console.log(`[DEBUG] Processing config for image: ${config.image} `);
             const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address } = config;
-=======
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode } = config;
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 
             // Ensure image exists or pull it
             try {
@@ -93,13 +132,8 @@ router.post('/', async (req, res) => {
                 });
             }
 
-<<<<<<< HEAD
             // Apply network settings
             let safeNetworkMode = networkMode || 'bridge';
-=======
-            // Secure network mode and apply stack bridge if applicable
-            let safeNetworkMode = (networkMode === 'bridge' || networkMode === 'none') ? networkMode : 'bridge';
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
 
             // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
             if (networkName && safeNetworkMode === 'bridge') {
@@ -123,7 +157,6 @@ router.post('/', async (req, res) => {
                 HostConfig: baseHostConfig
             };
 
-<<<<<<< HEAD
             // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
             if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
                 containerConfig.NetworkingConfig = {
@@ -136,10 +169,6 @@ router.post('/', async (req, res) => {
                     }
                 };
             }
-
-
-=======
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
             // WordPress Template specific environment injection (if they used the preset)
             // If the user deployed WordPress and MySQL together via the preset:
             if (image.includes('wordpress')) {
@@ -174,7 +203,6 @@ router.post('/', async (req, res) => {
 
             console.log(`[DEBUG] Pulling ${image}...`);
             // Create and start container
-<<<<<<< HEAD
             let container;
             try {
                 container = await docker.createContainer(containerConfig);
@@ -206,30 +234,19 @@ router.post('/', async (req, res) => {
                 }
                 throw err;
             }
-=======
-            const container = await docker.createContainer(containerConfig);
-            console.log(`[DEBUG] Container created ID: ${container.id}`);
-
-            await container.start();
-            console.log(`[DEBUG] Container ${container.id} started successfully`);
-
-            // Save to database
-            const dbContainer = new Container({
-                name,
-                image,
-                dockerId: container.id,
-                userId: req.user.userId,
-                status: 'running'
-            });
-
-            await dbContainer.save();
-            createdRecords.push(dbContainer);
-            console.log(`[DEBUG] Record saved to DB for ${name}`);
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
         }
 
         console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
         res.status(201).json(createdRecords);
+
+        // Audit log
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'CREATE_CONTAINER',
+            resourceName: req.body.stackName || 'Custom Stack',
+            details: `Created ${createdRecords.length} containers`
+        });
+
     } catch (error) {
         console.error(`[ERROR] API Exception during stack creation:`, error);
         res.status(500).json({ message: 'Error creating stack', error: error.message, stack: error.stack });
@@ -248,6 +265,13 @@ router.post('/:id/stop', async (req, res) => {
         dbContainer.status = 'stopped';
         await dbContainer.save();
 
+        // Audit Log
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'STOP_CONTAINER',
+            resourceName: dbContainer.name
+        });
+
         res.json({ message: 'Container stopped successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error stopping container', error: error.message });
@@ -265,6 +289,13 @@ router.post('/:id/start', async (req, res) => {
 
         dbContainer.status = 'running';
         await dbContainer.save();
+
+        // Audit Log
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'START_CONTAINER',
+            resourceName: dbContainer.name
+        });
 
         res.json({ message: 'Container started successfully' });
     } catch (error) {
@@ -298,6 +329,13 @@ router.delete('/:id', async (req, res) => {
 
         await Container.deleteOne({ _id: req.params.id });
 
+        // Audit Log
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'DELETE_CONTAINER',
+            resourceName: dbContainer.name
+        });
+
         res.json({ message: 'Container removed successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error removing container', error: error.message });
@@ -305,3 +343,4 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+

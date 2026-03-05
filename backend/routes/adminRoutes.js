@@ -2,6 +2,7 @@ import express from 'express';
 import Docker from 'dockerode';
 import User from '../models/User.js';
 import Container from '../models/Container.js';
+import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
@@ -76,9 +77,30 @@ router.delete('/containers/:id', async (req, res) => {
 
         await Container.deleteOne({ _id: req.params.id });
 
+        // Audit Log
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'FORCE_DELETE_CONTAINER',
+            resourceName: dbContainer.name,
+            details: `Admin forcefully removed container owned by ${dbContainer.userId}`
+        });
+
         res.json({ message: 'Container forcibly removed by admin' });
     } catch (error) {
         res.status(500).json({ message: 'Error removing container', error: error.message });
+    }
+});
+
+// Get audit logs
+router.get('/audit', async (req, res) => {
+    try {
+        const logs = await AuditLog.find()
+            .populate('userId', 'name email')
+            .sort({ createdAt: -1 })
+            .limit(100);
+        res.json(logs);
+    } catch (error) {
+        res.status(500).json({ message: 'Error fetching audit logs', error: error.message });
     }
 });
 

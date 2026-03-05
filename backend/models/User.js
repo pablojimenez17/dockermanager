@@ -22,6 +22,19 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['user', 'admin'],
         default: 'user'
+    },
+    planType: {
+        type: String,
+        enum: ['free', 'pro', 'enterprise'],
+        default: 'free'
+    },
+    planExpiresAt: {
+        type: Date
+    },
+    limits: {
+        maxContainers: { type: Number, default: 2 },
+        maxRamMb: { type: Number, default: 1024 },
+        maxCpuCores: { type: Number, default: 1 }
     }
 }, { timestamps: true });
 

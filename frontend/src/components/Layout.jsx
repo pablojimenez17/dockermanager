@@ -6,17 +6,10 @@ import { ToastProvider } from './ToastContext';
 const Layout = () => {
     return (
         <ToastProvider>
-<<<<<<< HEAD
             <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white transition-colors duration-200 relative w-full">
                 <Sidebar />
                 <main className="flex-1 flex flex-col h-screen overflow-y-auto overflow-x-hidden bg-slate-50 dark:bg-slate-900 transition-colors duration-200 relative">
                     <div className="container mx-auto max-w-7xl pt-4 md:pt-0">
-=======
-            <div className="flex relative h-screen bg-slate-900">
-                <Sidebar />
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-slate-900">
-                    <div className="container mx-auto max-w-7xl">
->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
                         <Outlet />
                     </div>
                 </main>

@@ -6,6 +6,7 @@ import { io } from 'socket.io-client';
 
 const Dashboard = () => {
     const [stats, setStats] = useState({ total: 0, running: 0, stopped: 0 });
+    const [metrics, setMetrics] = useState({ cpu: 0, mem: 0, memLimit: 0 });
     const [loading, setLoading] = useState(true);
     const name = localStorage.getItem('name') || 'User';
 
@@ -17,12 +18,37 @@ const Dashboard = () => {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 const containers = res.data;
-                const running = containers.filter(c => c.state === 'running').length;
+                const running = containers.filter(c => c.state === 'running');
+
                 setStats({
                     total: containers.length,
-                    running,
-                    stopped: containers.length - running
+                    running: running.length,
+                    stopped: containers.length - running.length
                 });
+
+                // Fetch metrics for running containers
+                let totalCpu = 0;
+                let totalMem = 0;
+                let totalMemLimit = 0;
+
+                if (running.length > 0) {
+                    const metricsPromises = running.map(c =>
+                        axios.get(`http://localhost:5000/api/stats/${c._id}`, {
+                            headers: { Authorization: `Bearer ${token}` }
+                        }).catch(() => null)
+                    );
+                    const metricsResults = await Promise.all(metricsPromises);
+                    metricsResults.forEach(m => {
+                        if (m && m.data) {
+                            totalCpu += parseFloat(m.data.cpuPercent) || 0;
+                            totalMem += parseFloat(m.data.memUsage) || 0;
+                            totalMemLimit += parseFloat(m.data.memLimit) || 0;
+                        }
+                    });
+                }
+
+                setMetrics({ cpu: totalCpu.toFixed(1), mem: totalMem, memLimit: totalMemLimit });
+
             } catch (err) {
                 console.error('Failed to parse dashboard stats', err);
             } finally {
@@ -117,6 +143,41 @@ const Dashboard = () => {
                             <ArrowRight size={20} />
                         </div>
                     </Link>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 md:p-8 shadow-xl mt-8">
+                <div className="flex items-center space-x-4 mb-6">
+                    <div className="p-3 bg-indigo-500/10 rounded-xl text-indigo-600 dark:text-indigo-400 hidden sm:block">
+                        <Activity size={24} />
+                    </div>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Active Resource Usage</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center"><Cpu className="mr-2" size={18} /> CPU Usage</h4>
+                            <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{metrics.cpu}%</span>
+                        </div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 mb-2 overflow-hidden">
+                            <div className="bg-indigo-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${Math.min(metrics.cpu, 100)}%` }}></div>
+                        </div>
+                        <p className="text-xs text-slate-500 text-right">Aggregated over running instances</p>
+                    </div>
+
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h4 className="font-semibold text-slate-700 dark:text-slate-300 flex items-center"><Server className="mr-2" size={18} /> Memory Usage</h4>
+                            <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                                {metrics.mem > 0 ? (metrics.mem / 1024 / 1024).toFixed(0) : 0} MB
+                            </span>
+                        </div>
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-3 mb-2 overflow-hidden">
+                            <div className="bg-emerald-500 h-3 rounded-full transition-all duration-1000" style={{ width: `${metrics.memLimit > 0 ? Math.min((metrics.mem / metrics.memLimit) * 100, 100) : 0}%` }}></div>
+                        </div>
+                        <p className="text-xs text-slate-500 text-right">Of system limits</p>
+                    </div>
                 </div>
             </div>
         </div>

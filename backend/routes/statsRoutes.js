@@ -18,8 +18,25 @@ router.get('/:id', async (req, res) => {
 
         const container = docker.getContainer(dbContainer.dockerId);
 
-        // Get single stats snapshot (stream: false)
-        const stats = await container.stats({ stream: false });
+        // Get single stats snapshot (stream: false) and inspect data
+        const [stats, info] = await Promise.all([
+            container.stats({ stream: false }),
+            container.inspect()
+        ]);
+
+        let networkMode = info.HostConfig.NetworkMode;
+        let ipv4Address = 'N/A';
+
+        if (info.NetworkSettings && info.NetworkSettings.Networks) {
+            const networks = info.NetworkSettings.Networks;
+            const netNames = Object.keys(networks);
+            if (netNames.length > 0) {
+                // Get the first network's IP address
+                ipv4Address = networks[netNames[0]].IPAddress || ipv4Address;
+                // If the mode is default 'default', use the custom network's name instead
+                if (networkMode === 'default' || !networkMode) networkMode = netNames[0];
+            }
+        }
 
         // Calculate simple percentages
         // CPU calculation can be complex depending on OS; simplified here
@@ -46,6 +63,8 @@ router.get('/:id', async (req, res) => {
             memUsage: memUsage,
             memLimit: memLimit,
             memPercent: memPercent.toFixed(2),
+            networkMode: networkMode,
+            ipv4Address: ipv4Address,
             raw: stats
         });
     } catch (error) {
