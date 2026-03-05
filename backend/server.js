@@ -7,6 +7,7 @@ import containerRoutes from './routes/containerRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
+import networkRoutes from './routes/networkRoutes.js';
 import { setupSockets } from './websockets.js';
 import { createServer } from 'http';
 
@@ -28,6 +29,7 @@ app.use('/api/containers', containerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
+app.use('/api/networks', networkRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')

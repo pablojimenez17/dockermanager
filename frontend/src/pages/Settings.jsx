@@ -25,10 +25,10 @@ const Settings = () => {
     };
 
     return (
-        <div className="p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">
+        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">
             <div className="mb-10">
-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Settings</h1>
-                <p className="text-slate-600 dark:text-slate-400 text-lg">Manage your account preferences and application layout.</p>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Settings</h1>
+                <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Manage your account preferences and application layout.</p>
             </div>
 
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">

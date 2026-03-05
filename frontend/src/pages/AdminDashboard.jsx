@@ -123,12 +123,12 @@ const AdminDashboard = () => {
     );
 
     return (
-        <div className="p-8 pb-20 text-slate-900 dark:text-white max-w-6xl mx-auto">
-            <div className="mb-10 flex items-center space-x-4">
-                <ShieldAlert className="text-purple-600 dark:text-purple-500" size={40} />
+        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-6xl mx-auto">
+            <div className="mb-10 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <ShieldAlert className="text-purple-600 dark:text-purple-500 shrink-0" size={40} />
                 <div>
-                    <h1 className="text-4xl font-extrabold tracking-tight mb-2">Admin Control Panel</h1>
-                    <p className="text-slate-600 dark:text-slate-400 text-lg">System-wide overview of users and container resources.</p>
+                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Admin Control Panel</h1>
+                    <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">System-wide overview of users and container resources.</p>
                 </div>
             </div>
 
@@ -172,13 +172,13 @@ const AdminDashboard = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-900 dark:text-white">
                     <Server className="text-brand-500 dark:text-brand-400" />
                     <span>Global Container Instances ({containers.length})</span>
                 </h3>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
+                    <table className="w-full text-left text-sm whitespace-nowrap md:whitespace-normal min-w-[600px]">
                         <thead>
                             <tr className="text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50">
                                 <th className="p-4 rounded-tl-xl">Container</th>

@@ -46,13 +46,13 @@ const Dashboard = () => {
     }, []);
 
     return (
-        <div className="p-8 pb-20 text-slate-900 dark:text-white transition-colors duration-200">
+        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white transition-colors duration-200">
             <div className="mb-10">
-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Welcome back, {name}</h1>
-                <p className="text-slate-500 dark:text-slate-400 text-lg">Here's what's happening with your deployments today.</p>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Welcome back, {name}</h1>
+                <p className="text-slate-500 dark:text-slate-400 text-base sm:text-lg">Here's what's happening with your deployments today.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl shadow-lg relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:scale-110 transition-transform duration-500">
                         <Server size={64} />
@@ -90,14 +90,14 @@ const Dashboard = () => {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 md:p-8 shadow-xl">
                 <div className="flex items-center space-x-4 mb-6">
-                    <div className="p-3 bg-brand-500/10 rounded-xl text-brand-600 dark:text-brand-400">
+                    <div className="p-3 bg-brand-500/10 rounded-xl text-brand-600 dark:text-brand-400 hidden sm:block">
                         <Navigation size={24} />
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Quick Actions</h2>
+                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Quick Actions</h2>
                 </div>
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Link to="/app/create" className="p-6 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl hover:border-brand-500/50 hover:bg-brand-50 dark:hover:bg-brand-500/5 transition-all group flex items-center justify-between">
                         <div>
                             <h4 className="font-semibold text-lg text-slate-900 dark:text-white mb-1 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">Start a New Container</h4>

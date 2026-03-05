@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 
 const Sidebar = () => {
@@ -17,6 +17,7 @@ const Sidebar = () => {
         { name: 'Dashboard', path: '/app', icon: <LayoutDashboard size={20} /> },
         { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={20} /> },
         { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
+        { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
     ];
 
     if (role === 'admin') {
@@ -26,10 +27,10 @@ const Sidebar = () => {
     navItems.push({ name: 'Settings', path: '/app/settings', icon: <Settings size={20} /> });
 
     return (
-        <div className="w-64 bg-white dark:bg-slate-800 h-full flex flex-col border-r border-slate-200 dark:border-slate-700 shadow-xl transition-colors duration-200">
+        <div className="w-64 bg-white dark:bg-slate-800 h-full flex flex-col border-r border-slate-200 dark:border-slate-700 shadow-xl transition-colors duration-200 shrink-0 overflow-y-auto">
             <div className="p-6 flex items-center space-x-3">
-                <Server className="text-brand-500 dark:text-brand-400" size={28} />
-                <span className="text-xl font-bold text-slate-800 dark:text-white tracking-wide">Docker Manager</span>
+                <Server className="text-brand-500 dark:text-brand-400 shrink-0" size={28} />
+                <span className="text-xl font-bold text-slate-800 dark:text-white whitespace-nowrap">Docker Manager</span>
             </div>
 
             <nav className="flex-1 px-4 space-y-2 mt-4">
@@ -51,7 +52,7 @@ const Sidebar = () => {
                 ))}
             </nav>
 
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+            <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2 shrink-0 border-b">
                 <button
                     onClick={toggleTheme}
                     className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 top hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200"
@@ -72,3 +73,4 @@ const Sidebar = () => {
 };
 
 export default Sidebar;
+

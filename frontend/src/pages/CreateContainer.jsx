@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -54,6 +54,7 @@ const getEmptyContainer = () => ({
     cpu: '1',
     restartPolicy: 'no',
     networkMode: 'bridge',
+    ipv4Address: '',
     envVars: [{ key: '', value: '' }],
     showAdvanced: false
 });
@@ -64,8 +65,25 @@ const CreateContainer = () => {
     const [activePreset, setActivePreset] = useState('custom');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [availableNetworks, setAvailableNetworks] = useState([]);
 
     const navigate = useNavigate();
+
+    useEffect(() => {
+        const fetchNetworks = async () => {
+            try {
+                const token = localStorage.getItem('token');
+                if (!token) return;
+                const res = await axios.get('http://localhost:5000/api/networks', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setAvailableNetworks(res.data);
+            } catch (err) {
+                console.error("Failed to fetch networks:", err);
+            }
+        };
+        fetchNetworks();
+    }, []);
 
     const handleSelectPredefined = (preset) => {
         setActivePreset(preset.id);
@@ -204,7 +222,8 @@ const CreateContainer = () => {
                     memory: c.memory,
                     cpu: c.cpu,
                     restartPolicy: c.restartPolicy,
-                    networkMode: c.networkMode
+                    networkMode: c.networkMode,
+                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
                 };
             });
 
@@ -216,19 +235,21 @@ const CreateContainer = () => {
 
             navigate('/app/containers');
         } catch (err) {
-            setError(err.response?.data?.message || 'Error deploying stack');
+            const specificError = err.response?.data?.error;
+            const generalMessage = err.response?.data?.message;
+            setError(specificError || generalMessage || 'Error deploying stack');
             setLoading(false);
         }
     };
 
     return (
-        <div className="p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
+        <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
             <div className="mb-10">
-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
-                <p className="text-slate-600 dark:text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
+                <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            <div className="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-10">
 
                 {/* Left Side: Presets (Moved to left for natural flow) */}
                 <div className="lg:col-span-4 space-y-4">
@@ -418,8 +439,28 @@ const CreateContainer = () => {
                                                         >
                                                             <option value="bridge">Bridge (Secure)</option>
                                                             <option value="none">None (Isolated)</option>
+                                                            {availableNetworks.filter(n => !['bridge', 'host', 'none'].includes(n.Name)).map(net => (
+                                                                <option key={net.Id} value={net.Name}>Custom: {net.Name}</option>
+                                                            ))}
                                                         </select>
                                                     </div>
+
+                                                    {c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' && (
+                                                        <div>
+                                                            <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                                <Network size={16} className="text-slate-500 dark:text-slate-400" />
+                                                                <span>IPv4 Address (Optional)</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={c.ipv4Address || ''}
+                                                                onChange={(e) => updateContainer(c.id, 'ipv4Address', e.target.value)}
+                                                                placeholder="e.g. 172.18.0.22"
+                                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Leave empty to auto-assign from subnet.</p>
+                                                        </div>
+                                                    )}
                                                 </div>
 
                                                 {/* Environment Variables Section */}
@@ -450,7 +491,7 @@ const CreateContainer = () => {
 
                                                     <div className="space-y-3 mb-3">
                                                         {c.envVars.map((env, eIdx) => (
-                                                            <div key={eIdx} className="flex items-center space-x-3">
+                                                            <div key={eIdx} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
                                                                 <input
                                                                     type="text"
                                                                     placeholder="e.g. NODE_ENV"

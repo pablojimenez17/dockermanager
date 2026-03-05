@@ -25,11 +25,16 @@ router.get('/', async (req, res) => {
                     ports: info.NetworkSettings.Ports
                 };
             } catch (err) {
+                if (err.statusCode === 404) {
+                    // Container was removed outside the app, silently clean up DB
+                    await Container.deleteOne({ _id: c._id });
+                    return null;
+                }
                 return { ...c.toObject(), state: 'error/not_found' };
             }
         }));
 
-        res.json(enrichedContainers);
+        res.json(enrichedContainers.filter(c => c !== null));
     } catch (error) {
         res.status(500).json({ message: 'Error retrieving containers', error: error.message });
     }
@@ -62,7 +67,7 @@ router.post('/', async (req, res) => {
         // Deploy sequentially to respect implicit dependencies 
         for (const config of stack) {
             console.log(`[DEBUG] Processing config for image: ${config.image}`);
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode } = config;
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address } = config;
 
             // Ensure image exists or pull it
             try {
@@ -84,8 +89,8 @@ router.post('/', async (req, res) => {
                 });
             }
 
-            // Secure network mode and apply stack bridge if applicable
-            let safeNetworkMode = (networkMode === 'bridge' || networkMode === 'none') ? networkMode : 'bridge';
+            // Apply network settings
+            let safeNetworkMode = networkMode || 'bridge';
 
             // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
             if (networkName && safeNetworkMode === 'bridge') {
@@ -108,6 +113,20 @@ router.post('/', async (req, res) => {
                 ExposedPorts,
                 HostConfig: baseHostConfig
             };
+
+            // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
+            if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
+                containerConfig.NetworkingConfig = {
+                    EndpointsConfig: {
+                        [safeNetworkMode]: {
+                            IPAMConfig: {
+                                IPv4Address: ipv4Address
+                            }
+                        }
+                    }
+                };
+            }
+
 
             // WordPress Template specific environment injection (if they used the preset)
             // If the user deployed WordPress and MySQL together via the preset:
@@ -143,24 +162,37 @@ router.post('/', async (req, res) => {
 
             console.log(`[DEBUG] Pulling ${image}...`);
             // Create and start container
-            const container = await docker.createContainer(containerConfig);
-            console.log(`[DEBUG] Container created ID: ${container.id}`);
+            let container;
+            try {
+                container = await docker.createContainer(containerConfig);
+                console.log(`[DEBUG] Container created ID: ${container.id}`);
 
-            await container.start();
-            console.log(`[DEBUG] Container ${container.id} started successfully`);
+                await container.start();
+                console.log(`[DEBUG] Container ${container.id} started successfully`);
 
-            // Save to database
-            const dbContainer = new Container({
-                name,
-                image,
-                dockerId: container.id,
-                userId: req.user.userId,
-                status: 'running'
-            });
+                // Save to database
+                const dbContainer = new Container({
+                    name,
+                    image,
+                    dockerId: container.id,
+                    userId: req.user.userId,
+                    status: 'running'
+                });
 
-            await dbContainer.save();
-            createdRecords.push(dbContainer);
-            console.log(`[DEBUG] Record saved to DB for ${name}`);
+                await dbContainer.save();
+                createdRecords.push(dbContainer);
+                console.log(`[DEBUG] Record saved to DB for ${name}`);
+            } catch (err) {
+                if (container) {
+                    try {
+                        console.log(`[DEBUG] Cleaning up orphaned container ${container.id} after failure...`);
+                        await container.remove({ force: true });
+                    } catch (cleanupErr) {
+                        console.error(`[ERROR] Failed to clean up orphaned container:`, cleanupErr.message);
+                    }
+                }
+                throw err;
+            }
         }
 
         console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
@@ -216,11 +248,20 @@ router.delete('/:id', async (req, res) => {
         const container = docker.getContainer(dbContainer.dockerId);
 
         try {
-            await container.stop();
-        } catch (e) {
-            // ignore if already stopped
+            await container.inspect(); // Check if exists first
+
+            try {
+                await container.stop();
+            } catch (e) {
+                // ignore if already stopped
+            }
+            await container.remove();
+        } catch (err) {
+            // If the container is already gone from Docker (404), that's fine, we still want to remove our DB record.
+            if (err.statusCode !== 404) {
+                throw err;
+            }
         }
-        await container.remove();
 
         await Container.deleteOne({ _id: req.params.id });
 
