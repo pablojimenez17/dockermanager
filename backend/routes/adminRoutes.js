@@ -36,7 +36,7 @@ router.get('/users', async (req, res) => {
 router.get('/containers', async (req, res) => {
     try {
         // Find containers with populated user details
-        const dbContainers = await Container.find().populate('userId', 'username');
+        const dbContainers = await Container.find().populate('userId', 'name email');
 
         // Enrich from Docker directly as well
         const enrichedContainers = await Promise.all(dbContainers.map(async (c) => {
@@ -47,10 +47,10 @@ router.get('/containers', async (req, res) => {
                     ...c.toObject(),
                     state: info.State.Status,
                     systemPorts: info.NetworkSettings.Ports,
-                    owner: c.userId?.username || 'Unknown'
+                    owner: c.userId?.name || 'Unknown'
                 };
             } catch (err) {
-                return { ...c.toObject(), state: 'error/not_found', owner: c.userId?.username || 'Unknown' };
+                return { ...c.toObject(), state: 'error/not_found', owner: c.userId?.name || 'Unknown' };
             }
         }));
 

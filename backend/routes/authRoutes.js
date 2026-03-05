@@ -6,18 +6,18 @@ const router = express.Router();
 
 router.post('/register', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { name, email, password } = req.body;
 
         // Check if user exists
-        const existingUser = await User.findOne({ username });
+        const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        // Assign admin role if username is pablo (case insensitive for safety)
-        const role = username.toLowerCase() === 'pablo' ? 'admin' : 'user';
+        // Assign admin role if name is pablo (case insensitive for safety)
+        const role = name.toLowerCase() === 'pablo' ? 'admin' : 'user';
 
-        const user = new User({ username, password, role });
+        const user = new User({ name, email, password, role });
         await user.save();
 
         res.status(201).json({ message: 'User created successfully' });
@@ -28,9 +28,9 @@ router.post('/register', async (req, res) => {
 
 router.post('/login', async (req, res) => {
     try {
-        const { username, password } = req.body;
+        const { email, password } = req.body;
 
-        const user = await User.findOne({ username });
+        const user = await User.findOne({ email });
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -41,7 +41,7 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
-        res.json({ token, username: user.username, role: user.role });
+        res.json({ token, name: user.name, email: user.email, role: user.role });
     } catch (error) {
         res.status(500).json({ message: 'Error logging in', error: error.message });
     }
