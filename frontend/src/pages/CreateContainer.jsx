@@ -58,14 +58,19 @@ const getEmptyContainer = () => ({
     id: crypto.randomUUID(),
     name: '',
     image: '',
+    replicas: 1,
     portBinding: '',
     memory: '512',
     cpu: '1',
     restartPolicy: 'no',
-    networkMode: 'bridge',
     ipv4Address: '',
-    envVars: [{ key: '', value: '' }],
-    showAdvanced: false
+    envVars: [{ key: '', value: '', type: 'raw' }],
+    showAdvanced: false,
+    exposeDomain: false,
+    domain: '',
+    domainPort: '',
+    volumeName: '',
+    volumeMountPath: ''
 });
 
 const CreateContainer = () => {
@@ -75,8 +80,12 @@ const CreateContainer = () => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [availableNetworks, setAvailableNetworks] = useState([]);
+    const [availableVolumes, setAvailableVolumes] = useState([]);
+    const [availableSecrets, setAvailableSecrets] = useState([]);
     const [limits, setLimits] = useState({ maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
     const [currentContainerCount, setCurrentContainerCount] = useState(0);
+    const [currentRamMb, setCurrentRamMb] = useState(0);
+    const [currentCpu, setCurrentCpu] = useState(0);
 
     const navigate = useNavigate();
 
@@ -85,14 +94,29 @@ const CreateContainer = () => {
             try {
                 const token = localStorage.getItem('token');
                 if (!token) return;
-                const [netRes, meRes, myContainersRes] = await Promise.all([
+                const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
                     axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
                     axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } })
+                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get('http://localhost:5000/api/volumes', { headers: { Authorization: `Bearer ${token}` } }),
+                    axios.get('http://localhost:5000/api/secrets', { headers: { Authorization: `Bearer ${token}` } })
                 ]);
                 setAvailableNetworks(netRes.data);
+                setAvailableVolumes(volRes.data || []);
+                setAvailableSecrets(secRes.data || []);
                 if (meRes.data.limits) setLimits(meRes.data.limits);
                 setCurrentContainerCount(myContainersRes.data.length);
+
+                let totalRam = 0;
+                let totalCpu = 0;
+                myContainersRes.data.forEach(c => {
+                    if (c.hostConfig) {
+                        totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
+                        totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
+                    }
+                });
+                setCurrentRamMb(Math.round(totalRam));
+                setCurrentCpu(Math.round(totalCpu * 10) / 10);
             } catch (err) {
                 console.error("Failed to fetch context:", err);
             }
@@ -185,7 +209,7 @@ const CreateContainer = () => {
     const addEnvVar = (containerId) => {
         setContainers(containers.map(c => {
             if (c.id === containerId) {
-                return { ...c, envVars: [...c.envVars, { key: '', value: '' }] };
+                return { ...c, envVars: [...c.envVars, { key: '', value: '', type: 'raw' }] };
             }
             return c;
         }));
@@ -196,7 +220,7 @@ const CreateContainer = () => {
             if (c.id === containerId) {
                 const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
                 // Ensure at least one empty box
-                if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
+                if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '', type: 'raw' });
                 return { ...c, envVars: newEnvVars };
             }
             return c;
@@ -210,11 +234,11 @@ const CreateContainer = () => {
                 // Filter out any keys that belong to other known presets
                 const existingValid = c.envVars.filter(env => env.key.trim() !== '' && !allPresetKeys.has(env.key));
                 const existingKeys = new Set(existingValid.map(env => env.key));
-                const newVars = suggestedVars.filter(v => !existingKeys.has(v.key));
+                const newVars = suggestedVars.filter(v => !existingKeys.has(v.key)).map(v => ({ ...v, type: 'raw' }));
 
                 const mergedVars = [...existingValid, ...newVars];
                 if (mergedVars.length === 0 || mergedVars[mergedVars.length - 1].key !== '') {
-                    mergedVars.push({ key: '', value: '' });
+                    mergedVars.push({ key: '', value: '', type: 'raw' });
                 }
                 return { ...c, envVars: mergedVars };
             }
@@ -232,21 +256,26 @@ const CreateContainer = () => {
             const token = localStorage.getItem('token');
             // Format payload
             const payload = containers.map(c => {
-                // Filter out empty EnvVars and format as ["KEY=VALUE"]
+                // Filter out empty EnvVars and format as ["KEY=VALUE"] or ["KEY={{SECRET:name}}"]
                 const validEnvVars = c.envVars
                     .filter(env => env.key.trim() !== '')
-                    .map(env => `${env.key.trim()}=${env.value.trim()}`);
+                    .map(env => env.type === 'secret' ? `${env.key.trim()}={{SECRET:${env.value.trim()}}}` : `${env.key.trim()}=${env.value.trim()}`);
 
                 return {
                     name: c.name,
                     image: c.image,
+                    replicas: c.replicas ? parseInt(c.replicas) : 1,
                     ports: c.portBinding ? [c.portBinding] : [],
                     env: validEnvVars,
                     memory: c.memory,
                     cpu: c.cpu,
                     restartPolicy: c.restartPolicy,
                     networkMode: c.networkMode,
-                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
+                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined,
+                    domain: c.exposeDomain ? c.domain : undefined,
+                    domainPort: c.exposeDomain ? c.domainPort : undefined,
+                    volumeName: c.volumeName && c.volumeMountPath ? c.volumeName : undefined,
+                    volumeMountPath: c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined
                 };
             });
 
@@ -271,8 +300,8 @@ const CreateContainer = () => {
     const requestedCpu = containers.reduce((acc, curr) => acc + (curr.cpu ? parseFloat(curr.cpu) : 1), 0);
 
     const isExceedingLimits = (currentContainerCount + requestedContainers > limits.maxContainers) ||
-        (requestedRamMb > limits.maxRamMb) ||
-        (requestedCpu > limits.maxCpuCores);
+        (currentRamMb + requestedRamMb > limits.maxRamMb) ||
+        (currentCpu + requestedCpu > limits.maxCpuCores);
 
     return (
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
@@ -342,41 +371,41 @@ const CreateContainer = () => {
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-slate-500">Containers</span>
-                                        <span className={`font-bold ${currentContainerCount + requestedContainers > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {currentContainerCount + requestedContainers} / {limits.maxContainers}
+                                        <span className="text-slate-500">Current Containers</span>
+                                        <span className={`font-bold ${currentContainerCount > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {currentContainerCount} / {limits.maxContainers}
                                         </span>
                                     </div>
                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
-                                        <div className={`h-1.5 rounded-full ${currentContainerCount + requestedContainers > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(((currentContainerCount + requestedContainers) / limits.maxContainers) * 100, 100)}%` }}></div>
+                                        <div className={`h-1.5 rounded-full ${currentContainerCount > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min((currentContainerCount / limits.maxContainers) * 100, 100)}%` }}></div>
                                     </div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-slate-500">Est. RAM</span>
-                                        <span className={`font-bold ${requestedRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {requestedRamMb}MB / {limits.maxRamMb}MB
+                                        <span className="text-slate-500">Current RAM Use</span>
+                                        <span className={`font-bold ${currentRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {currentRamMb}MB / {limits.maxRamMb}MB
                                         </span>
                                     </div>
                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
-                                        <div className={`h-1.5 rounded-full ${requestedRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((requestedRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
+                                        <div className={`h-1.5 rounded-full ${currentRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((currentRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
                                     </div>
                                 </div>
                                 <div>
                                     <div className="flex justify-between text-xs mb-1">
-                                        <span className="text-slate-500">Est. CPU</span>
-                                        <span className={`font-bold ${requestedCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                            {requestedCpu} / {limits.maxCpuCores} vCPU
+                                        <span className="text-slate-500">Current CPU Use</span>
+                                        <span className={`font-bold ${currentCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+                                            {currentCpu} / {limits.maxCpuCores} vCPU
                                         </span>
                                     </div>
                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
-                                        <div className={`h-1.5 rounded-full ${requestedCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((requestedCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
+                                        <div className={`h-1.5 rounded-full ${currentCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((currentCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
                                     </div>
                                 </div>
                             </div>
                             {isExceedingLimits && (
                                 <p className="text-xs text-red-500 mt-4 flex items-center">
-                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! You must upgrade your plan or reduce the resources.
+                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! Stack requests {requestedContainers} containers, {requestedRamMb}MB RAM, and {requestedCpu} vCPU which pushes you over your plan.
                                 </p>
                             )}
                         </div>
@@ -431,6 +460,24 @@ const CreateContainer = () => {
                                     </div>
 
                                     <div className="mb-6">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center">
+                                            Replicas (High Availability)
+                                            <span className="ml-2 text-xs bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">Auto Load-Balanced</span>
+                                        </label>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Traefik will distribute incoming traffic across all instances automatically.</p>
+                                        <div className="relative md:w-1/2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max="10"
+                                                value={c.replicas || 1}
+                                                onChange={(e) => updateContainer(c.id, 'replicas', e.target.value)}
+                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-bold transition-shadow"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-6">
                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
                                         <input
                                             type="text"
@@ -439,6 +486,55 @@ const CreateContainer = () => {
                                             placeholder="Host_Port:Container_Port (e.g., 8080:80)"
                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
                                         />
+                                    </div>
+
+                                    {/* Domain Exposer */}
+                                    <div className="mb-6 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-5">
+                                        <div className="flex items-center justify-between mb-4">
+                                            <div className="flex items-center space-x-3 text-purple-700 dark:text-purple-300">
+                                                <Globe size={20} />
+                                                <div>
+                                                    <h5 className="font-bold text-sm">Expose to Internet (Traefik Router)</h5>
+                                                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">Attach a custom domain to this container automatically.</p>
+                                                </div>
+                                            </div>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={c.exposeDomain || false}
+                                                    onChange={(e) => updateContainer(c.id, 'exposeDomain', e.target.checked)}
+                                                    className="sr-only peer"
+                                                />
+                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600"></div>
+                                            </label>
+                                        </div>
+
+                                        {c.exposeDomain && (
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-purple-200/50 dark:border-purple-800/50 animate-fade-in text-slate-900 dark:text-white">
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1.5">Custom Domain</label>
+                                                    <input
+                                                        type="text"
+                                                        value={c.domain || ''}
+                                                        onChange={(e) => updateContainer(c.id, 'domain', e.target.value)}
+                                                        placeholder="e.g., api.pablo.dev"
+                                                        required={c.exposeDomain}
+                                                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-mono placeholder-slate-400"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1.5">Container Internal Port</label>
+                                                    <input
+                                                        type="number"
+                                                        value={c.domainPort || ''}
+                                                        onChange={(e) => updateContainer(c.id, 'domainPort', e.target.value)}
+                                                        placeholder="e.g., 80 or 3000"
+                                                        required={c.exposeDomain}
+                                                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-mono placeholder-slate-400"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Advanced Options Accordion for this specific container */}
@@ -542,6 +638,44 @@ const CreateContainer = () => {
                                                     )}
                                                 </div>
 
+                                                {/* Volume Attachment */}
+                                                <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                    <div>
+                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                            <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
+                                                            <span>Attach Persistent Volume</span>
+                                                        </label>
+                                                        <select
+                                                            value={c.volumeName || ''}
+                                                            onChange={(e) => updateContainer(c.id, 'volumeName', e.target.value)}
+                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+                                                        >
+                                                            <option value="">None (Ephemeral)</option>
+                                                            {availableVolumes.map(v => (
+                                                                <option key={v._id || v.name} value={v.name}>{v.name}</option>
+                                                            ))}
+                                                        </select>
+                                                        <p className="text-xs text-slate-500 mt-1">Select a persistent disk to save data.</p>
+                                                    </div>
+
+                                                    {c.volumeName && (
+                                                        <div>
+                                                            <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                                <span>Container Mount Path</span>
+                                                            </label>
+                                                            <input
+                                                                type="text"
+                                                                value={c.volumeMountPath || ''}
+                                                                onChange={(e) => updateContainer(c.id, 'volumeMountPath', e.target.value)}
+                                                                placeholder="e.g. /data or /var/lib/mysql"
+                                                                required={!!c.volumeName}
+                                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-mono text-sm"
+                                                            />
+                                                            <p className="text-xs text-slate-500 mt-1">Where the volume mounts inside the container.</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+
                                                 {/* Environment Variables Section */}
                                                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50">
                                                     <label className="flex flex-col mb-4">
@@ -579,13 +713,39 @@ const CreateContainer = () => {
                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
                                                                 />
                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder="e.g. production"
-                                                                    value={env.value}
-                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
-                                                                    className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
-                                                                />
+
+                                                                <div className="flex bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-brand-500">
+                                                                    <select
+                                                                        value={env.type || 'raw'}
+                                                                        onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)}
+                                                                        className="bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-0 outline-none w-24 border-r dark:border-slate-700 font-medium"
+                                                                    >
+                                                                        <option value="raw">Raw</option>
+                                                                        <option value="secret">Secret</option>
+                                                                    </select>
+
+                                                                    {(!env.type || env.type === 'raw') ? (
+                                                                        <input
+                                                                            type="text"
+                                                                            placeholder="e.g. production"
+                                                                            value={env.value}
+                                                                            onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
+                                                                            className="flex-1 px-3 py-2 bg-transparent border-none text-slate-900 dark:text-white font-mono text-sm focus:ring-0 outline-none w-full"
+                                                                        />
+                                                                    ) : (
+                                                                        <select
+                                                                            value={env.value}
+                                                                            onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
+                                                                            className="flex-1 px-3 py-2 bg-transparent border-none text-slate-900 dark:text-white font-mono text-sm focus:ring-0 outline-none w-full"
+                                                                        >
+                                                                            <option value="">-- Select Secret --</option>
+                                                                            {availableSecrets.map(sec => (
+                                                                                <option key={sec._id} value={sec.name}>{sec.name}</option>
+                                                                            ))}
+                                                                        </select>
+                                                                    )}
+                                                                </div>
+
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => removeEnvVar(c.id, eIdx)}

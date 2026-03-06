@@ -9,7 +9,11 @@ import adminRoutes from './routes/adminRoutes.js';
 import aiRoutes from './routes/aiRoutes.js';
 import networkRoutes from './routes/networkRoutes.js';
 import planRoutes from './routes/planRoutes.js';
+import gitRoutes from './routes/gitRoutes.js';
+import volumeRoutes from './routes/volumeRoutes.js';
+import secretRoutes from './routes/secretRoutes.js';
 import { setupSockets } from './websockets.js';
+import { initProxyService } from './proxyService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 
@@ -33,11 +37,19 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/networks', networkRoutes);
 app.use('/api/plans', planRoutes);
+app.use('/api/git', gitRoutes);
+app.use('/api/volumes', volumeRoutes);
+app.use('/api/secrets', secretRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')
     .then(async () => {
-        console.log('Connected to MongoDB');
+        console.log('MongoDB connected...');
+
+        // Boot the Proxy Service
+        await initProxyService();
+
+        // Seed default admin user if no admins
         try {
             const existingAdmin = await User.findOne({ email: 'test' });
             if (!existingAdmin) {

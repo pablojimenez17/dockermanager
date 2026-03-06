@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network } from 'lucide-react';
+import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network, Info } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -110,6 +110,23 @@ const ViewContainers = () => {
         } catch (err) {
             console.error(`Error performing ${action} on container ${id}`, err);
             addToast('Action Failed', `Could not ${action} container.`, 'error');
+        }
+    };
+
+    const handleRedeploy = async (id, name, image) => {
+        try {
+            const token = localStorage.getItem('token');
+            addToast('Redeploy Started', `Pulling latest ${image} and spawning Green container for ${name}...`, 'info');
+
+            await axios.put(`http://localhost:5000/api/containers/${id}/redeploy`, {}, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            addToast('Zero-Downtime Success', `${name} is now running the latest version. Old container removed.`, 'success');
+            fetchContainers();
+        } catch (err) {
+            console.error(`Error redeploying container ${id}`, err);
+            addToast('Redeployment Failed', err.response?.data?.message || `Could not complete redeploy for ${name}.`, 'error');
         }
     };
 
@@ -326,13 +343,38 @@ const ViewContainers = () => {
                                         <button
                                             onClick={() => handleAction(container._id, 'stop')}
                                             className="flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            title="Gracefully stop the container without deleting its data"
                                         >
                                             <Square size={16} /> <span>Stop</span>
                                         </button>
 
                                         <button
+                                            onClick={() => handleRedeploy(container._id, container.name, container.image)}
+                                            className="group relative flex-1 min-w-[100px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 border border-indigo-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        >
+                                            <RefreshCw size={16} /> <span>Redeploy</span>
+
+                                            {/* Custom Hover Tooltip */}
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[280px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-4 shadow-2xl border border-slate-700/50">
+                                                    <div className="flex items-start mb-2 text-indigo-400">
+                                                        <Info size={16} className="mr-2 shrink-0 mt-0.5" />
+                                                        <span className="font-bold text-sm">Zero-Downtime Update</span>
+                                                    </div>
+                                                    <p className="text-slate-300 leading-relaxed text-left">
+                                                        This button downloads the latest version of your app and turns it on. Traefik will seamlessly switch your users to the new version without a single second of downtime, and then delete the old one.
+                                                    </p>
+
+                                                    {/* Triangle pointer */}
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                                </div>
+                                            </div>
+                                        </button>
+
+                                        <button
                                             onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
                                             className="flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            title="Open an interactive SSH/Bash console inside the container"
                                         >
                                             <MonitorPlay size={16} /> <span>Console</span>
                                         </button>
@@ -341,6 +383,7 @@ const ViewContainers = () => {
                                     <button
                                         onClick={() => handleAction(container._id, 'start')}
                                         className="flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        title="Boot up the stopped container"
                                     >
                                         <Play size={16} /> <span>Start</span>
                                     </button>
@@ -349,13 +392,19 @@ const ViewContainers = () => {
                                 <button
                                     onClick={() => fetchLogs(container._id, container.name)}
                                     className="flex-1 min-w-[100px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-white dark:border-transparent py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                    title="View historical runtime logs"
                                 >
                                     <Terminal size={16} /> <span>Logs</span>
                                 </button>
 
                                 <button
-                                    onClick={() => handleAction(container._id, 'delete')}
+                                    onClick={() => {
+                                        if (window.confirm(`Are you sure you want to completely delete ${container.name}? This will destroy all unsaved data not mapped to a volume.`)) {
+                                            handleAction(container._id, 'delete');
+                                        }
+                                    }}
                                     className="flex-1 min-w-[100px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                    title="Permanently delete container and its data"
                                 >
                                     <Trash2 size={16} /> <span>Remove</span>
                                 </button>

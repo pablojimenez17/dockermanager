@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 
 const Sidebar = () => {
@@ -9,14 +9,17 @@ const Sidebar = () => {
 
     const handleLogout = () => {
         localStorage.removeItem('token');
-        navigate('/login');
+        navigate('/');
     };
 
     const role = localStorage.getItem('role') || 'user';
     const navItems = [
         { name: 'Dashboard', path: '/app', icon: <LayoutDashboard size={20} /> },
         { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={20} /> },
+        { name: 'Deploy from Git', path: '/app/git-deploy', icon: <GitBranch size={20} /> },
         { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
+        { name: 'Secret Manager', path: '/app/secrets', icon: <Lock size={20} /> },
+        { name: 'Volumes (Disks)', path: '/app/volumes', icon: <HardDrive size={20} /> },
         { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
         { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={20} /> },
     ];

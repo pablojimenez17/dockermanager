@@ -10,6 +10,9 @@ import Networks from './pages/Networks';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
 import Plans from './pages/Plans';
+import GitDeploy from './pages/GitDeploy';
+import Volumes from './pages/Volumes';
+import Secrets from './pages/Secrets';
 import Layout from './components/Layout';
 import { ThemeProvider } from './components/ThemeContext';
 import ChatAssistant from './components/ChatAssistant';
@@ -35,7 +38,10 @@ const App = () => {
         <Route path="/app" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Dashboard />} />
           <Route path="create" element={<CreateContainer />} />
+          <Route path="git-deploy" element={<GitDeploy />} />
           <Route path="containers" element={<ViewContainers />} />
+          <Route path="secrets" element={<Secrets />} />
+          <Route path="volumes" element={<Volumes />} />
           <Route path="networks" element={<Networks />} />
           <Route path="admin" element={<AdminDashboard />} />
           <Route path="plans" element={<Plans />} />

@@ -67,6 +67,8 @@ const Plans = () => {
                 'Up to 2 Containers limit',
                 '1 GB RAM quota',
                 '1 CPU Core equivalent',
+                '1 GB Persistent Storage (1 Disk)',
+                'No Custom Domains',
                 'Community Support'
             ],
             color: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200',
@@ -83,6 +85,8 @@ const Plans = () => {
                 'Up to 10 Containers limit',
                 '8 GB RAM quota',
                 '4 CPU Cores equivalent',
+                '10 GB Persistent Storage (5 Disks)',
+                '3 Custom Domains',
                 'Priority Support',
                 'Advanced Network Modes'
             ],
@@ -100,6 +104,8 @@ const Plans = () => {
                 'Up to 50 Containers limit',
                 '32 GB RAM quota',
                 '16 CPU Cores equivalent',
+                '100 GB Persistent Storage (20 Disks)',
+                'Unlimited Custom Domains',
                 '24/7 Dedicated Support',
                 'Custom Node Mapping'
             ],

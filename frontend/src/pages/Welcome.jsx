@@ -68,29 +68,129 @@ const Welcome = () => {
 
             {/* Features Grid */}
             <div id="features" className="max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-slate-800">
-                <div className="grid md:grid-cols-3 gap-8">
-                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl hover:border-slate-300 dark:hover:border-slate-500 shadow-xl dark:shadow-none transition-all">
-                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-500 dark:text-indigo-400 mb-6">
+                <div className="text-center mb-16">
+                    <h2 className="text-4xl font-extrabold tracking-tight mb-4">Everything you need to ship faster</h2>
+                    <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+                        We've built a complete Platform as a Service (PaaS) right into your Docker engine.
+                    </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {/* Feature 1 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-500 dark:text-indigo-400 mb-6 border border-indigo-100 dark:border-indigo-500/20">
                             <Zap size={24} />
                         </div>
-                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Instant Creation</h3>
-                        <p className="text-slate-600 dark:text-slate-400">Launch standard images or custom Docker Hub templates in seconds. Configure ports and variables easily.</p>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Git Deploy Pipelines</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Deploy directly from GitHub repositories. The PaaS engine clones your code, safely builds Dockerfiles in a restricted sandbox, and spins up your app in seconds.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl hover:border-slate-300 dark:hover:border-slate-500 shadow-xl dark:shadow-none transition-all">
-                        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 dark:text-emerald-400 mb-6">
+                    {/* Feature 2 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-500 dark:text-emerald-400 mb-6 border border-emerald-100 dark:border-emerald-500/20">
                             <Activity size={24} />
                         </div>
-                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Live Monitoring</h3>
-                        <p className="text-slate-600 dark:text-slate-400">Keep an eye on CPU, Memory, and application logs in real-time right from your dashboard.</p>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Auto-Routing & Traefik Domains</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Forget Nginx configs. Assign custom domains (e.g. `api.pablo.dev`) to any container via the UI. Our built-in Traefik Proxy reverse-routes traffic automatically.</p>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl hover:border-slate-300 dark:hover:border-slate-500 shadow-xl dark:shadow-none transition-all">
-                        <div className="w-12 h-12 bg-purple-50 dark:bg-purple-500/10 rounded-xl flex items-center justify-center text-purple-500 dark:text-purple-400 mb-6">
+                    {/* Feature 3 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-pink-50 dark:bg-pink-500/10 rounded-xl flex items-center justify-center text-pink-500 dark:text-pink-400 mb-6 border border-pink-100 dark:border-pink-500/20">
+                            <Server size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Smart Stack Builder</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Deploy single instances or multi-tier apps (like WordPress + MySQL) simultaneously. Includes 1-click presets and auto-injected environment variables to link containers.</p>
+                    </div>
+
+                    {/* Feature 4 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-amber-50 dark:bg-amber-500/10 rounded-xl flex items-center justify-center text-amber-500 dark:text-amber-400 mb-6 border border-amber-100 dark:border-amber-500/20">
                             <ShieldCheck size={24} />
                         </div>
-                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Secure & Private</h3>
-                        <p className="text-slate-600 dark:text-slate-400">Built with standard authentication practices to ensure your containers remain solely under your control.</p>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Hardware Quotas & Billing</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Live monitoring of CPU, RAM, Disk Space, and Domain count limits based on your subscription tier. Prevents users from exhausting host machine resources.</p>
+                    </div>
+
+                    {/* Feature 5 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-blue-50 dark:bg-blue-500/10 rounded-xl flex items-center justify-center text-blue-500 dark:text-blue-400 mb-6 border border-blue-100 dark:border-blue-500/20">
+                            <Server size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Persistent Disks & Networks</h3>
+                        <p className="text-slate-600 dark:text-slate-400">Manage isolated Docker volumes and bridge networks. Attach persistent storage so your databases never lose data when containers restart.</p>
+                    </div>
+
+                    {/* Feature 6 */}
+                    <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl shadow-xl dark:shadow-none transition-all hover:-translate-y-1">
+                        <div className="w-12 h-12 bg-slate-100 dark:bg-slate-700/50 rounded-xl flex items-center justify-center text-slate-700 dark:text-slate-300 mb-6 border border-slate-200 dark:border-slate-600/50">
+                            <Server size={24} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-3 text-slate-900 dark:text-white">Live Terminals & Logs</h3>
+                        <p className="text-slate-600 dark:text-slate-400">No SSH required. Access interactive Bash/Sh shells directly inside any container from the browser, or stream live stdout/stderr logs instantly.</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Plans Preview */}
+            <div className="max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-slate-800">
+                <div className="text-center mb-16">
+                    <h2 className="text-4xl font-extrabold tracking-tight mb-4">Simple, transparent pricing</h2>
+                    <p className="text-xl text-slate-600 dark:text-slate-400 max-w-2xl mx-auto">
+                        Start for free, upgrade when your app scales to millions.
+                    </p>
+                </div>
+
+                <div className="grid md:grid-cols-3 gap-8">
+                    {/* Free Plan */}
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl flex flex-col">
+                        <h3 className="text-2xl font-bold mb-2">Hobby</h3>
+                        <p className="text-sm text-slate-500 mb-6">Perfect for learning Docker and personal projects.</p>
+                        <div className="text-4xl font-extrabold mb-6">$0<span className="text-lg text-slate-500 font-normal">/mo</span></div>
+                        <ul className="space-y-4 mb-8 flex-1 text-slate-600 dark:text-slate-400">
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Up to 2 Containers limit</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 1 GB RAM quota</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 1 CPU Core equivalent</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 1 GB Persistent Storage (1 Disk)</li>
+                            <li className="flex items-center"><span className="text-red-500 mr-2">✕</span> No Custom Domains</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Community Support</li>
+                        </ul>
+                        <Link to="/register" className="w-full text-center bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-900 dark:text-white py-3 rounded-xl font-semibold transition-colors">Start Free</Link>
+                    </div>
+
+                    {/* Pro Plan */}
+                    <div className="bg-gradient-to-br from-brand-500 to-indigo-600 text-white p-8 rounded-3xl flex flex-col shadow-2xl scale-105 z-10 border border-brand-400/30">
+                        <div className="text-xs font-bold uppercase tracking-wider text-brand-200 mb-2">Most Popular</div>
+                        <h3 className="text-2xl font-bold mb-2">Professional</h3>
+                        <p className="text-sm text-brand-100 mb-6">For active developers needing more resources.</p>
+                        <div className="text-4xl font-extrabold mb-6">$12<span className="text-lg text-brand-200 font-normal">/mo</span></div>
+                        <ul className="space-y-4 mb-8 flex-1 text-white/90">
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> Up to 10 Containers limit</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> 8 GB RAM quota</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> 4 CPU Cores equivalent</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> 10 GB Persistent Storage (5 Disks)</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> 3 Custom Domains</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> Priority Support</li>
+                            <li className="flex items-center"><span className="mr-2 text-emerald-300">✓</span> Advanced Network Modes</li>
+                        </ul>
+                        <Link to="/register" className="w-full text-center bg-white text-brand-600 hover:bg-slate-50 py-3 rounded-xl font-semibold transition-colors shadow-lg">Upgrade Now</Link>
+                    </div>
+
+                    {/* Enterprise Plan */}
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-8 rounded-3xl flex flex-col">
+                        <h3 className="text-2xl font-bold mb-2">Enterprise</h3>
+                        <p className="text-sm text-slate-500 mb-6">Uncapped potential for production workloads.</p>
+                        <div className="text-4xl font-extrabold mb-6">$45<span className="text-lg text-slate-500 font-normal">/mo</span></div>
+                        <ul className="space-y-4 mb-8 flex-1 text-slate-600 dark:text-slate-400">
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Up to 50 Containers limit</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 32 GB RAM quota</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 16 CPU Cores equivalent</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 100 GB Persistent Storage (20 Disks)</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Unlimited Custom Domains</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> 24/7 Dedicated Support</li>
+                            <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Custom Node Mapping</li>
+                        </ul>
+                        <Link to="/register" className="w-full text-center bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-900 dark:text-white py-3 rounded-xl font-semibold transition-colors">Contact Sales</Link>
                     </div>
                 </div>
             </div>

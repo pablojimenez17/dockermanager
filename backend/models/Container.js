@@ -22,6 +22,10 @@ const containerSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    domain: {
+        type: String,
+        trim: true
     }
 }, { timestamps: true });
 

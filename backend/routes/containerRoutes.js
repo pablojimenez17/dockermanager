@@ -2,6 +2,7 @@ import express from 'express';
 import Docker from 'dockerode';
 import Container from '../models/Container.js';
 import User from '../models/User.js';
+import Secret, { decrypt } from '../models/Secret.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
 import path from 'path';
@@ -26,7 +27,11 @@ router.get('/', async (req, res) => {
                 return {
                     ...c.toObject(),
                     state: info.State.Status,
-                    ports: info.NetworkSettings.Ports
+                    ports: info.NetworkSettings.Ports,
+                    hostConfig: {
+                        Memory: info.HostConfig.Memory || 0,
+                        NanoCPUs: info.HostConfig.NanoCPUs || 0
+                    }
                 };
             } catch (err) {
                 if (err.statusCode === 404) {
@@ -57,7 +62,7 @@ router.post('/', async (req, res) => {
         // QUOTA VALIDATION
         // ==========================================
         const user = await User.findById(req.user.userId);
-        const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 };
+        const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1, maxDomains: 0, maxVolumes: 1, maxVolumeSizeMb: 1024 };
 
         // 1. Check Container Count Limits
         const currentContainersDb = await Container.find({ userId: req.user.userId });
@@ -69,10 +74,21 @@ router.post('/', async (req, res) => {
 
         // 2. Assess requested RAM vs Limit
         let requestedRamMb = 0;
+        let requestedDomainsCount = 0;
+
         stack.forEach(c => {
             // If they don't specify, we assume 512MB default allocation per container for counting purposes
             requestedRamMb += c.memory ? parseInt(c.memory) : 512;
+            if (c.domain) requestedDomainsCount++;
         });
+
+        // 3. Domain limits
+        const currentDomainsDb = currentContainersDb.filter(c => c.domain && c.domain.trim() !== '');
+        if (currentDomainsDb.length + requestedDomainsCount > limits.maxDomains) {
+            return res.status(403).json({
+                message: `Quota Exceeded: Your plan limits you to ${limits.maxDomains} custom domains. You have ${currentDomainsDb.length} active and requested ${requestedDomainsCount} more.`
+            });
+        }
 
         // Sum current allocated RAM across running/existing containers
         let currentAllocatedRamBytes = 0;
@@ -107,10 +123,10 @@ router.post('/', async (req, res) => {
 
         console.log(`[DEBUG] Attempting to create stack of length ${stack.length} `);
 
-        // Deploy sequentially to respect implicit dependencies 
+        // Deploy sequentially to respect implicit dependencies
         for (const config of stack) {
             console.log(`[DEBUG] Processing config for image: ${config.image} `);
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address } = config;
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, domain, domainPort, volumeName, volumeMountPath, replicas = 1 } = config;
 
             // Ensure image exists or pull it
             try {
@@ -119,122 +135,174 @@ router.post('/', async (req, res) => {
                 console.log(`Pull error or image exists for ${image}, trying to create anyway`, err.message);
             }
 
-            // Prepare port bindings
-            const PortBindings = {};
-            const ExposedPorts = {};
-            if (ports && ports.length > 0) {
-                ports.forEach(p => {
-                    const [hostPort, containerPort] = p.split(':');
-                    if (hostPort && containerPort) {
-                        PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
-                        ExposedPorts[`${containerPort}/tcp`] = {};
-                    }
-                });
-            }
+            for (let r = 0; r < replicas; r++) {
+                const instanceName = replicas > 1 ? `${name}-${r + 1}` : name;
+                console.log(`[DEBUG] Spawning replica ${r + 1}/${replicas} for ${name} -> ${instanceName}`);
 
-            // Apply network settings
-            let safeNetworkMode = networkMode || 'bridge';
+                // Prepare port bindings
+                const PortBindings = {};
+                const ExposedPorts = {};
+                if (ports && ports.length > 0) {
+                    ports.forEach(p => {
+                        const [hostPort, containerPort] = p.split(':');
+                        if (hostPort && containerPort) {
+                            PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
+                            ExposedPorts[`${containerPort}/tcp`] = {};
+                        }
+                    });
+                }
 
-            // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
-            if (networkName && safeNetworkMode === 'bridge') {
-                safeNetworkMode = networkName;
-            }
-
-            // Build Advanced Host Configuration
-            const baseHostConfig = {
-                PortBindings,
-                ...(memory && { Memory: parseInt(memory) * 1024 * 1024 }),
-                ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
-                ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
-                NetworkMode: safeNetworkMode
-            };
-
-            const containerConfig = {
-                Image: image,
-                name: name,
-                Env: env || [],
-                ExposedPorts,
-                HostConfig: baseHostConfig
-            };
-
-            // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
-            if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
-                containerConfig.NetworkingConfig = {
-                    EndpointsConfig: {
-                        [safeNetworkMode]: {
-                            IPAMConfig: {
-                                IPv4Address: ipv4Address
+                // --- Secret Manager Interception ---
+                const finalEnv = [];
+                if (env && env.length > 0) {
+                    for (let envStr of env) {
+                        const secretMatch = envStr.match(/^(.*?)=\{\{SECRET:(.*?)\}\}$/);
+                        if (secretMatch) {
+                            const envKey = secretMatch[1];
+                            const secretName = secretMatch[2];
+                            try {
+                                const secretDoc = await Secret.findOne({ userId: req.user.userId, name: secretName });
+                                if (secretDoc) {
+                                    const decryptedValue = decrypt(secretDoc.encryptedValue, secretDoc.iv);
+                                    finalEnv.push(`${envKey}=${decryptedValue}`);
+                                } else {
+                                    console.warn(`Secret ${secretName} not found for user. Skipping injection.`);
+                                }
+                            } catch (err) {
+                                console.error(`Error decrypting secret ${secretName}:`, err);
                             }
+                        } else {
+                            finalEnv.push(envStr); // raw env value
                         }
                     }
-                };
-            }
-            // WordPress Template specific environment injection (if they used the preset)
-            // If the user deployed WordPress and MySQL together via the preset:
-            if (image.includes('wordpress')) {
-                // Find DB in stack
-                const dbConfig = stack.find(c => c.image.includes('mysql') || c.image.includes('mariadb'));
-                if (dbConfig) {
-                    containerConfig.Env = [
-                        ...containerConfig.Env,
-                        `WORDPRESS_DB_HOST=${dbConfig.name}:3306`,
-                        `WORDPRESS_DB_USER=wordpress`,
-                        `WORDPRESS_DB_PASSWORD=somewordpress`,
-                        `WORDPRESS_DB_NAME=wordpress`
-                    ];
                 }
-            }
+                // -----------------------------------
 
-            if (image.includes('mysql') && stack.some(c => c.image.includes('wordpress'))) {
-                containerConfig.Env = [
-                    ...containerConfig.Env,
-                    `MYSQL_ROOT_PASSWORD=somewordpress`,
-                    `MYSQL_DATABASE=wordpress`,
-                    `MYSQL_USER=wordpress`,
-                    `MYSQL_PASSWORD=somewordpress`
-                ];
-            }
+                // Apply network settings
+                let safeNetworkMode = networkMode || 'bridge';
 
-            // Keep OS base images alive so they don't appear as "exited" instantly
-            const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos'];
-            if (keepsAlive.some(img => image.includes(img))) {
-                containerConfig.Cmd = ['tail', '-f', '/dev/null'];
-            }
+                // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
+                if (networkName && safeNetworkMode === 'bridge') {
+                    safeNetworkMode = networkName;
+                }
 
-            console.log(`[DEBUG] Pulling ${image}...`);
-            // Create and start container
-            let container;
-            try {
-                container = await docker.createContainer(containerConfig);
-                console.log(`[DEBUG] Container created ID: ${container.id}`);
-
-                await container.start();
-                console.log(`[DEBUG] Container ${container.id} started successfully`);
-
-                // Save to database
-                const dbContainer = new Container({
-                    name,
-                    image,
-                    dockerId: container.id,
-                    userId: req.user.userId,
-                    status: 'running'
-                });
-
-                await dbContainer.save();
-                createdRecords.push(dbContainer);
-                console.log(`[DEBUG] Record saved to DB for ${name}`);
-            } catch (err) {
-                if (container) {
-                    try {
-                        console.log(`[DEBUG] Cleaning up orphaned container ${container.id} after failure...`);
-                        await container.remove({ force: true });
-                    } catch (cleanupErr) {
-                        console.error(`[ERROR] Failed to clean up orphaned container:`, cleanupErr.message);
+                // Expose domain port if not otherwise exposed
+                if (domain && domain.trim() !== '' && domainPort) {
+                    if (!PortBindings[`${domainPort}/tcp`]) {
+                        ExposedPorts[`${domainPort}/tcp`] = {};
                     }
                 }
-                throw err;
-            }
-        }
+
+                // Build Advanced Host Configuration
+                const baseHostConfig = {
+                    PortBindings,
+                    ...(memory && { Memory: parseInt(memory) * 1024 * 1024 }),
+                    ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
+                    ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
+                    NetworkMode: safeNetworkMode,
+                    ...(volumeName && volumeMountPath && { Binds: [`${volumeName}:${volumeMountPath}`] })
+                };
+
+                const containerConfig = {
+                    Image: image,
+                    name: instanceName,
+                    Env: finalEnv,
+                    ExposedPorts,
+                    HostConfig: baseHostConfig,
+                    Labels: {}
+                };
+
+                // Inject Custom Domain (Traefik Reverse Proxy labels)
+                if (domain && domain.trim() !== '' && domainPort) {
+                    const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
+                    containerConfig.Labels = {
+                        'traefik.enable': 'true',
+                        [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
+                        [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
+                        'traefik.docker.network': safeNetworkMode
+                    };
+                }
+
+                // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
+                if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
+                    containerConfig.NetworkingConfig = {
+                        EndpointsConfig: {
+                            [safeNetworkMode]: {
+                                IPAMConfig: {
+                                    IPv4Address: ipv4Address
+                                }
+                            }
+                        }
+                    };
+                }
+                // WordPress Template specific environment injection (if they used the preset)
+                // If the user deployed WordPress and MySQL together via the preset:
+                if (image.includes('wordpress')) {
+                    // Find DB in stack
+                    const dbConfig = stack.find(c => c.image.includes('mysql') || c.image.includes('mariadb'));
+                    if (dbConfig) {
+                        containerConfig.Env = [
+                            ...containerConfig.Env,
+                            `WORDPRESS_DB_HOST=${dbConfig.name}:3306`,
+                            `WORDPRESS_DB_USER=wordpress`,
+                            `WORDPRESS_DB_PASSWORD=somewordpress`,
+                            `WORDPRESS_DB_NAME=wordpress`
+                        ];
+                    }
+                }
+
+                if (image.includes('mysql') && stack.some(c => c.image.includes('wordpress'))) {
+                    containerConfig.Env = [
+                        ...containerConfig.Env,
+                        `MYSQL_ROOT_PASSWORD=somewordpress`,
+                        `MYSQL_DATABASE=wordpress`,
+                        `MYSQL_USER=wordpress`,
+                        `MYSQL_PASSWORD=somewordpress`
+                    ];
+                }
+
+                // Keep OS base images alive so they don't appear as "exited" instantly
+                const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos'];
+                if (keepsAlive.some(img => image.includes(img))) {
+                    containerConfig.Cmd = ['tail', '-f', '/dev/null'];
+                }
+
+                console.log(`[DEBUG] Pulling ${image}...`);
+                // Create and start container
+                let container;
+                try {
+                    container = await docker.createContainer(containerConfig);
+                    console.log(`[DEBUG] Container created ID: ${container.id}`);
+
+                    await container.start();
+                    console.log(`[DEBUG] Container ${container.id} started successfully`);
+
+                    // Save to database
+                    const dbContainer = new Container({
+                        name: instanceName,
+                        image,
+                        dockerId: container.id,
+                        userId: req.user.userId,
+                        status: 'running',
+                        domain: domain && domainPort ? domain.trim() : undefined
+                    });
+
+                    await dbContainer.save();
+                    createdRecords.push(dbContainer);
+                    console.log(`[DEBUG] Record saved to DB for ${instanceName}`);
+                } catch (err) {
+                    if (container) {
+                        try {
+                            console.log(`[DEBUG] Cleaning up orphaned container ${container.id} after failure...`);
+                            await container.remove({ force: true });
+                        } catch (cleanupErr) {
+                            console.error(`[ERROR] Failed to clean up orphaned container:`, cleanupErr.message);
+                        }
+                    }
+                    throw err;
+                }
+            } // End of replicas loop
+        } // End of stack loop
 
         console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
         res.status(201).json(createdRecords);
@@ -303,6 +371,85 @@ router.post('/:id/start', async (req, res) => {
     }
 });
 
+// PUT: Redeploy container (Zero-Downtime Blue/Green)
+router.put('/:id/redeploy', async (req, res) => {
+    try {
+        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        if (!dbContainer) {
+            return res.status(404).json({ message: 'Container not found or you do not have permission' });
+        }
+
+        const oldDockerContainer = docker.getContainer(dbContainer.dockerId);
+        let oldConfig;
+        try {
+            oldConfig = await oldDockerContainer.inspect();
+        } catch (err) {
+            return res.status(404).json({ message: 'Underlying Docker container is missing. Cannot redeploy gracefully.' });
+        }
+
+        // Pull the latest version of the image before downtime
+        console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
+        try {
+            await docker.pull(dbContainer.image);
+        } catch (pullErr) {
+            console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private): ${pullErr.message}`);
+        }
+
+        // Prepare Green Container Config based on Blue's specs
+        const greenName = `${dbContainer.name}-redeploy-${Date.now()}`;
+        console.log(`[Zero-Downtime] Spawning Green Container: ${greenName}`);
+
+        const greenConfig = {
+            Image: dbContainer.image,
+            name: greenName,
+            Env: oldConfig.Config.Env,
+            Cmd: oldConfig.Config.Cmd,
+            ExposedPorts: oldConfig.Config.ExposedPorts,
+            HostConfig: oldConfig.HostConfig,
+            Labels: oldConfig.Config.Labels,
+            NetworkingConfig: {}
+        };
+
+        // Reconnect to exact same networks
+        if (oldConfig.NetworkSettings && oldConfig.NetworkSettings.Networks) {
+            greenConfig.NetworkingConfig.EndpointsConfig = oldConfig.NetworkSettings.Networks;
+        }
+
+        const greenContainer = await docker.createContainer(greenConfig);
+        await greenContainer.start();
+
+        console.log(`[Zero-Downtime] Green Container ${greenContainer.id} started. Waiting 3 seconds for Traefik routing to apply & Healthchecks...`);
+
+        // Give time for the container to boot up and Traefik to register the dynamic labels
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        console.log(`[Zero-Downtime] Stopping and removing Blue Container ${oldDockerContainer.id}`);
+        // Terminate Blue Container
+        try {
+            await oldDockerContainer.stop();
+        } catch (e) { } // ignore already stopped
+        await oldDockerContainer.remove();
+
+        // Update DB Record to point to Green
+        dbContainer.dockerId = greenContainer.id;
+        dbContainer.name = greenName; // Optional: Update the name, or keep it logical. If we update, next redeploy uses the new name.
+        await dbContainer.save();
+
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'CREATE_CONTAINER', // Logged as creation/update
+            resourceName: dbContainer.name,
+            details: `Zero-Downtime Redeploy successful for ${dbContainer.image}`
+        });
+
+        res.json({ message: 'Zero-Downtime Redeployment successful', container: dbContainer });
+
+    } catch (error) {
+        console.error('[Zero-Downtime Error]', error);
+        res.status(500).json({ message: 'Error attempting zero-downtime redeploy', error: error.message });
+    }
+});
+
 // Remove a container
 router.delete('/:id', async (req, res) => {
     try {
@@ -339,6 +486,85 @@ router.delete('/:id', async (req, res) => {
         res.json({ message: 'Container removed successfully' });
     } catch (error) {
         res.status(500).json({ message: 'Error removing container', error: error.message });
+    }
+});
+
+// PUT: Redeploy container (Zero-Downtime Blue/Green)
+router.put('/:id/redeploy', async (req, res) => {
+    try {
+        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        if (!dbContainer) {
+            return res.status(404).json({ message: 'Container not found or you do not have permission' });
+        }
+
+        const oldDockerContainer = docker.getContainer(dbContainer.dockerId);
+        let oldConfig;
+        try {
+            oldConfig = await oldDockerContainer.inspect();
+        } catch (err) {
+            return res.status(404).json({ message: 'Underlying Docker container is missing. Cannot redeploy gracefully.' });
+        }
+
+        // Pull the latest version of the image before downtime
+        console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
+        try {
+            await docker.pull(dbContainer.image);
+        } catch (pullErr) {
+            console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private): ${pullErr.message}`);
+        }
+
+        // Prepare Green Container Config based on Blue's specs
+        const greenName = `${dbContainer.name}-redeploy-${Date.now()}`;
+        console.log(`[Zero-Downtime] Spawning Green Container: ${greenName}`);
+
+        const greenConfig = {
+            Image: dbContainer.image,
+            name: greenName,
+            Env: oldConfig.Config.Env,
+            Cmd: oldConfig.Config.Cmd,
+            ExposedPorts: oldConfig.Config.ExposedPorts,
+            HostConfig: oldConfig.HostConfig,
+            Labels: oldConfig.Config.Labels,
+            NetworkingConfig: {}
+        };
+
+        // Reconnect to exact same networks
+        if (oldConfig.NetworkSettings && oldConfig.NetworkSettings.Networks) {
+            greenConfig.NetworkingConfig.EndpointsConfig = oldConfig.NetworkSettings.Networks;
+        }
+
+        const greenContainer = await docker.createContainer(greenConfig);
+        await greenContainer.start();
+
+        console.log(`[Zero-Downtime] Green Container ${greenContainer.id} started. Waiting 3 seconds for Traefik routing to apply & Healthchecks...`);
+
+        // Give time for the container to boot up and Traefik to register the dynamic labels
+        await new Promise(resolve => setTimeout(resolve, 3000));
+
+        console.log(`[Zero-Downtime] Stopping and removing Blue Container ${oldDockerContainer.id}`);
+        // Terminate Blue Container
+        try {
+            await oldDockerContainer.stop();
+        } catch (e) { } // ignore already stopped
+        await oldDockerContainer.remove();
+
+        // Update DB Record to point to Green
+        dbContainer.dockerId = greenContainer.id;
+        dbContainer.name = greenName; // Optional: Update the name, or keep it logical. If we update, next redeploy uses the new name.
+        await dbContainer.save();
+
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'CREATE_CONTAINER', // Logged as creation/update
+            resourceName: dbContainer.name,
+            details: `Zero-Downtime Redeploy successful for ${dbContainer.image}`
+        });
+
+        res.json({ message: 'Zero-Downtime Redeployment successful', container: dbContainer });
+
+    } catch (error) {
+        console.error('[Zero-Downtime Error]', error);
+        res.status(500).json({ message: 'Error attempting zero-downtime redeploy', error: error.message });
     }
 });
 

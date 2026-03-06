@@ -9,17 +9,26 @@ const PLANS = {
     free: {
         maxContainers: 2,
         maxRamMb: 1024,
-        maxCpuCores: 1
+        maxCpuCores: 1,
+        maxDomains: 0,
+        maxVolumes: 1,
+        maxVolumeSizeMb: 1024 // 1GB
     },
     pro: {
         maxContainers: 10,
         maxRamMb: 8192,
-        maxCpuCores: 4
+        maxCpuCores: 4,
+        maxDomains: 3,
+        maxVolumes: 5,
+        maxVolumeSizeMb: 10240 // 10GB
     },
     enterprise: {
         maxContainers: 50,
         maxRamMb: 32768, // 32 GB
-        maxCpuCores: 16
+        maxCpuCores: 16,
+        maxDomains: 99,
+        maxVolumes: 20,
+        maxVolumeSizeMb: 102400 // 100GB
     }
 };
 
