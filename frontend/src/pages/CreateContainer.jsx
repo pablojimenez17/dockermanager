@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert } from 'lucide-react';
+import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -58,11 +58,11 @@ const getEmptyContainer = () => ({
     id: crypto.randomUUID(),
     name: '',
     image: '',
-    replicas: 1,
     portBinding: '',
     memory: '512',
     cpu: '1',
     restartPolicy: 'no',
+    networkMode: 'bridge',
     ipv4Address: '',
     envVars: [{ key: '', value: '', type: 'raw' }],
     showAdvanced: false,
@@ -264,7 +264,6 @@ const CreateContainer = () => {
                 return {
                     name: c.name,
                     image: c.image,
-                    replicas: c.replicas ? parseInt(c.replicas) : 1,
                     ports: c.portBinding ? [c.portBinding] : [],
                     env: validEnvVars,
                     memory: c.memory,
@@ -460,32 +459,41 @@ const CreateContainer = () => {
                                     </div>
 
                                     <div className="mb-6">
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center">
-                                            Replicas (High Availability)
-                                            <span className="ml-2 text-xs bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">Auto Load-Balanced</span>
+                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 relative group w-fit">
+                                            <span>Port Binding (Optional)</span>
+                                            <Info size={16} className="text-slate-400 cursor-help" />
+                                            {/* Port Binding Tooltip */}
+                                            <div className="absolute bottom-full left-0 mb-3 w-[280px] sm:w-[350px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                                <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-4 text-left relative overflow-hidden">
+                                                    <p className="text-sm font-bold text-white mb-2">Host vs Container Ports</p>
+                                                    <p className="text-xs text-slate-300 mb-2 leading-relaxed">
+                                                        The format is <code className="text-brand-400 font-bold bg-slate-800 px-1 rounded">HOST_PORT:CONTAINER_PORT</code> (e.g. 8080:80).
+                                                    </p>
+                                                    <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4 mb-3">
+                                                        <li><strong className="text-brand-400">Host Port:</strong> The port opened on your server/machine to the outside network.</li>
+                                                        <li><strong className="text-slate-300">Container Port:</strong> The port the software listens to <i>internally</i> inside its isolated container.</li>
+                                                    </ul>
+                                                    <p className="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20 leading-relaxed text-left">
+                                                        ⚠️ <strong>Traefik user?</strong> Ignore this field completely! Traefik handles routing without exposing raw ports to the host machine.
+                                                    </p>
+                                                    <div className="absolute -bottom-2 left-6 w-4 h-4 bg-slate-900 border-b border-r border-slate-700 transform rotate-45"></div>
+                                                </div>
+                                            </div>
                                         </label>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Traefik will distribute incoming traffic across all instances automatically.</p>
-                                        <div className="relative md:w-1/2">
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                max="10"
-                                                value={c.replicas || 1}
-                                                onChange={(e) => updateContainer(c.id, 'replicas', e.target.value)}
-                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-bold transition-shadow"
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div className="mb-6">
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
                                         <input
                                             type="text"
                                             value={c.portBinding}
                                             onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
-                                            placeholder="Host_Port:Container_Port (e.g., 8080:80)"
-                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
+                                            placeholder="e.g., 8080:80"
+                                            disabled={c.exposeDomain}
+                                            className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm ${c.exposeDomain ? 'opacity-50 cursor-not-allowed' : ''}`}
                                         />
+                                        {c.exposeDomain && (
+                                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center animate-fade-in">
+                                                <AlertCircle size={14} className="mr-1" />
+                                                Disabled because Traefik handles secure routing internally.
+                                            </p>
+                                        )}
                                     </div>
 
                                     {/* Domain Exposer */}
@@ -493,9 +501,40 @@ const CreateContainer = () => {
                                         <div className="flex items-center justify-between mb-4">
                                             <div className="flex items-center space-x-3 text-purple-700 dark:text-purple-300">
                                                 <Globe size={20} />
-                                                <div>
+                                                <div className="flex items-center space-x-2 relative group">
                                                     <h5 className="font-bold text-sm">Expose to Internet (Traefik Router)</h5>
-                                                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">Attach a custom domain to this container automatically.</p>
+                                                    <Info size={16} className="text-purple-400 cursor-help" />
+
+                                                    {/* Tooltip for Newbies */}
+                                                    <div className="absolute bottom-full left-0 mb-3 w-[320px] sm:w-[400px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                                        <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-4 text-left relative overflow-hidden">
+                                                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-brand-500"></div>
+                                                            <p className="text-sm font-bold text-white mb-2 flex items-center">
+                                                                <Globe size={16} className="text-purple-400 mr-2" />
+                                                                How does this work?
+                                                            </p>
+                                                            <p className="text-xs text-slate-300 mb-2 leading-relaxed">
+                                                                Instead of opening gross numbers like <code className="bg-slate-800 text-purple-300 px-1 py-0.5 rounded">http://IP:8080</code> to the whole internet, Traefik acts as a smart bouncer.
+                                                            </p>
+                                                            <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4 mb-2">
+                                                                <li><strong className="text-slate-300">Domain:</strong> Type what people put in the browser (e.g., <code className="text-green-400">api.myweb.com</code>).</li>
+                                                                <li><strong className="text-slate-300">Internal Port:</strong> Type the port the app uses <i>inside</i> its container (e.g., React uses <code className="text-brand-400">80</code>, Node uses <code className="text-brand-400">3000</code>).</li>
+                                                            </ul>
+                                                            <div className="bg-purple-900/30 border border-purple-500/30 p-3 rounded-lg mt-3">
+                                                                <p className="text-[11px] text-purple-200 mb-2 border-b border-purple-700/50 pb-2">
+                                                                    <strong>🌐 Network & Port Advice:</strong>
+                                                                </p>
+                                                                <ul className="text-[11px] text-purple-300 space-y-2">
+                                                                    <li><strong className="text-white">Network Mode:</strong> Leave it on <code className="bg-purple-800/50 px-1 rounded">Bridge</code> for simple internet exposure. Use <code className="bg-purple-800/50 px-1 rounded">Custom Network</code> only if you manually created a private network to link this app to a Database.</li>
+                                                                    <li><strong className="text-white">Port Binding:</strong> We highly recommend leaving the global <i className="text-purple-200">Port Binding (Optional)</i> field empty above. Traefik doesn't need ports mapped to your machine to secure your domain.</li>
+                                                                </ul>
+                                                            </div>
+
+                                                            {/* Arrow pointing down */}
+                                                            <div className="absolute -bottom-2 left-6 w-4 h-4 bg-slate-900 border-b border-r border-slate-700 transform rotate-45"></div>
+                                                        </div>
+                                                    </div>
+
                                                 </div>
                                             </div>
                                             <label className="relative inline-flex items-center cursor-pointer">

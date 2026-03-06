@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network, Info } from 'lucide-react';
+import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network, Info, Settings, Globe } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -15,6 +15,13 @@ const ViewContainers = () => {
     const [activeTerminal, setActiveTerminal] = useState(null);
     const [expandedContainers, setExpandedContainers] = useState({});
     const [containerStats, setContainerStats] = useState({});
+
+    // Edit Modal State
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editingContainer, setEditingContainer] = useState(null);
+    const [editDomain, setEditDomain] = useState('');
+    const [editPort, setEditPort] = useState('');
+
     const { addToast } = useToast();
 
     // We use a ref to hold the latest containers so socket closures can read it
@@ -130,6 +137,39 @@ const ViewContainers = () => {
         }
     };
 
+    const openEditModal = (container) => {
+        setEditingContainer(container);
+        setEditDomain(container.domain || '');
+        // We try to guess the exposed port if it had one, or default to 80
+        const guessedPort = container.ports && Object.keys(container.ports).length > 0
+            ? Object.keys(container.ports)[0].split('/')[0]
+            : '80';
+        setEditPort(guessedPort);
+        setEditModalOpen(true);
+    };
+
+    const submitEdit = async (e) => {
+        e.preventDefault();
+        try {
+            const token = localStorage.getItem('token');
+            addToast('Updating Container', `Applying network settings for ${editingContainer.name}...`, 'info');
+            setEditModalOpen(false);
+
+            await axios.put(`http://localhost:5000/api/containers/${editingContainer._id}/edit`, {
+                domain: editDomain,
+                domainPort: editPort
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+
+            addToast('Update Successful', 'Container routing settings updated.', 'success');
+            fetchContainers();
+        } catch (err) {
+            console.error('Error editing container:', err);
+            addToast('Update Failed', err.response?.data?.message || 'Could not edit container.', 'error');
+        }
+    };
+
     const fetchLogs = async (id, name) => {
         try {
             const token = localStorage.getItem('token');
@@ -241,9 +281,18 @@ const ViewContainers = () => {
                                         <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1">{container.image}</p>
                                     </div>
                                 </div>
-                                <div className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${container.state === 'running' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500/50 dark:text-emerald-400' : 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-900/30 dark:border-rose-500/50 dark:text-rose-400'
-                                    }`}>
-                                    {container.state ? container.state.toUpperCase() : 'UNKNOWN'}
+                                <div className="flex items-center space-x-3">
+                                    <button
+                                        onClick={() => openEditModal(container)}
+                                        className="p-2 text-slate-400 hover:text-brand-500 bg-slate-50 hover:bg-brand-50 dark:bg-slate-800 dark:hover:bg-brand-500/10 rounded-xl transition-all"
+                                        title="Settings / Expose to Internet"
+                                    >
+                                        <Settings size={20} />
+                                    </button>
+                                    <div className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${container.state === 'running' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500/50 dark:text-emerald-400' : 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-900/30 dark:border-rose-500/50 dark:text-rose-400'
+                                        }`}>
+                                        {container.state ? container.state.toUpperCase() : 'UNKNOWN'}
+                                    </div>
                                 </div>
                             </div>
 
@@ -342,10 +391,23 @@ const ViewContainers = () => {
                                     <>
                                         <button
                                             onClick={() => handleAction(container._id, 'stop')}
-                                            className="flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                            title="Gracefully stop the container without deleting its data"
+                                            className="group relative flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                         >
                                             <Square size={16} /> <span>Stop</span>
+
+                                            {/* Custom Hover Tooltip */}
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[240px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                                    <div className="flex items-start mb-1 text-amber-400">
+                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                        <span className="font-bold">Pause Container</span>
+                                                    </div>
+                                                    <p className="text-slate-300 leading-relaxed font-normal">
+                                                        Gracefully stop the container without deleting its data. You can start it again later.
+                                                    </p>
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                                </div>
+                                            </div>
                                         </button>
 
                                         <button
@@ -356,16 +418,17 @@ const ViewContainers = () => {
 
                                             {/* Custom Hover Tooltip */}
                                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[280px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-4 shadow-2xl border border-slate-700/50">
-                                                    <div className="flex items-start mb-2 text-indigo-400">
-                                                        <Info size={16} className="mr-2 shrink-0 mt-0.5" />
-                                                        <span className="font-bold text-sm">Zero-Downtime Update</span>
+                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                                    <div className="flex items-start mb-1 text-indigo-400">
+                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                        <span className="font-bold">Zero-Downtime Update</span>
                                                     </div>
-                                                    <p className="text-slate-300 leading-relaxed text-left">
-                                                        This button downloads the latest version of your app and turns it on. Traefik will seamlessly switch your users to the new version without a single second of downtime, and then delete the old one.
+                                                    <p className="text-slate-300 leading-relaxed font-normal mb-1.5">
+                                                        Downloads the latest app version and turns it on. Traefik seamlessly switches users to the new version without a single second of downtime, then deletes the old one.
                                                     </p>
-
-                                                    {/* Triangle pointer */}
+                                                    <p className="text-indigo-300/80 text-[11px] leading-relaxed font-medium">
+                                                        💡 <span className="text-white">Best for:</span> Web Servers (Nginx, React) & APIs (Node, Python). <span className="text-rose-300">Do NOT use on Database containers.</span>
+                                                    </p>
                                                     <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
                                                 </div>
                                             </div>
@@ -373,28 +436,67 @@ const ViewContainers = () => {
 
                                         <button
                                             onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
-                                            className="flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                            title="Open an interactive SSH/Bash console inside the container"
+                                            className="group relative flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                         >
                                             <MonitorPlay size={16} /> <span>Console</span>
+
+                                            {/* Custom Hover Tooltip */}
+                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[240px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                                    <div className="flex items-start mb-1 text-brand-400">
+                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                        <span className="font-bold">Terminal Access</span>
+                                                    </div>
+                                                    <p className="text-slate-300 leading-relaxed font-normal">
+                                                        Open an interactive SSH/Bash console inside the container to run commands directly.
+                                                    </p>
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                                </div>
+                                            </div>
                                         </button>
                                     </>
                                 ) : (
                                     <button
                                         onClick={() => handleAction(container._id, 'start')}
-                                        className="flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                        title="Boot up the stopped container"
+                                        className="group relative flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                     >
                                         <Play size={16} /> <span>Start</span>
+
+                                        {/* Custom Hover Tooltip */}
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                            <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                                <div className="flex items-start mb-1 text-emerald-400">
+                                                    <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                    <span className="font-bold">Boot Container</span>
+                                                </div>
+                                                <p className="text-slate-300 leading-relaxed font-normal">
+                                                    Turn on this stopped container.
+                                                </p>
+                                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                            </div>
+                                        </div>
                                     </button>
                                 )}
 
                                 <button
                                     onClick={() => fetchLogs(container._id, container.name)}
-                                    className="flex-1 min-w-[100px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-white dark:border-transparent py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                    title="View historical runtime logs"
+                                    className="group relative flex-1 min-w-[100px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-white dark:border-transparent py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                 >
                                     <Terminal size={16} /> <span>Logs</span>
+
+                                    {/* Custom Hover Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[220px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                        <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                            <div className="flex items-start mb-1 text-slate-300">
+                                                <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                <span className="font-bold text-white">View Console Logs</span>
+                                            </div>
+                                            <p className="text-slate-400 leading-relaxed font-normal">
+                                                View historical runtime logs and error outputs for this container.
+                                            </p>
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                        </div>
+                                    </div>
                                 </button>
 
                                 <button
@@ -403,10 +505,23 @@ const ViewContainers = () => {
                                             handleAction(container._id, 'delete');
                                         }
                                     }}
-                                    className="flex-1 min-w-[100px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                    title="Permanently delete container and its data"
+                                    className="group relative flex-[2] min-w-[150px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                 >
                                     <Trash2 size={16} /> <span>Remove</span>
+
+                                    {/* Custom Hover Tooltip */}
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[260px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
+                                        <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
+                                            <div className="flex items-start mb-1 text-rose-400">
+                                                <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+                                                <span className="font-bold tracking-wide">Danger Zone</span>
+                                            </div>
+                                            <p className="text-slate-300 leading-relaxed font-normal">
+                                                Permanently delete this container and its data. Unsaved files not in a Volume will be lost forever.
+                                            </p>
+                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
+                                        </div>
+                                    </div>
                                 </button>
                             </div>
                         </div>
@@ -449,6 +564,73 @@ const ViewContainers = () => {
                     containerName={activeTerminal.name}
                     onClose={() => setActiveTerminal(null)}
                 />
+            )}
+
+            {/* Edit / Settings Modal */}
+            {editModalOpen && editingContainer && (
+                <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center">
+                                <Settings className="mr-2 text-brand-500" /> Settings: {editingContainer.name}
+                            </h3>
+                            <button onClick={() => setEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1">
+                                <Square size={20} className="stroke-[2.5px]" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={submitEdit} className="p-6">
+                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
+                                <Globe size={18} className="mr-2 text-purple-500" /> Expose to Internet
+                            </h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
+                                Add a custom Traefik domain to connect this container to the public web safely.
+                                <br /> <strong className="text-amber-500">Note:</strong> Applying these settings will restart the container instantly to apply network changes.
+                            </p>
+
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                        Custom Domain URL
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editDomain}
+                                        onChange={(e) => setEditDomain(e.target.value)}
+                                        placeholder="e.g., app.mydomain.com"
+                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm"
+                                    />
+                                    <p className="text-[10px] text-slate-500 mt-1">Leave empty to remove internet access.</p>
+                                </div>
+                                {editDomain.trim() !== '' && (
+                                    <div className="animate-fade-in">
+                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+                                            Internal Container Port
+                                        </label>
+                                        <input
+                                            type="number"
+                                            value={editPort}
+                                            onChange={(e) => setEditPort(e.target.value)}
+                                            required={editDomain.trim() !== ''}
+                                            placeholder="e.g., 80 or 3000"
+                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm"
+                                        />
+                                        <p className="text-[10px] text-slate-500 mt-1">The port your app listens on inside the container.</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700/50">
+                                <button type="button" onClick={() => setEditModalOpen(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors">
+                                    Cancel
+                                </button>
+                                <button type="submit" className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-brand-500/25">
+                                    Save & Apply
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
             )}
         </div>
     );
