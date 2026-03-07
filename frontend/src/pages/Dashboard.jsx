@@ -13,10 +13,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchSummary = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get('http://localhost:5000/api/containers', {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const res = await axios.get('http://localhost:5000/api/containers');
                 const containers = res.data;
                 const running = containers.filter(c => c.state === 'running');
 
@@ -33,9 +30,7 @@ const Dashboard = () => {
 
                 if (running.length > 0) {
                     const metricsPromises = running.map(c =>
-                        axios.get(`http://localhost:5000/api/stats/${c._id}`, {
-                            headers: { Authorization: `Bearer ${token}` }
-                        }).catch(() => null)
+                        axios.get(`http://localhost:5000/api/stats/${c._id}`).catch(() => null)
                     );
                     const metricsResults = await Promise.all(metricsPromises);
                     metricsResults.forEach(m => {

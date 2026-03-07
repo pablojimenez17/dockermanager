@@ -15,7 +15,7 @@ const Login = () => {
         e.preventDefault();
         try {
             const res = await axios.post('http://localhost:5000/api/auth/login', { email, password });
-            localStorage.setItem('token', res.data.token);
+            // `token` is securely set via HttpOnly cookie now
             localStorage.setItem('name', res.data.name);
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);

@@ -3,6 +3,7 @@ import Docker from 'dockerode';
 import Container from '../models/Container.js';
 import User from '../models/User.js';
 import Secret, { decrypt } from '../models/Secret.js';
+import Registry, { decrypt as decryptRegistry } from '../models/Registry.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
 import path from 'path';
@@ -13,6 +14,40 @@ const router = express.Router();
 const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 router.use(authMiddleware);
+
+// Helper to dynamically resolve registry authentication for private pulls
+const resolveRegistryAuth = async (image, userId) => {
+    let authconfig = null;
+    const imageParts = image.split('/');
+    if (imageParts.length > 1) {
+        let potentialRegistryUrl = imageParts[0]; // e.g., ghcr.io
+
+        // Handle DockerHub edge cases where user inputs `myusername/myrepo:latest` instead of `docker.io/myusername/myrepo`
+        if (!potentialRegistryUrl.includes('.')) {
+            potentialRegistryUrl = 'index.docker.io/v1/'; // standard docker hub api
+        }
+
+        try {
+            // Find a registry entry matching the URL (case insensitive)
+            const registryDoc = await Registry.findOne({
+                userId,
+                url: { $regex: new RegExp(potentialRegistryUrl, 'i') }
+            });
+
+            if (registryDoc) {
+                authconfig = {
+                    username: registryDoc.username,
+                    password: decryptRegistry(registryDoc.encryptedPassword, registryDoc.iv),
+                    serveraddress: registryDoc.url
+                };
+                console.log(`[DEBUG] Found encrypted private registry credentials for ${registryDoc.url}`);
+            }
+        } catch (e) {
+            console.error("[ERROR] Failed to fetch private registry config:", e);
+        }
+    }
+    return authconfig;
+};
 
 // Get all containers for the logged-in user
 router.get('/', async (req, res) => {
@@ -128,9 +163,14 @@ router.post('/', async (req, res) => {
             console.log(`[DEBUG] Processing config for image: ${config.image} `);
             const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, domain, domainPort, volumeName, volumeMountPath } = config;
 
-            // Ensure image exists or pull it
+            // Ensure image exists or pull it using private registry if available
             try {
-                await docker.pull(image);
+                const authconfig = await resolveRegistryAuth(image, req.user.userId);
+                if (authconfig) {
+                    await docker.pull(image, { authconfig });
+                } else {
+                    await docker.pull(image);
+                }
             } catch (err) {
                 console.log(`Pull error or image exists for ${image}, trying to create anyway`, err.message);
             }
@@ -385,12 +425,17 @@ router.put('/:id/redeploy', async (req, res) => {
             return res.status(404).json({ message: 'Underlying Docker container is missing. Cannot redeploy gracefully.' });
         }
 
-        // Pull the latest version of the image before downtime
+        // Pull the latest version of the image before downtime, utilizing private credentials if available
         console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
         try {
-            await docker.pull(dbContainer.image);
+            const authconfig = await resolveRegistryAuth(dbContainer.image, req.user.userId);
+            if (authconfig) {
+                await docker.pull(dbContainer.image, { authconfig });
+            } else {
+                await docker.pull(dbContainer.image);
+            }
         } catch (pullErr) {
-            console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private): ${pullErr.message}`);
+            console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private without credentials): ${pullErr.message}`);
         }
 
         // Prepare Green Container Config based on Blue's specs

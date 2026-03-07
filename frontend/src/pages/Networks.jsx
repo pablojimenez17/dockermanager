@@ -24,10 +24,7 @@ const Networks = () => {
     const fetchNetworks = async () => {
         try {
             setLoading(true);
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/networks', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get('http://localhost:5000/api/networks');
             // Filter out some default docker networks to reduce clutter if desired, 
             // but we'll show all of them so the user knows what exists.
             setNetworks(res.data);
@@ -42,10 +39,7 @@ const Networks = () => {
     const handleCreateNetwork = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/networks', formData, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post('http://localhost:5000/api/networks', formData);
             addToast(`Network ${formData.name} created successfully!`, 'success');
             setShowCreateModal(false);
             setFormData({ name: '', subnet: '', gateway: '' });
@@ -61,10 +55,7 @@ const Networks = () => {
         if (!window.confirm(`Are you sure you want to delete network: ${name}?`)) return;
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/networks/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.delete(`http://localhost:5000/api/networks/${id}`);
             addToast(`Network ${name} deleted successfully!`, 'success');
             fetchNetworks();
         } catch (error) {

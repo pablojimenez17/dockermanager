@@ -21,11 +21,10 @@ const AdminDashboard = () => {
 
     const fetchData = async () => {
         try {
-            const token = localStorage.getItem('token');
             const [usersRes, containersRes, auditRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('http://localhost:5000/api/admin/containers', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('http://localhost:5000/api/admin/audit', { headers: { Authorization: `Bearer ${token}` } }).catch(() => ({ data: [] }))
+                axios.get('http://localhost:5000/api/admin/users'),
+                axios.get('http://localhost:5000/api/admin/containers'),
+                axios.get('http://localhost:5000/api/admin/audit').catch(() => ({ data: [] }))
             ]);
             setUsers(usersRes.data);
             setContainers(containersRes.data);
@@ -82,10 +81,7 @@ const AdminDashboard = () => {
 
     const fetchLogs = async (id, name) => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`);
             setSelectedLogs({ name, content: res.data });
         } catch (err) {
             setSelectedLogs({ name, content: "Error fetching logs or container not running." });
@@ -95,13 +91,10 @@ const AdminDashboard = () => {
     const handleForceDelete = async (id) => {
         if (!window.confirm("Are you sure you want to forcibly remove this container for this user?")) return;
         try {
-            const token = localStorage.getItem('token');
             const targetContainer = containers.find(c => c._id === id);
             const cName = targetContainer ? targetContainer.name : 'Container';
 
-            await axios.delete(`http://localhost:5000/api/admin/containers/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.delete(`http://localhost:5000/api/admin/containers/${id}`);
 
             addToast('Container Deleted', `Forcefully unlinked and removed ${cName}`, 'error');
             fetchData();

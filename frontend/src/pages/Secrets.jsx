@@ -14,10 +14,7 @@ const Secrets = () => {
 
     const fetchSecrets = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/secrets', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get('http://localhost:5000/api/secrets');
             setSecrets(res.data);
         } catch (error) {
             console.error('Failed to fetch secrets:', error);
@@ -43,10 +40,7 @@ const Secrets = () => {
 
         setSubmitting(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/secrets', newSecret, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post('http://localhost:5000/api/secrets', newSecret);
             addToast('Success', 'Secret encrypted and stored in vault', 'success');
             setNewSecret({ name: '', value: '', description: '' });
             setShowForm(false);
@@ -64,10 +58,7 @@ const Secrets = () => {
         }
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/secrets/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.delete(`http://localhost:5000/api/secrets/${id}`);
             addToast('Deleted', `Secret ${name} removed from vault`, 'success');
             fetchSecrets();
         } catch (error) {

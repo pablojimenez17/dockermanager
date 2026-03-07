@@ -16,12 +16,9 @@ const Volumes = () => {
         setLoading(true);
         setError('');
         try {
-            const token = localStorage.getItem('token');
-            if (!token) return;
-
             const [meRes, volRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('http://localhost:5000/api/volumes', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('http://localhost:5000/api/auth/me'),
+                axios.get('http://localhost:5000/api/volumes')
             ]);
 
             if (meRes.data.limits) setLimits(meRes.data.limits);
@@ -52,10 +49,7 @@ const Volumes = () => {
         setError('');
         setActionLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/volumes', { name: newVolumeName }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post('http://localhost:5000/api/volumes', { name: newVolumeName });
             setNewVolumeName('');
             await fetchVolumes();
         } catch (err) {
@@ -71,10 +65,7 @@ const Volumes = () => {
         setError('');
         setActionLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/volumes/${id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.delete(`http://localhost:5000/api/volumes/${id}`);
             await fetchVolumes();
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to delete volume. It might be currently attached to a running container.');

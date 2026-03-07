@@ -35,12 +35,9 @@ const ChatAssistant = () => {
 
         try {
             // Include token so backend knows who is asking (optional, but good for security)
-            const token = localStorage.getItem('token');
             const response = await axios.post('http://localhost:5000/api/ai/chat', {
                 message: userMessage,
                 history: messages // Exclude the very last user message we just appended locally
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             setMessages(prev => [...prev, { role: 'assistant', text: response.data.reply }]);

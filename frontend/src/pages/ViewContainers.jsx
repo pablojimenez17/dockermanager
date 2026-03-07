@@ -31,10 +31,7 @@ const ViewContainers = () => {
     const fetchContainers = async () => {
         try {
             setRefreshing(true);
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/containers', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get('http://localhost:5000/api/containers');
             setContainers(res.data);
             setError('');
         } catch (err) {
@@ -91,7 +88,6 @@ const ViewContainers = () => {
 
     const handleAction = async (id, action) => {
         try {
-            const token = localStorage.getItem('token');
             const targetContainer = containers.find(c => c._id === id);
             const cName = targetContainer ? targetContainer.name : 'Container';
 
@@ -101,9 +97,7 @@ const ViewContainers = () => {
 
             const method = action === 'delete' ? 'delete' : 'post';
 
-            await axios[method](endpoint, action === 'delete' ? { headers: { Authorization: `Bearer ${token}` } } : {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios[method](endpoint, action === 'delete' ? {  } : {});
 
             if (action === 'start') {
                 addToast('Container Started', `${cName} successfully started.`, 'success');
@@ -122,12 +116,9 @@ const ViewContainers = () => {
 
     const handleRedeploy = async (id, name, image) => {
         try {
-            const token = localStorage.getItem('token');
             addToast('Redeploy Started', `Pulling latest ${image} and spawning Green container for ${name}...`, 'info');
 
-            await axios.put(`http://localhost:5000/api/containers/${id}/redeploy`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.put(`http://localhost:5000/api/containers/${id}/redeploy`, {});
 
             addToast('Zero-Downtime Success', `${name} is now running the latest version. Old container removed.`, 'success');
             fetchContainers();
@@ -151,15 +142,12 @@ const ViewContainers = () => {
     const submitEdit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
             addToast('Updating Container', `Applying network settings for ${editingContainer.name}...`, 'info');
             setEditModalOpen(false);
 
             await axios.put(`http://localhost:5000/api/containers/${editingContainer._id}/edit`, {
                 domain: editDomain,
                 domainPort: editPort
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
 
             addToast('Update Successful', 'Container routing settings updated.', 'success');
@@ -172,10 +160,7 @@ const ViewContainers = () => {
 
     const fetchLogs = async (id, name) => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`);
             setSelectedLogs({ name, content: res.data });
         } catch (err) {
             setSelectedLogs({ name, content: "Error fetching logs or container not running." });
@@ -188,10 +173,7 @@ const ViewContainers = () => {
 
         if (!isExpanded && container.state === 'running') {
             try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get(`http://localhost:5000/api/stats/${container._id}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
+                const res = await axios.get(`http://localhost:5000/api/stats/${container._id}`);
                 setContainerStats(prev => ({ ...prev, [container._id]: res.data }));
             } catch (err) {
                 console.error("Failed to fetch stats for", container.name);

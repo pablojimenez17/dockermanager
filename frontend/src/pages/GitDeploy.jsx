@@ -22,11 +22,9 @@ const GitDeploy = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
                 const [meRes, containersRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } })
+                    axios.get('http://localhost:5000/api/auth/me'),
+                    axios.get('http://localhost:5000/api/containers')
                 ]);
 
                 if (meRes.data.limits) setLimits(meRes.data.limits);
@@ -72,10 +70,7 @@ const GitDeploy = () => {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/git/deploy', form, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post('http://localhost:5000/api/git/deploy', form);
             navigate('/app/containers');
         } catch (err) {
             setError(err.response?.data?.message || 'Error deploying from Git');

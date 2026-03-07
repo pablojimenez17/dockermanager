@@ -11,10 +11,7 @@ const Plans = () => {
 
     const fetchCurrentPlan = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/auth/me', {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.get('http://localhost:5000/api/auth/me');
             setCurrentPlan(res.data.planType || 'free');
             // Update local storage just in case
             localStorage.setItem('planType', res.data.planType);
@@ -34,10 +31,7 @@ const Plans = () => {
 
         setProcessing(true);
         try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post('http://localhost:5000/api/plans/upgrade', { planType }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await axios.post('http://localhost:5000/api/plans/upgrade', { planType });
 
             setCurrentPlan(res.data.planType);
             localStorage.setItem('planType', res.data.planType);

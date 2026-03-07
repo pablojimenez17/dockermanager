@@ -20,7 +20,17 @@ router.post('/register', async (req, res) => {
         const user = new User({ name, email, password, role });
         await user.save();
 
-        res.status(201).json({ message: 'User created successfully' });
+        const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
+
+        // Set HTTP-Only Cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
+        res.status(201).json({ message: 'User created successfully', token });
     } catch (error) {
         res.status(500).json({ message: 'Error creating user', error: error.message });
     }
@@ -41,8 +51,17 @@ router.post('/login', async (req, res) => {
         }
 
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
+
+        // Set HTTP-Only Cookie
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 24 * 60 * 60 * 1000 // 1 day
+        });
+
         res.json({
-            token,
+            token, // Kept for backwards compatibility if needed during migration
             name: user.name,
             email: user.email,
             role: user.role,
@@ -52,6 +71,16 @@ router.post('/login', async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Error logging in', error: error.message });
     }
+});
+
+// Logout Route
+router.post('/logout', (req, res) => {
+    res.clearCookie('token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax'
+    });
+    res.json({ message: 'Logged out successfully' });
 });
 
 router.get('/me', authMiddleware, async (req, res) => {

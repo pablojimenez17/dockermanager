@@ -2,6 +2,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import cookieParser from 'cookie-parser';
 import authRoutes from './routes/authRoutes.js';
 import containerRoutes from './routes/containerRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
@@ -12,6 +13,7 @@ import planRoutes from './routes/planRoutes.js';
 import gitRoutes from './routes/gitRoutes.js';
 import volumeRoutes from './routes/volumeRoutes.js';
 import secretRoutes from './routes/secretRoutes.js';
+import registryRoutes from './routes/registryRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import User from './models/User.js';
@@ -26,8 +28,12 @@ const server = createServer(app);
 setupSockets(server);
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: 'http://localhost:5173', // Vite default port
+    credentials: true // Required for HTTP-Only cookies
+}));
 app.use(express.json());
+app.use(cookieParser());
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -40,6 +46,7 @@ app.use('/api/plans', planRoutes);
 app.use('/api/git', gitRoutes);
 app.use('/api/volumes', volumeRoutes);
 app.use('/api/secrets', secretRoutes);
+app.use('/api/registries', registryRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')

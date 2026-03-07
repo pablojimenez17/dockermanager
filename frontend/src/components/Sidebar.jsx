@@ -1,14 +1,20 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck } from 'lucide-react';
 import { useTheme } from './ThemeContext';
+import axios from 'axios';
 
 const Sidebar = () => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
+    const handleLogout = async () => {
+        try {
+            await axios.post('http://localhost:5000/api/auth/logout');
+        } catch (e) {
+            console.error('Logout error', e);
+        }
+        localStorage.clear();
         navigate('/');
     };
 
@@ -19,6 +25,7 @@ const Sidebar = () => {
         { name: 'Deploy from Git', path: '/app/git-deploy', icon: <GitBranch size={20} /> },
         { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
         { name: 'Secret Manager', path: '/app/secrets', icon: <Lock size={20} /> },
+        { name: 'Private Registries', path: '/app/registries', icon: <ShieldCheck size={20} /> },
         { name: 'Volumes (Disks)', path: '/app/volumes', icon: <HardDrive size={20} /> },
         { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
         { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={20} /> },

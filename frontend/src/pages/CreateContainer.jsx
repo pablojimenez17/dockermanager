@@ -92,14 +92,12 @@ const CreateContainer = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                const token = localStorage.getItem('token');
-                if (!token) return;
                 const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/volumes', { headers: { Authorization: `Bearer ${token}` } }),
-                    axios.get('http://localhost:5000/api/secrets', { headers: { Authorization: `Bearer ${token}` } })
+                    axios.get('http://localhost:5000/api/networks'),
+                    axios.get('http://localhost:5000/api/auth/me'),
+                    axios.get('http://localhost:5000/api/containers'),
+                    axios.get('http://localhost:5000/api/volumes'),
+                    axios.get('http://localhost:5000/api/secrets')
                 ]);
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
@@ -253,7 +251,6 @@ const CreateContainer = () => {
         setLoading(true);
 
         try {
-            const token = localStorage.getItem('token');
             // Format payload
             const payload = containers.map(c => {
                 // Filter out empty EnvVars and format as ["KEY=VALUE"] or ["KEY={{SECRET:name}}"]
@@ -280,9 +277,7 @@ const CreateContainer = () => {
 
             // Since our backend logic was previously updated to handle "host" vs "bridge",
             // we will send the format as { stack: payload }
-            await axios.post('http://localhost:5000/api/containers', { stack: payload }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            await axios.post('http://localhost:5000/api/containers', { stack: payload });
 
             navigate('/app/containers');
         } catch (err) {
