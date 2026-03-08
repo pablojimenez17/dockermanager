@@ -15,6 +15,52 @@ const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe
 
 router.use(authMiddleware);
 
+// Helper to wait for image download fully before creating containers
+const pullImageSync = (image, authconfig = null) => {
+    return new Promise((resolve, reject) => {
+        const onStream = (err, stream) => {
+            if (err) return reject(err);
+            docker.modem.followProgress(
+                stream,
+                (err2, output) => {
+                    if (err2) return reject(err2);
+                    // dockerode followProgress may resolve cleanly even if an error occurred in the stream
+                    // We must check the last output objects for an 'error' property
+                    if (output && output.length > 0) {
+                        const lastEvent = output[output.length - 1];
+                        if (lastEvent.error) {
+                            return reject(new Error(`Docker pull failed: ${lastEvent.error}`));
+                        }
+                    }
+                    resolve(output);
+                },
+                () => { } // onProgress (required, avoid crash)
+            );
+        };
+        // IMPORTANT: do NOT pass empty {} opts — dockerode on Windows breaks silently
+        if (authconfig) {
+            docker.pull(image, { authconfig }, onStream);
+        } else {
+            docker.pull(image, onStream);
+        }
+    });
+};
+
+// Docker Desktop on Windows has a race condition: image may not be immediately
+// available after pull completes. This helper retries inspect until confirmed.
+const waitForImage = async (imageName, maxRetries = 10, delayMs = 2000) => {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            await docker.getImage(imageName).inspect();
+            return true;
+        } catch (_) {
+            console.log(`[TEMPLATE] Waiting for image ${imageName} to become available... (${i + 1}/${maxRetries})`);
+            await new Promise(r => setTimeout(r, delayMs));
+        }
+    }
+    throw new Error(`Image ${imageName} not available after pull. Docker may need more time.`);
+};
+
 // Helper to dynamically resolve registry authentication for private pulls
 const resolveRegistryAuth = async (image, userId) => {
     let authconfig = null;
@@ -165,14 +211,24 @@ router.post('/', async (req, res) => {
 
             // Ensure image exists or pull it using private registry if available
             try {
-                const authconfig = await resolveRegistryAuth(image, req.user.userId);
-                if (authconfig) {
-                    await docker.pull(image, { authconfig });
-                } else {
-                    await docker.pull(image);
+                let imageExists = false;
+                try {
+                    await docker.getImage(image).inspect();
+                    imageExists = true;
+                } catch (_) { }
+
+                if (!imageExists) {
+                    const authconfig = await resolveRegistryAuth(image, req.user.userId);
+                    console.log(`[DEBUG] Pulling ${image}...`);
+                    await pullImageSync(image, authconfig);
                 }
+
+                // Crucial for Docker Desktop on Windows: Wait for image to be indexed
+                await waitForImage(image);
             } catch (err) {
-                console.log(`Pull error or image exists for ${image}, trying to create anyway`, err.message);
+                console.warn(`[DEBUG] Pull failed for ${image}: ${err.message}`);
+                // Throw so the API aborts and returns a 400/500 to the frontend with the real reason
+                throw new Error(`Failed to pull image ${image}: ${err.message}`);
             }
 
             const instanceName = name;
@@ -258,7 +314,8 @@ router.post('/', async (req, res) => {
                     'traefik.enable': 'true',
                     [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                     [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
-                    'traefik.docker.network': safeNetworkMode
+                    'traefik.docker.network': safeNetworkMode,
+                    [`traefik.http.routers.${appId}.tls.certresolver`]: 'myresolver'
                 };
             }
 
@@ -429,11 +486,7 @@ router.put('/:id/redeploy', async (req, res) => {
         console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
         try {
             const authconfig = await resolveRegistryAuth(dbContainer.image, req.user.userId);
-            if (authconfig) {
-                await docker.pull(dbContainer.image, { authconfig });
-            } else {
-                await docker.pull(dbContainer.image);
-            }
+            await pullImageSync(dbContainer.image, authconfig);
         } catch (pullErr) {
             console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private without credentials): ${pullErr.message}`);
         }
@@ -654,7 +707,8 @@ router.put('/:id/redeploy', async (req, res) => {
         // Pull the latest version of the image before downtime
         console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
         try {
-            await docker.pull(dbContainer.image);
+            const authconfig = await resolveRegistryAuth(dbContainer.image, req.user.userId);
+            await pullImageSync(dbContainer.image, authconfig);
         } catch (pullErr) {
             console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private): ${pullErr.message}`);
         }
@@ -711,6 +765,194 @@ router.put('/:id/redeploy', async (req, res) => {
     } catch (error) {
         console.error('[Zero-Downtime Error]', error);
         res.status(500).json({ message: 'Error attempting zero-downtime redeploy', error: error.message });
+    }
+});
+// Deploy a 1-Click App Template
+router.post('/template', async (req, res) => {
+    try {
+        const { templateId, domainBase, secrets, customAppName, envInputs } = req.body;
+
+        // 1. Find the template
+        let templatesPath = path.join(process.cwd(), 'data', 'templates.json');
+        if (!fs.existsSync(templatesPath)) templatesPath = path.join(process.cwd(), 'backend', 'data', 'templates.json');
+
+        const templatesRaw = fs.readFileSync(templatesPath, 'utf8');
+        const templates = JSON.parse(templatesRaw);
+
+        const template = templates.find(t => t.id === templateId);
+        if (!template) {
+            return res.status(404).json({ message: 'Template not found' });
+        }
+
+        // 2. Setup a unique isolated network
+        const networkName = `stack_${templateId}_${Math.random().toString(36).substring(7)}`;
+        await docker.createNetwork({
+            Name: networkName,
+            Driver: 'bridge'
+        });
+
+        const createdRecords = [];
+
+        // 3. Process and deploy each container in the template sequentially
+        for (const containerDef of template.containers) {
+            console.log(`[TEMPLATE] Processing ${containerDef.name_prefix} (image: ${containerDef.image})`);
+
+            // Pull image – try local check first, pull if missing, then verify
+            let imageExists = false;
+            try {
+                await docker.getImage(containerDef.image).inspect();
+                imageExists = true;
+                console.log(`[TEMPLATE] Image ${containerDef.image} already cached locally.`);
+            } catch (_) {
+                imageExists = false;
+            }
+
+            if (!imageExists) {
+                console.log(`[TEMPLATE] Pulling ${containerDef.image} from registry...`);
+                let authconfig = null;
+                try { authconfig = await resolveRegistryAuth(containerDef.image, req.user.userId); } catch (_) { }
+                await pullImageSync(containerDef.image, authconfig); // throws on failure - no silent catch
+                console.log(`[TEMPLATE] Pull complete for ${containerDef.image}`);
+            }
+
+            // Verify image is actually available (Docker Desktop Windows race condition)
+            await waitForImage(containerDef.image);
+
+            let instanceName = `${containerDef.name_prefix}-${Math.random().toString(36).substring(7)}`;
+            if (customAppName && customAppName.trim() !== '') {
+                // If template has multiple containers, append the prefix to distinguish them
+                instanceName = template.containers.length > 1
+                    ? `${customAppName.trim()}-${containerDef.name_prefix}`
+                    : customAppName.trim();
+            }
+
+            // Build Env - decrypt secrets from vault
+            const finalEnv = [];
+            if (containerDef.env) {
+                for (const e of containerDef.env) {
+                    if (e.type === 'secret') {
+                        const secretName = secrets && secrets[e.key];
+                        if (secretName) {
+                            // Resolve from the Secret Manager vault
+                            const secretDoc = await Secret.findOne({ userId: req.user.userId, name: secretName });
+                            if (secretDoc) {
+                                const decryptedVal = decrypt(secretDoc.encryptedValue, secretDoc.iv);
+                                finalEnv.push(`${e.key}=${decryptedVal}`);
+                            }
+                        }
+                    } else if (e.type === 'input' && e.key === 'url' && domainBase) {
+                        finalEnv.push(`${e.key}=https://${domainBase}`);
+                    } else if (e.type === 'input' && envInputs && envInputs[e.key] !== undefined) {
+                        finalEnv.push(`${e.key}=${envInputs[e.key]}`);
+                    } else if (e.value) {
+                        finalEnv.push(`${e.key}=${e.value}`);
+                    }
+                }
+            }
+
+            // Expose Ports natively (mostly for databases that shouldn't be publicly routed via Traefik but exposed locally if needed, usually we don't expose them to host in prod but keep simple for now)
+            const PortBindings = {};
+            const ExposedPorts = {};
+            if (containerDef.ports) {
+                containerDef.ports.forEach(p => {
+                    // Map container port to a random open host port or specific if dictated
+                    if (p.host && p.container) {
+                        // Normally we shouldn't map host ports blindly in a PaaS, but for local 1-clicks it's ok unless we solely rely on Traefik
+                        // For safety, let's only expose to Traefik, but we'll bind for dashboard visibility
+                        PortBindings[`${p.container}/tcp`] = [{ HostPort: '' }]; // random host port
+                        ExposedPorts[`${p.container}/tcp`] = {};
+                    }
+                });
+            }
+
+            // Traefik Labels (Inject routing if it's the primary app container and domain is provided)
+            let Labels = {};
+            // If the container has port 80 or 2368 (web app ports) and a domain is provided, configure Traefik
+            const isWebAppContainer = containerDef.ports && containerDef.ports.some(p => p.container === 80 || p.container === 2368 || p.container === 8080);
+
+            if (isWebAppContainer && domainBase) {
+                const cleanDomain = domainBase.trim().toLowerCase();
+                const targetPort = containerDef.ports[0].container.toString();
+
+                Labels = {
+                    "traefik.enable": "true",
+                    [`traefik.http.routers.${instanceName}.rule`]: `Host(\`${cleanDomain}\`)`,
+                    [`traefik.http.routers.${instanceName}.entrypoints`]: "web",
+                    [`traefik.http.services.${instanceName}.loadbalancer.server.port`]: targetPort
+                };
+            }
+
+            // Volumes
+            const Binds = [];
+            // For PaaS templates, we use true Docker Managed Volumes (Named Volumes)
+            if (containerDef.volumes) {
+                for (const v of containerDef.volumes) {
+                    const uniqueVolumeName = `${instanceName}_${v.hostPath}`;
+
+                    // Explicitly create the volume to avoid Windows/Linux path issues
+                    try {
+                        const existingVolume = await docker.getVolume(uniqueVolumeName).inspect().catch(() => null);
+                        if (!existingVolume) {
+                            await docker.createVolume({
+                                Name: uniqueVolumeName,
+                                Driver: 'local'
+                            });
+                        }
+                    } catch (volErr) {
+                        console.warn(`[TEMPLATE] Failed to pre-create volume, it might already exist: ${volErr.message}`);
+                    }
+
+                    Binds.push(`${uniqueVolumeName}:${v.containerPath}`);
+                }
+            }
+
+            const baseHostConfig = {
+                PortBindings,
+                NetworkMode: networkName,
+                Binds,
+                RestartPolicy: { Name: 'unless-stopped' }
+            };
+
+            const dockerConfig = {
+                Image: containerDef.image,
+                name: instanceName,
+                Env: finalEnv,
+                ExposedPorts,
+                HostConfig: baseHostConfig,
+                Labels,
+                ...(containerDef.command ? { Cmd: containerDef.command } : {})
+            };
+
+            const container = await docker.createContainer(dockerConfig);
+            await container.start();
+
+            // Store in our DB
+            const dbContainer = await Container.create({
+                userId: req.user.userId,
+                dockerId: container.id,
+                name: instanceName,
+                image: containerDef.image,
+                domain: (isWebAppContainer && domainBase) ? domainBase : null,
+                domainPort: (isWebAppContainer && domainBase) ? containerDef.ports[0].container.toString() : null,
+                status: 'running',
+                stackId: networkName // Group them visually later
+            });
+
+            createdRecords.push(dbContainer);
+
+            await AuditLog.create({
+                userId: req.user.userId,
+                action: 'CREATE_CONTAINER',
+                resourceName: instanceName,
+                details: `Deployed as part of ${template.name} stack`
+            });
+        }
+
+        res.status(201).json({ message: 'Template Deployed Successfully', containers: createdRecords });
+
+    } catch (error) {
+        console.error('[Template Deploy Error]', error);
+        res.status(500).json({ message: 'Error deploying template', error: error.message });
     }
 });
 

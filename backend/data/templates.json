@@ -1,0 +1,359 @@
+[
+    {
+        "id": "wordpress",
+        "name": "WordPress",
+        "icon": "https://cdn.simpleicons.org/wordpress/21759B",
+        "description": "The world's most popular open-source content management system.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "wordpress:latest",
+                "name_prefix": "wp-app",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "WORDPRESS_DB_HOST",
+                        "value": "db:3306"
+                    },
+                    {
+                        "key": "WORDPRESS_DB_USER",
+                        "value": "wordpress",
+                        "type": "input",
+                        "label": "WordPress DB User"
+                    },
+                    {
+                        "key": "WORDPRESS_DB_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "WORDPRESS_DB_NAME",
+                        "value": "wordpress",
+                        "type": "input",
+                        "label": "WordPress DB Name"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "wp_data",
+                        "containerPath": "/var/www/html",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "mysql:8.0",
+                "name_prefix": "wp-db",
+                "env": [
+                    {
+                        "key": "MYSQL_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "MySQL Root Password"
+                    },
+                    {
+                        "key": "MYSQL_DATABASE",
+                        "value": "wordpress",
+                        "type": "input",
+                        "label": "MySQL Database Name"
+                    },
+                    {
+                        "key": "MYSQL_USER",
+                        "value": "wordpress",
+                        "type": "input",
+                        "label": "MySQL Database User"
+                    },
+                    {
+                        "key": "MYSQL_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "wp_db_data",
+                        "containerPath": "/var/lib/mysql",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "postgresql",
+        "name": "PostgreSQL",
+        "icon": "https://cdn.simpleicons.org/postgresql/4169E1",
+        "description": "A powerful, open source object-relational database system.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "postgres:15-alpine",
+                "name_prefix": "postgres",
+                "ports": [
+                    {
+                        "host": 5432,
+                        "container": 5432
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "POSTGRES_USER",
+                        "value": "postgres"
+                    },
+                    {
+                        "key": "POSTGRES_PASSWORD",
+                        "type": "secret",
+                        "label": "PostgreSQL Password"
+                    },
+                    {
+                        "key": "POSTGRES_DB",
+                        "value": "default_db"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "postgres_data",
+                        "containerPath": "/var/lib/postgresql/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "redis",
+        "name": "Redis",
+        "icon": "https://cdn.simpleicons.org/redis/DC382D",
+        "description": "In-memory data structure store, used as a database, cache, and message broker.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "redis:7-alpine",
+                "name_prefix": "redis",
+                "ports": [
+                    {
+                        "host": 6379,
+                        "container": 6379
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "redis_data",
+                        "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ghost",
+        "name": "Ghost",
+        "icon": "https://cdn.simpleicons.org/ghost/15171A",
+        "description": "The creator network platform inside a powerful CMS.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "ghost:5-alpine",
+                "name_prefix": "ghost-app",
+                "ports": [
+                    {
+                        "host": 2368,
+                        "container": 2368
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "database__client",
+                        "value": "mysql"
+                    },
+                    {
+                        "key": "database__connection__host",
+                        "value": "db"
+                    },
+                    {
+                        "key": "database__connection__user",
+                        "value": "root"
+                    },
+                    {
+                        "key": "database__connection__password",
+                        "type": "secret",
+                        "label": "MySQL Root Password"
+                    },
+                    {
+                        "key": "database__connection__database",
+                        "value": "ghost"
+                    },
+                    {
+                        "key": "url",
+                        "type": "input",
+                        "label": "Full Domain URL (e.g. https://blog.orbit.local)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "ghost_data",
+                        "containerPath": "/var/lib/ghost/content",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "mysql:8.0",
+                "name_prefix": "ghost-db",
+                "env": [
+                    {
+                        "key": "MYSQL_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "MySQL Root Password"
+                    },
+                    {
+                        "key": "MYSQL_DATABASE",
+                        "value": "ghost"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "ghost_db_data",
+                        "containerPath": "/var/lib/mysql",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "nginx",
+        "name": "Nginx Web Server",
+        "icon": "https://cdn.simpleicons.org/nginx/009639",
+        "description": "High-performance web server & reverse proxy.",
+        "category": "Web Proxy",
+        "containers": [
+            {
+                "image": "nginx:alpine",
+                "name_prefix": "nginx-server",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "node",
+        "name": "Node.js Environment",
+        "icon": "https://cdn.simpleicons.org/nodedotjs/339933",
+        "description": "Lightweight Node 18 Alpine runtime environment.",
+        "category": "Runtime",
+        "containers": [
+            {
+                "image": "node:18-alpine",
+                "name_prefix": "node-env",
+                "ports": [
+                    {
+                        "host": 3000,
+                        "container": 3000
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "NODE_ENV",
+                        "value": "production"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "minecraft",
+        "name": "Minecraft Java Server",
+        "icon": "https://cdn.simpleicons.org/minecraft",
+        "description": "Ready-to-play Minecraft Java Server (itzg).",
+        "category": "Gaming",
+        "containers": [
+            {
+                "image": "itzg/minecraft-server",
+                "name_prefix": "mc-server",
+                "ports": [
+                    {
+                        "host": 25565,
+                        "container": 25565
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "EULA",
+                        "value": "TRUE",
+                        "type": "input",
+                        "label": "Accept EULA (TRUE/FALSE)"
+                    },
+                    {
+                        "key": "VERSION",
+                        "value": "LATEST",
+                        "type": "input",
+                        "label": "Minecraft Version (e.g. 1.20.4 or LATEST)"
+                    },
+                    {
+                        "key": "MEMORY",
+                        "value": "2G",
+                        "type": "input",
+                        "label": "Server RAM Allocation (e.g. 2G, 4G)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "mc_data",
+                        "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ubuntu",
+        "name": "Ubuntu Linux",
+        "icon": "https://cdn.simpleicons.org/ubuntu/E95420",
+        "description": "Ubuntu Linux complete environment for general-purpose workloads and utilities.",
+        "category": "OS",
+        "containers": [
+            {
+                "image": "ubuntu:latest",
+                "name_prefix": "ubuntu-os",
+                "ports": [],
+                "command": [
+                    "tail",
+                    "-f",
+                    "/dev/null"
+                ],
+                "env": []
+            }
+        ]
+    },
+    {
+        "id": "kali",
+        "name": "Kali Linux",
+        "icon": "https://cdn.simpleicons.org/kalilinux/557C94",
+        "description": "Kali Linux base image for penetration testing and security research.",
+        "category": "OS",
+        "containers": [
+            {
+                "image": "kalilinux/kali-rolling",
+                "name_prefix": "kali-os",
+                "ports": [],
+                "command": [
+                    "tail",
+                    "-f",
+                    "/dev/null"
+                ],
+                "env": []
+            }
+        ]
+    }
+]

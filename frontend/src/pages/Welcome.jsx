@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Server, ArrowRight, ShieldCheck, Zap, Activity, Sun, Moon } from 'lucide-react';
+import { Server, ArrowRight, ShieldCheck, Zap, Activity, Sun, Moon, GraduationCap, Aperture } from 'lucide-react';
 import { useTheme } from '../components/ThemeContext';
 
 const Welcome = () => {
@@ -11,10 +11,10 @@ const Welcome = () => {
             <nav className="border-b border-slate-200 dark:border-slate-800 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md sticky top-0 z-50 transition-colors duration-200">
                 <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                     <div className="flex items-center space-x-3">
-                        <div className="w-10 h-10 bg-brand-500/10 rounded-xl flex items-center justify-center border border-brand-500/20 shadow-[0_0_15px_rgba(14,165,233,0.2)]">
-                            <Server className="text-brand-400" size={24} />
+                        <div className="w-10 h-10 bg-brand-500/10 rounded-xl flex items-center justify-center border border-brand-500/20 shadow-[0_0_15px_rgba(14,165,233,0.2)] text-brand-500 dark:text-brand-400">
+                            <Aperture className="animate-[spin_15s_linear_infinite]" size={24} />
                         </div>
-                        <span className="text-xl font-bold tracking-wide">Docker Manager</span>
+                        <span className="text-xl font-bold tracking-wide">Orbit</span>
                     </div>
                     <div className="flex items-center space-x-6">
                         <button
@@ -191,6 +191,54 @@ const Welcome = () => {
                             <li className="flex items-center"><span className="text-emerald-500 mr-2">✓</span> Custom Node Mapping</li>
                         </ul>
                         <Link to="/register" className="w-full text-center bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-900 dark:text-white py-3 rounded-xl font-semibold transition-colors">Contact Sales</Link>
+                    </div>
+                </div>
+            </div>
+
+            {/* Trusted By Section (Footer) */}
+            <div className="max-w-7xl mx-auto px-6 py-24 text-center">
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-16">
+                    <p className="text-sm font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-12">
+                        Trusted by industry leaders & institutions
+                    </p>
+                    <div className="flex flex-wrap justify-center items-center gap-12 md:gap-20 opacity-50 hover:opacity-100 transition-opacity duration-500 grayscale hover:grayscale-0">
+
+                        {/* Education */}
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default" title="Institut Pedralbes">
+                            <GraduationCap size={44} className="text-slate-800 dark:text-white" strokeWidth={1.5} />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Institut Pedralbes</span>
+                        </div>
+
+                        {/* IT / Cloud */}
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default" title="Google">
+                            <img src="https://cdn.simpleicons.org/google/4285F4" alt="Google" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Google</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default" title="Spotify">
+                            <img src="https://cdn.simpleicons.org/spotify/1ED760" alt="Spotify" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Spotify</span>
+                        </div>
+
+                        {/* Science / Aerospace */}
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default" title="NASA">
+                            <img src="https://cdn.simpleicons.org/nasa/0B3D91" alt="NASA" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">NASA</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default hidden sm:flex" title="Stripe">
+                            <img src="https://cdn.simpleicons.org/stripe/008CDD" alt="Stripe" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Stripe</span>
+                        </div>
+
+                        {/* Automotive */}
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default" title="Tesla">
+                            <img src="https://cdn.simpleicons.org/tesla/E31937" alt="Tesla" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Tesla</span>
+                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-2 transition-transform hover:scale-110 cursor-default hidden md:flex" title="Porsche">
+                            <img src="https://cdn.simpleicons.org/porsche/D5001C" alt="Porsche" className="h-10 w-10 object-contain" />
+                            <span className="font-bold text-sm text-slate-800 dark:text-slate-200 tracking-tight">Porsche</span>
+                        </div>
+
                     </div>
                 </div>
             </div>

@@ -15,6 +15,7 @@ import GitDeploy from './pages/GitDeploy';
 import Volumes from './pages/Volumes';
 import Secrets from './pages/Secrets';
 import Registries from './pages/Registry';
+import Marketplace from './pages/Marketplace';
 import Layout from './components/Layout';
 import { ThemeProvider } from './components/ThemeContext';
 import ChatAssistant from './components/ChatAssistant';
@@ -58,6 +59,7 @@ const App = () => {
           <Route index element={<Dashboard />} />
           <Route path="create" element={<CreateContainer />} />
           <Route path="git-deploy" element={<GitDeploy />} />
+          <Route path="marketplace" element={<Marketplace />} />
           <Route path="containers" element={<ViewContainers />} />
           <Route path="secrets" element={<Secrets />} />
           <Route path="registries" element={<Registries />} />

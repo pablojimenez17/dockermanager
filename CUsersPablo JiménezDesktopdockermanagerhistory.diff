@@ -1,0 +1,2742 @@
+commit e191379e41e54353648391efa6c7c39eab4a3f7d
+Author: Pablo Jiménez <pablojpri8903@gmail.com>
+Date:   Sat Mar 7 11:46:45 2026 +0100
+
+    feat: Implement initial Docker management platform with user authentication, secure registry and secrets management, and comprehensive container-related UI.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index d4c3017..4f50e80 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -92,14 +92,12 @@ const CreateContainer = () => {
+     useEffect(() => {
+         const fetchContext = async () => {
+             try {
+-                const token = localStorage.getItem('token');
+-                if (!token) return;
+                 const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
+-                    axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
+-                    axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+-                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } }),
+-                    axios.get('http://localhost:5000/api/volumes', { headers: { Authorization: `Bearer ${token}` } }),
+-                    axios.get('http://localhost:5000/api/secrets', { headers: { Authorization: `Bearer ${token}` } })
++                    axios.get('http://localhost:5000/api/networks'),
++                    axios.get('http://localhost:5000/api/auth/me'),
++                    axios.get('http://localhost:5000/api/containers'),
++                    axios.get('http://localhost:5000/api/volumes'),
++                    axios.get('http://localhost:5000/api/secrets')
+                 ]);
+                 setAvailableNetworks(netRes.data);
+                 setAvailableVolumes(volRes.data || []);
+@@ -253,7 +251,6 @@ const CreateContainer = () => {
+         setLoading(true);
+ 
+         try {
+-            const token = localStorage.getItem('token');
+             // Format payload
+             const payload = containers.map(c => {
+                 // Filter out empty EnvVars and format as ["KEY=VALUE"] or ["KEY={{SECRET:name}}"]
+@@ -280,9 +277,7 @@ const CreateContainer = () => {
+ 
+             // Since our backend logic was previously updated to handle "host" vs "bridge",
+             // we will send the format as { stack: payload }
+-            await axios.post('http://localhost:5000/api/containers', { stack: payload }, {
+-                headers: { Authorization: `Bearer ${token}` }
+-            });
++            await axios.post('http://localhost:5000/api/containers', { stack: payload });
+ 
+             navigate('/app/containers');
+         } catch (err) {
+
+commit d5f518b96694f985f6a87388ae098d3d9ae33c2a
+Author: Pablo Jiménez <pablojpri8903@gmail.com>
+Date:   Sat Mar 7 00:13:03 2026 +0100
+
+    feat: Implement container management with creation (including presets) and viewing, alongside new AI and container backend routes.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index 4b20416..d4c3017 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -1,5 +1,5 @@
+ import React, { useState, useEffect } from 'react';
+-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert } from 'lucide-react';
++import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
+ import axios from 'axios';
+ import { useNavigate } from 'react-router-dom';
+ 
+@@ -58,11 +58,11 @@ const getEmptyContainer = () => ({
+     id: crypto.randomUUID(),
+     name: '',
+     image: '',
+-    replicas: 1,
+     portBinding: '',
+     memory: '512',
+     cpu: '1',
+     restartPolicy: 'no',
++    networkMode: 'bridge',
+     ipv4Address: '',
+     envVars: [{ key: '', value: '', type: 'raw' }],
+     showAdvanced: false,
+@@ -264,7 +264,6 @@ const CreateContainer = () => {
+                 return {
+                     name: c.name,
+                     image: c.image,
+-                    replicas: c.replicas ? parseInt(c.replicas) : 1,
+                     ports: c.portBinding ? [c.portBinding] : [],
+                     env: validEnvVars,
+                     memory: c.memory,
+@@ -460,32 +459,41 @@ const CreateContainer = () => {
+                                     </div>
+ 
+                                     <div className="mb-6">
+-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center">
+-                                            Replicas (High Availability)
+-                                            <span className="ml-2 text-xs bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">Auto Load-Balanced</span>
++                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 relative group w-fit">
++                                            <span>Port Binding (Optional)</span>
++                                            <Info size={16} className="text-slate-400 cursor-help" />
++                                            {/* Port Binding Tooltip */}
++                                            <div className="absolute bottom-full left-0 mb-3 w-[280px] sm:w-[350px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
++                                                <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-4 text-left relative overflow-hidden">
++                                                    <p className="text-sm font-bold text-white mb-2">Host vs Container Ports</p>
++                                                    <p className="text-xs text-slate-300 mb-2 leading-relaxed">
++                                                        The format is <code className="text-brand-400 font-bold bg-slate-800 px-1 rounded">HOST_PORT:CONTAINER_PORT</code> (e.g. 8080:80).
++                                                    </p>
++                                                    <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4 mb-3">
++                                                        <li><strong className="text-brand-400">Host Port:</strong> The port opened on your server/machine to the outside network.</li>
++                                                        <li><strong className="text-slate-300">Container Port:</strong> The port the software listens to <i>internally</i> inside its isolated container.</li>
++                                                    </ul>
++                                                    <p className="text-[11px] text-amber-300 bg-amber-500/10 p-2 rounded border border-amber-500/20 leading-relaxed text-left">
++                                                        ⚠️ <strong>Traefik user?</strong> Ignore this field completely! Traefik handles routing without exposing raw ports to the host machine.
++                                                    </p>
++                                                    <div className="absolute -bottom-2 left-6 w-4 h-4 bg-slate-900 border-b border-r border-slate-700 transform rotate-45"></div>
++                                                </div>
++                                            </div>
+                                         </label>
+-                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Traefik will distribute incoming traffic across all instances automatically.</p>
+-                                        <div className="relative md:w-1/2">
+-                                            <input
+-                                                type="number"
+-                                                min="1"
+-                                                max="10"
+-                                                value={c.replicas || 1}
+-                                                onChange={(e) => updateContainer(c.id, 'replicas', e.target.value)}
+-                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-bold transition-shadow"
+-                                            />
+-                                        </div>
+-                                    </div>
+-
+-                                    <div className="mb-6">
+-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
+                                         <input
+                                             type="text"
+                                             value={c.portBinding}
+                                             onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
+-                                            placeholder="Host_Port:Container_Port (e.g., 8080:80)"
+-                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
++                                            placeholder="e.g., 8080:80"
++                                            disabled={c.exposeDomain}
++                                            className={`w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm ${c.exposeDomain ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                         />
++                                        {c.exposeDomain && (
++                                            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400 flex items-center animate-fade-in">
++                                                <AlertCircle size={14} className="mr-1" />
++                                                Disabled because Traefik handles secure routing internally.
++                                            </p>
++                                        )}
+                                     </div>
+ 
+                                     {/* Domain Exposer */}
+@@ -493,9 +501,40 @@ const CreateContainer = () => {
+                                         <div className="flex items-center justify-between mb-4">
+                                             <div className="flex items-center space-x-3 text-purple-700 dark:text-purple-300">
+                                                 <Globe size={20} />
+-                                                <div>
++                                                <div className="flex items-center space-x-2 relative group">
+                                                     <h5 className="font-bold text-sm">Expose to Internet (Traefik Router)</h5>
+-                                                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">Attach a custom domain to this container automatically.</p>
++                                                    <Info size={16} className="text-purple-400 cursor-help" />
++
++                                                    {/* Tooltip for Newbies */}
++                                                    <div className="absolute bottom-full left-0 mb-3 w-[320px] sm:w-[400px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
++                                                        <div className="bg-slate-900 border border-slate-700 shadow-2xl rounded-2xl p-4 text-left relative overflow-hidden">
++                                                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 to-brand-500"></div>
++                                                            <p className="text-sm font-bold text-white mb-2 flex items-center">
++                                                                <Globe size={16} className="text-purple-400 mr-2" />
++                                                                How does this work?
++                                                            </p>
++                                                            <p className="text-xs text-slate-300 mb-2 leading-relaxed">
++                                                                Instead of opening gross numbers like <code className="bg-slate-800 text-purple-300 px-1 py-0.5 rounded">http://IP:8080</code> to the whole internet, Traefik acts as a smart bouncer.
++                                                            </p>
++                                                            <ul className="text-xs text-slate-400 space-y-2 list-disc pl-4 mb-2">
++                                                                <li><strong className="text-slate-300">Domain:</strong> Type what people put in the browser (e.g., <code className="text-green-400">api.myweb.com</code>).</li>
++                                                                <li><strong className="text-slate-300">Internal Port:</strong> Type the port the app uses <i>inside</i> its container (e.g., React uses <code className="text-brand-400">80</code>, Node uses <code className="text-brand-400">3000</code>).</li>
++                                                            </ul>
++                                                            <div className="bg-purple-900/30 border border-purple-500/30 p-3 rounded-lg mt-3">
++                                                                <p className="text-[11px] text-purple-200 mb-2 border-b border-purple-700/50 pb-2">
++                                                                    <strong>🌐 Network & Port Advice:</strong>
++                                                                </p>
++                                                                <ul className="text-[11px] text-purple-300 space-y-2">
++                                                                    <li><strong className="text-white">Network Mode:</strong> Leave it on <code className="bg-purple-800/50 px-1 rounded">Bridge</code> for simple internet exposure. Use <code className="bg-purple-800/50 px-1 rounded">Custom Network</code> only if you manually created a private network to link this app to a Database.</li>
++                                                                    <li><strong className="text-white">Port Binding:</strong> We highly recommend leaving the global <i className="text-purple-200">Port Binding (Optional)</i> field empty above. Traefik doesn't need ports mapped to your machine to secure your domain.</li>
++                                                                </ul>
++                                                            </div>
++
++                                                            {/* Arrow pointing down */}
++                                                            <div className="absolute -bottom-2 left-6 w-4 h-4 bg-slate-900 border-b border-r border-slate-700 transform rotate-45"></div>
++                                                        </div>
++                                                    </div>
++
+                                                 </div>
+                                             </div>
+                                             <label className="relative inline-flex items-center cursor-pointer">
+
+commit 3a4e3b90dd7c3e4a24d81e306d6aad755e336e3c
+Author: Pablo Jiménez <pablojpri8903@gmail.com>
+Date:   Fri Mar 6 20:17:22 2026 +0100
+
+    feat: Implement a full-stack Docker management application including frontend UI and backend API for managing containers, volumes, secrets, and Git deployments.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index a2e9470..4b20416 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -58,14 +58,19 @@ const getEmptyContainer = () => ({
+     id: crypto.randomUUID(),
+     name: '',
+     image: '',
++    replicas: 1,
+     portBinding: '',
+     memory: '512',
+     cpu: '1',
+     restartPolicy: 'no',
+-    networkMode: 'bridge',
+     ipv4Address: '',
+-    envVars: [{ key: '', value: '' }],
+-    showAdvanced: false
++    envVars: [{ key: '', value: '', type: 'raw' }],
++    showAdvanced: false,
++    exposeDomain: false,
++    domain: '',
++    domainPort: '',
++    volumeName: '',
++    volumeMountPath: ''
+ });
+ 
+ const CreateContainer = () => {
+@@ -75,8 +80,12 @@ const CreateContainer = () => {
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState('');
+     const [availableNetworks, setAvailableNetworks] = useState([]);
++    const [availableVolumes, setAvailableVolumes] = useState([]);
++    const [availableSecrets, setAvailableSecrets] = useState([]);
+     const [limits, setLimits] = useState({ maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
+     const [currentContainerCount, setCurrentContainerCount] = useState(0);
++    const [currentRamMb, setCurrentRamMb] = useState(0);
++    const [currentCpu, setCurrentCpu] = useState(0);
+ 
+     const navigate = useNavigate();
+ 
+@@ -85,14 +94,29 @@ const CreateContainer = () => {
+             try {
+                 const token = localStorage.getItem('token');
+                 if (!token) return;
+-                const [netRes, meRes, myContainersRes] = await Promise.all([
++                const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
+                     axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
+                     axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
+-                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } })
++                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } }),
++                    axios.get('http://localhost:5000/api/volumes', { headers: { Authorization: `Bearer ${token}` } }),
++                    axios.get('http://localhost:5000/api/secrets', { headers: { Authorization: `Bearer ${token}` } })
+                 ]);
+                 setAvailableNetworks(netRes.data);
++                setAvailableVolumes(volRes.data || []);
++                setAvailableSecrets(secRes.data || []);
+                 if (meRes.data.limits) setLimits(meRes.data.limits);
+                 setCurrentContainerCount(myContainersRes.data.length);
++
++                let totalRam = 0;
++                let totalCpu = 0;
++                myContainersRes.data.forEach(c => {
++                    if (c.hostConfig) {
++                        totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
++                        totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
++                    }
++                });
++                setCurrentRamMb(Math.round(totalRam));
++                setCurrentCpu(Math.round(totalCpu * 10) / 10);
+             } catch (err) {
+                 console.error("Failed to fetch context:", err);
+             }
+@@ -185,7 +209,7 @@ const CreateContainer = () => {
+     const addEnvVar = (containerId) => {
+         setContainers(containers.map(c => {
+             if (c.id === containerId) {
+-                return { ...c, envVars: [...c.envVars, { key: '', value: '' }] };
++                return { ...c, envVars: [...c.envVars, { key: '', value: '', type: 'raw' }] };
+             }
+             return c;
+         }));
+@@ -196,7 +220,7 @@ const CreateContainer = () => {
+             if (c.id === containerId) {
+                 const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
+                 // Ensure at least one empty box
+-                if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
++                if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '', type: 'raw' });
+                 return { ...c, envVars: newEnvVars };
+             }
+             return c;
+@@ -210,11 +234,11 @@ const CreateContainer = () => {
+                 // Filter out any keys that belong to other known presets
+                 const existingValid = c.envVars.filter(env => env.key.trim() !== '' && !allPresetKeys.has(env.key));
+                 const existingKeys = new Set(existingValid.map(env => env.key));
+-                const newVars = suggestedVars.filter(v => !existingKeys.has(v.key));
++                const newVars = suggestedVars.filter(v => !existingKeys.has(v.key)).map(v => ({ ...v, type: 'raw' }));
+ 
+                 const mergedVars = [...existingValid, ...newVars];
+                 if (mergedVars.length === 0 || mergedVars[mergedVars.length - 1].key !== '') {
+-                    mergedVars.push({ key: '', value: '' });
++                    mergedVars.push({ key: '', value: '', type: 'raw' });
+                 }
+                 return { ...c, envVars: mergedVars };
+             }
+@@ -232,21 +256,26 @@ const CreateContainer = () => {
+             const token = localStorage.getItem('token');
+             // Format payload
+             const payload = containers.map(c => {
+-                // Filter out empty EnvVars and format as ["KEY=VALUE"]
++                // Filter out empty EnvVars and format as ["KEY=VALUE"] or ["KEY={{SECRET:name}}"]
+                 const validEnvVars = c.envVars
+                     .filter(env => env.key.trim() !== '')
+-                    .map(env => `${env.key.trim()}=${env.value.trim()}`);
++                    .map(env => env.type === 'secret' ? `${env.key.trim()}={{SECRET:${env.value.trim()}}}` : `${env.key.trim()}=${env.value.trim()}`);
+ 
+                 return {
+                     name: c.name,
+                     image: c.image,
++                    replicas: c.replicas ? parseInt(c.replicas) : 1,
+                     ports: c.portBinding ? [c.portBinding] : [],
+                     env: validEnvVars,
+                     memory: c.memory,
+                     cpu: c.cpu,
+                     restartPolicy: c.restartPolicy,
+                     networkMode: c.networkMode,
+-                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
++                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined,
++                    domain: c.exposeDomain ? c.domain : undefined,
++                    domainPort: c.exposeDomain ? c.domainPort : undefined,
++                    volumeName: c.volumeName && c.volumeMountPath ? c.volumeName : undefined,
++                    volumeMountPath: c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined
+                 };
+             });
+ 
+@@ -271,8 +300,8 @@ const CreateContainer = () => {
+     const requestedCpu = containers.reduce((acc, curr) => acc + (curr.cpu ? parseFloat(curr.cpu) : 1), 0);
+ 
+     const isExceedingLimits = (currentContainerCount + requestedContainers > limits.maxContainers) ||
+-        (requestedRamMb > limits.maxRamMb) ||
+-        (requestedCpu > limits.maxCpuCores);
++        (currentRamMb + requestedRamMb > limits.maxRamMb) ||
++        (currentCpu + requestedCpu > limits.maxCpuCores);
+ 
+     return (
+         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
+@@ -342,41 +371,41 @@ const CreateContainer = () => {
+                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                 <div>
+                                     <div className="flex justify-between text-xs mb-1">
+-                                        <span className="text-slate-500">Containers</span>
+-                                        <span className={`font-bold ${currentContainerCount + requestedContainers > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+-                                            {currentContainerCount + requestedContainers} / {limits.maxContainers}
++                                        <span className="text-slate-500">Current Containers</span>
++                                        <span className={`font-bold ${currentContainerCount > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {currentContainerCount} / {limits.maxContainers}
+                                         </span>
+                                     </div>
+                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+-                                        <div className={`h-1.5 rounded-full ${currentContainerCount + requestedContainers > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(((currentContainerCount + requestedContainers) / limits.maxContainers) * 100, 100)}%` }}></div>
++                                        <div className={`h-1.5 rounded-full ${currentContainerCount > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min((currentContainerCount / limits.maxContainers) * 100, 100)}%` }}></div>
+                                     </div>
+                                 </div>
+                                 <div>
+                                     <div className="flex justify-between text-xs mb-1">
+-                                        <span className="text-slate-500">Est. RAM</span>
+-                                        <span className={`font-bold ${requestedRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+-                                            {requestedRamMb}MB / {limits.maxRamMb}MB
++                                        <span className="text-slate-500">Current RAM Use</span>
++                                        <span className={`font-bold ${currentRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {currentRamMb}MB / {limits.maxRamMb}MB
+                                         </span>
+                                     </div>
+                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+-                                        <div className={`h-1.5 rounded-full ${requestedRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((requestedRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
++                                        <div className={`h-1.5 rounded-full ${currentRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((currentRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
+                                     </div>
+                                 </div>
+                                 <div>
+                                     <div className="flex justify-between text-xs mb-1">
+-                                        <span className="text-slate-500">Est. CPU</span>
+-                                        <span className={`font-bold ${requestedCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
+-                                            {requestedCpu} / {limits.maxCpuCores} vCPU
++                                        <span className="text-slate-500">Current CPU Use</span>
++                                        <span className={`font-bold ${currentCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {currentCpu} / {limits.maxCpuCores} vCPU
+                                         </span>
+                                     </div>
+                                     <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
+-                                        <div className={`h-1.5 rounded-full ${requestedCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((requestedCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
++                                        <div className={`h-1.5 rounded-full ${currentCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((currentCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
+                                     </div>
+                                 </div>
+                             </div>
+                             {isExceedingLimits && (
+                                 <p className="text-xs text-red-500 mt-4 flex items-center">
+-                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! You must upgrade your plan or reduce the resources.
++                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! Stack requests {requestedContainers} containers, {requestedRamMb}MB RAM, and {requestedCpu} vCPU which pushes you over your plan.
+                                 </p>
+                             )}
+                         </div>
+@@ -430,6 +459,24 @@ const CreateContainer = () => {
+                                         </div>
+                                     </div>
+ 
++                                    <div className="mb-6">
++                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1 flex items-center">
++                                            Replicas (High Availability)
++                                            <span className="ml-2 text-xs bg-brand-100 text-brand-700 dark:bg-brand-500/20 dark:text-brand-300 px-2 py-0.5 rounded-full font-bold">Auto Load-Balanced</span>
++                                        </label>
++                                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-3">Traefik will distribute incoming traffic across all instances automatically.</p>
++                                        <div className="relative md:w-1/2">
++                                            <input
++                                                type="number"
++                                                min="1"
++                                                max="10"
++                                                value={c.replicas || 1}
++                                                onChange={(e) => updateContainer(c.id, 'replicas', e.target.value)}
++                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-bold transition-shadow"
++                                            />
++                                        </div>
++                                    </div>
++
+                                     <div className="mb-6">
+                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
+                                         <input
+@@ -441,6 +488,55 @@ const CreateContainer = () => {
+                                         />
+                                     </div>
+ 
++                                    {/* Domain Exposer */}
++                                    <div className="mb-6 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-2xl p-5">
++                                        <div className="flex items-center justify-between mb-4">
++                                            <div className="flex items-center space-x-3 text-purple-700 dark:text-purple-300">
++                                                <Globe size={20} />
++                                                <div>
++                                                    <h5 className="font-bold text-sm">Expose to Internet (Traefik Router)</h5>
++                                                    <p className="text-xs text-purple-600 dark:text-purple-400 mt-0.5">Attach a custom domain to this container automatically.</p>
++                                                </div>
++                                            </div>
++                                            <label className="relative inline-flex items-center cursor-pointer">
++                                                <input
++                                                    type="checkbox"
++                                                    checked={c.exposeDomain || false}
++                                                    onChange={(e) => updateContainer(c.id, 'exposeDomain', e.target.checked)}
++                                                    className="sr-only peer"
++                                                />
++                                                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 dark:peer-focus:ring-purple-800 rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600"></div>
++                                            </label>
++                                        </div>
++
++                                        {c.exposeDomain && (
++                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-purple-200/50 dark:border-purple-800/50 animate-fade-in text-slate-900 dark:text-white">
++                                                <div>
++                                                    <label className="block text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1.5">Custom Domain</label>
++                                                    <input
++                                                        type="text"
++                                                        value={c.domain || ''}
++                                                        onChange={(e) => updateContainer(c.id, 'domain', e.target.value)}
++                                                        placeholder="e.g., api.pablo.dev"
++                                                        required={c.exposeDomain}
++                                                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-mono placeholder-slate-400"
++                                                    />
++                                                </div>
++                                                <div>
++                                                    <label className="block text-xs font-semibold text-purple-700 dark:text-purple-300 mb-1.5">Container Internal Port</label>
++                                                    <input
++                                                        type="number"
++                                                        value={c.domainPort || ''}
++                                                        onChange={(e) => updateContainer(c.id, 'domainPort', e.target.value)}
++                                                        placeholder="e.g., 80 or 3000"
++                                                        required={c.exposeDomain}
++                                                        className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-mono placeholder-slate-400"
++                                                    />
++                                                </div>
++                                            </div>
++                                        )}
++                                    </div>
++
+                                     {/* Advanced Options Accordion for this specific container */}
+                                     <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
+                                         <button
+@@ -542,6 +638,44 @@ const CreateContainer = () => {
+                                                     )}
+                                                 </div>
+ 
++                                                {/* Volume Attachment */}
++                                                <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50 mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                            <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
++                                                            <span>Attach Persistent Volume</span>
++                                                        </label>
++                                                        <select
++                                                            value={c.volumeName || ''}
++                                                            onChange={(e) => updateContainer(c.id, 'volumeName', e.target.value)}
++                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
++                                                        >
++                                                            <option value="">None (Ephemeral)</option>
++                                                            {availableVolumes.map(v => (
++                                                                <option key={v._id || v.name} value={v.name}>{v.name}</option>
++                                                            ))}
++                                                        </select>
++                                                        <p className="text-xs text-slate-500 mt-1">Select a persistent disk to save data.</p>
++                                                    </div>
++
++                                                    {c.volumeName && (
++                                                        <div>
++                                                            <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                                <span>Container Mount Path</span>
++                                                            </label>
++                                                            <input
++                                                                type="text"
++                                                                value={c.volumeMountPath || ''}
++                                                                onChange={(e) => updateContainer(c.id, 'volumeMountPath', e.target.value)}
++                                                                placeholder="e.g. /data or /var/lib/mysql"
++                                                                required={!!c.volumeName}
++                                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 font-mono text-sm"
++                                                            />
++                                                            <p className="text-xs text-slate-500 mt-1">Where the volume mounts inside the container.</p>
++                                                        </div>
++                                                    )}
++                                                </div>
++
+                                                 {/* Environment Variables Section */}
+                                                 <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                                                     <label className="flex flex-col mb-4">
+@@ -579,13 +713,39 @@ const CreateContainer = () => {
+                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
+                                                                 />
+                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
+-                                                                <input
+-                                                                    type="text"
+-                                                                    placeholder="e.g. production"
+-                                                                    value={env.value}
+-                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
+-                                                                    className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
+-                                                                />
++
++                                                                <div className="flex bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-brand-500">
++                                                                    <select
++                                                                        value={env.type || 'raw'}
++                                                                        onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)}
++                                                                        className="bg-slate-100 dark:bg-slate-800 border-none px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:ring-0 outline-none w-24 border-r dark:border-slate-700 font-medium"
++                                                                    >
++                                                                        <option value="raw">Raw</option>
++                                                                        <option value="secret">Secret</option>
++                                                                    </select>
++
++                                                                    {(!env.type || env.type === 'raw') ? (
++                                                                        <input
++                                                                            type="text"
++                                                                            placeholder="e.g. production"
++                                                                            value={env.value}
++                                                                            onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
++                                                                            className="flex-1 px-3 py-2 bg-transparent border-none text-slate-900 dark:text-white font-mono text-sm focus:ring-0 outline-none w-full"
++                                                                        />
++                                                                    ) : (
++                                                                        <select
++                                                                            value={env.value}
++                                                                            onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
++                                                                            className="flex-1 px-3 py-2 bg-transparent border-none text-slate-900 dark:text-white font-mono text-sm focus:ring-0 outline-none w-full"
++                                                                        >
++                                                                            <option value="">-- Select Secret --</option>
++                                                                            {availableSecrets.map(sec => (
++                                                                                <option key={sec._id} value={sec.name}>{sec.name}</option>
++                                                                            ))}
++                                                                        </select>
++                                                                    )}
++                                                                </div>
++
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => removeEnvVar(c.id, eIdx)}
+
+commit 311232072d5e9901c125c65dec8cb365fa8d89e6
+Author: Pablo Jiménez <pablojpri8903@gmail.com>
+Date:   Thu Mar 5 18:07:26 2026 +0100
+
+    feat: Add initial project structure including backend API, core frontend pages, and dependencies.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index d88a8c4..a2e9470 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -1,10 +1,5 @@
+-<<<<<<< HEAD
+ import React, { useState, useEffect } from 'react';
+-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
+-=======
+-import React, { useState } from 'react';
+-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers } from 'lucide-react';
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
++import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert } from 'lucide-react';
+ import axios from 'axios';
+ import { useNavigate } from 'react-router-dom';
+ 
+@@ -13,10 +8,12 @@ const predefinedImages = [
+     { id: 'ubuntu', name: 'Ubuntu Latest', image: 'ubuntu:latest', icon: <Server size={24} />, desc: 'Base Ubuntu OS image for raw Linux setup' },
+     { id: 'node', name: 'Node.js', image: 'node:18-alpine', icon: <Code size={24} />, desc: 'Lightweight Node 18 environment' },
+     { id: 'nginx', name: 'Nginx', image: 'nginx:alpine', icon: <Globe size={24} />, desc: 'High-performance web server & reverse proxy' },
+-    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
++    { id: 'postgres', name: 'PostgreSQL', image: 'postgres:15-alpine', icon: <Database size={24} />, desc: 'Advanced open source relational database' },
++    { id: 'redis', name: 'Redis', image: 'redis:alpine', icon: <Zap size={24} />, desc: 'In-memory data structure store, used as a database, cache, and message broker' },
++    { id: 'minecraft', name: 'Minecraft Server', image: 'itzg/minecraft-server', icon: <Box size={24} />, desc: 'Ready-to-play Minecraft Java Server' },
++    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Globe size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
+ ];
+ 
+-<<<<<<< HEAD
+ const APP_ENV_PRESETS = {
+     mysql: [
+         { key: 'MYSQL_ROOT_PASSWORD', value: 'secret' },
+@@ -38,6 +35,11 @@ const APP_ENV_PRESETS = {
+     mongo: [
+         { key: 'MONGO_INITDB_ROOT_USERNAME', value: 'root' },
+         { key: 'MONGO_INITDB_ROOT_PASSWORD', value: 'secret' }
++    ],
++    minecraft: [
++        { key: 'EULA', value: 'TRUE' },
++        { key: 'VERSION', value: 'LATEST' },
++        { key: 'MEMORY', value: '1G' }
+     ]
+ };
+ 
+@@ -48,11 +50,10 @@ const getSuggestedEnvVars = (imageStr) => {
+     if (lower.includes('postgres')) return { label: 'PostgreSQL', vars: APP_ENV_PRESETS.postgres };
+     if (lower.includes('wordpress')) return { label: 'WordPress', vars: APP_ENV_PRESETS.wordpress };
+     if (lower.includes('mongo')) return { label: 'MongoDB', vars: APP_ENV_PRESETS.mongo };
++    if (lower.includes('minecraft')) return { label: 'Minecraft', vars: APP_ENV_PRESETS.minecraft };
+     return null;
+ };
+ 
+-=======
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+ const getEmptyContainer = () => ({
+     id: crypto.randomUUID(),
+     name: '',
+@@ -62,10 +63,7 @@ const getEmptyContainer = () => ({
+     cpu: '1',
+     restartPolicy: 'no',
+     networkMode: 'bridge',
+-<<<<<<< HEAD
+     ipv4Address: '',
+-=======
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+     envVars: [{ key: '', value: '' }],
+     showAdvanced: false
+ });
+@@ -77,28 +75,31 @@ const CreateContainer = () => {
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState('');
+     const [availableNetworks, setAvailableNetworks] = useState([]);
++    const [limits, setLimits] = useState({ maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
++    const [currentContainerCount, setCurrentContainerCount] = useState(0);
+ 
+     const navigate = useNavigate();
+ 
+-<<<<<<< HEAD
+     useEffect(() => {
+-        const fetchNetworks = async () => {
++        const fetchContext = async () => {
+             try {
+                 const token = localStorage.getItem('token');
+                 if (!token) return;
+-                const res = await axios.get('http://localhost:5000/api/networks', {
+-                    headers: { Authorization: `Bearer ${token}` }
+-                });
+-                setAvailableNetworks(res.data);
++                const [netRes, meRes, myContainersRes] = await Promise.all([
++                    axios.get('http://localhost:5000/api/networks', { headers: { Authorization: `Bearer ${token}` } }),
++                    axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } }),
++                    axios.get('http://localhost:5000/api/containers', { headers: { Authorization: `Bearer ${token}` } })
++                ]);
++                setAvailableNetworks(netRes.data);
++                if (meRes.data.limits) setLimits(meRes.data.limits);
++                setCurrentContainerCount(myContainersRes.data.length);
+             } catch (err) {
+-                console.error("Failed to fetch networks:", err);
++                console.error("Failed to fetch context:", err);
+             }
+         };
+-        fetchNetworks();
++        fetchContext();
+     }, []);
+ 
+-=======
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+     const handleSelectPredefined = (preset) => {
+         setActivePreset(preset.id);
+ 
+@@ -134,7 +135,15 @@ const CreateContainer = () => {
+         const single = getEmptyContainer();
+         single.image = preset.image;
+         single.name = '';
++
+         if (preset.id === 'nginx') single.portBinding = '8080:80';
++        if (preset.id === 'postgres') single.portBinding = '5432:5432';
++        if (preset.id === 'redis') single.portBinding = '6379:6379';
++        if (preset.id === 'minecraft') {
++            single.portBinding = '25565:25565';
++            single.memory = '2048'; // Minecraft needs more RAM
++        }
++
+         setContainers([single]);
+     };
+ 
+@@ -186,17 +195,13 @@ const CreateContainer = () => {
+         setContainers(containers.map(c => {
+             if (c.id === containerId) {
+                 const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
+-<<<<<<< HEAD
+                 // Ensure at least one empty box
+                 if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
+-=======
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                 return { ...c, envVars: newEnvVars };
+             }
+             return c;
+         }));
+     };
+-<<<<<<< HEAD
+ 
+     const injectEnvVars = (containerId, suggestedVars) => {
+         const allPresetKeys = new Set(Object.values(APP_ENV_PRESETS).flat().map(v => v.key));
+@@ -216,8 +221,6 @@ const CreateContainer = () => {
+             return c;
+         }));
+     };
+-=======
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+     // -------------------------------------
+ 
+     const handleSubmit = async (e) => {
+@@ -242,12 +245,8 @@ const CreateContainer = () => {
+                     memory: c.memory,
+                     cpu: c.cpu,
+                     restartPolicy: c.restartPolicy,
+-<<<<<<< HEAD
+                     networkMode: c.networkMode,
+                     ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
+-=======
+-                    networkMode: c.networkMode
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                 };
+             });
+ 
+@@ -259,19 +258,23 @@ const CreateContainer = () => {
+ 
+             navigate('/app/containers');
+         } catch (err) {
+-<<<<<<< HEAD
+             const specificError = err.response?.data?.error;
+             const generalMessage = err.response?.data?.message;
+             setError(specificError || generalMessage || 'Error deploying stack');
+-=======
+-            setError(err.response?.data?.message || 'Error deploying stack');
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+             setLoading(false);
+         }
+     };
+ 
++    // Calculate quotas needed for this stack
++    const requestedContainers = containers.length;
++    const requestedRamMb = containers.reduce((acc, curr) => acc + (curr.memory ? parseInt(curr.memory) : 512), 0);
++    const requestedCpu = containers.reduce((acc, curr) => acc + (curr.cpu ? parseFloat(curr.cpu) : 1), 0);
++
++    const isExceedingLimits = (currentContainerCount + requestedContainers > limits.maxContainers) ||
++        (requestedRamMb > limits.maxRamMb) ||
++        (requestedCpu > limits.maxCpuCores);
++
+     return (
+-<<<<<<< HEAD
+         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
+             <div className="mb-10">
+                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
+@@ -284,20 +287,6 @@ const CreateContainer = () => {
+                 <div className="lg:col-span-4 space-y-4">
+                     <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 text-slate-900 dark:text-white">
+                         <Server className="text-purple-600 dark:text-purple-400" />
+-=======
+-        <div className="p-8 pb-20 text-white max-w-7xl mx-auto">
+-            <div className="mb-10">
+-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
+-                <p className="text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+-            </div>
+-
+-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+-
+-                {/* Left Side: Presets (Moved to left for natural flow) */}
+-                <div className="lg:col-span-4 space-y-4">
+-                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+-                        <Server className="text-purple-400" />
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                         <span>Quick Presets</span>
+                     </h3>
+ 
+@@ -308,7 +297,6 @@ const CreateContainer = () => {
+                                 onClick={() => handleSelectPredefined(img)}
+                                 className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
+                                     ${activePreset === img.id
+-<<<<<<< HEAD
+                                         ? 'bg-brand-50 border-brand-300 shadow-[0_0_15px_rgba(14,165,233,0.05)] dark:bg-brand-500/10 dark:border-brand-500 dark:shadow-[0_0_15px_rgba(14,165,233,0.15)]'
+                                         : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-500'}
+                                 `}
+@@ -320,19 +308,6 @@ const CreateContainer = () => {
+                                     <h4 className="font-bold text-slate-900 dark:text-white text-lg">{img.name}</h4>
+                                     {img.image !== 'custom' && <p className="text-sm font-mono text-brand-600 dark:text-brand-300 my-1">{img.image}</p>}
+                                     <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{img.desc}</p>
+-=======
+-                                        ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
+-                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
+-                                `}
+-                            >
+-                                <div className={`p-3 rounded-xl shrink-0 ${activePreset === img.id ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+-                                    {img.icon}
+-                                </div>
+-                                <div>
+-                                    <h4 className="font-bold text-white text-lg">{img.name}</h4>
+-                                    {img.image !== 'custom' && <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>}
+-                                    <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                 </div>
+                             </div>
+                         ))}
+@@ -342,19 +317,11 @@ const CreateContainer = () => {
+                 {/* Right Side: Stack Builder */}
+                 <div className="lg:col-span-8">
+                     <div className="flex justify-between items-center mb-6">
+-<<<<<<< HEAD
+                         <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
+                             <Layers className="text-brand-500 dark:text-brand-400" />
+                             <span>Stack Builder</span>
+                         </h3>
+                         <div className="text-sm text-slate-600 bg-white border-slate-200 dark:text-slate-400 dark:bg-slate-800 px-4 py-2 rounded-xl border dark:border-slate-700">
+-=======
+-                        <h3 className="text-xl font-bold flex items-center space-x-2">
+-                            <Layers className="text-brand-400" />
+-                            <span>Stack Builder</span>
+-                        </h3>
+-                        <div className="text-sm text-slate-400 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                             {containers.length} Container{containers.length !== 1 ? 's' : ''} Selected
+                         </div>
+                     </div>
+@@ -367,9 +334,55 @@ const CreateContainer = () => {
+                             </div>
+                         )}
+ 
++                        {/* Quotas Visualization */}
++                        <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-sm">
++                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
++                                <ShieldAlert size={18} className="mr-2 text-brand-500" /> Plan Resource Quotas
++                            </h4>
++                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
++                                <div>
++                                    <div className="flex justify-between text-xs mb-1">
++                                        <span className="text-slate-500">Containers</span>
++                                        <span className={`font-bold ${currentContainerCount + requestedContainers > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {currentContainerCount + requestedContainers} / {limits.maxContainers}
++                                        </span>
++                                    </div>
++                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
++                                        <div className={`h-1.5 rounded-full ${currentContainerCount + requestedContainers > limits.maxContainers ? 'bg-red-500' : 'bg-brand-500'}`} style={{ width: `${Math.min(((currentContainerCount + requestedContainers) / limits.maxContainers) * 100, 100)}%` }}></div>
++                                    </div>
++                                </div>
++                                <div>
++                                    <div className="flex justify-between text-xs mb-1">
++                                        <span className="text-slate-500">Est. RAM</span>
++                                        <span className={`font-bold ${requestedRamMb > limits.maxRamMb ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {requestedRamMb}MB / {limits.maxRamMb}MB
++                                        </span>
++                                    </div>
++                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
++                                        <div className={`h-1.5 rounded-full ${requestedRamMb > limits.maxRamMb ? 'bg-red-500' : 'bg-emerald-500'}`} style={{ width: `${Math.min((requestedRamMb / limits.maxRamMb) * 100, 100)}%` }}></div>
++                                    </div>
++                                </div>
++                                <div>
++                                    <div className="flex justify-between text-xs mb-1">
++                                        <span className="text-slate-500">Est. CPU</span>
++                                        <span className={`font-bold ${requestedCpu > limits.maxCpuCores ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
++                                            {requestedCpu} / {limits.maxCpuCores} vCPU
++                                        </span>
++                                    </div>
++                                    <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
++                                        <div className={`h-1.5 rounded-full ${requestedCpu > limits.maxCpuCores ? 'bg-red-500' : 'bg-indigo-500'}`} style={{ width: `${Math.min((requestedCpu / limits.maxCpuCores) * 100, 100)}%` }}></div>
++                                    </div>
++                                </div>
++                            </div>
++                            {isExceedingLimits && (
++                                <p className="text-xs text-red-500 mt-4 flex items-center">
++                                    <AlertCircle size={12} className="mr-1" /> Limits exceeded! You must upgrade your plan or reduce the resources.
++                                </p>
++                            )}
++                        </div>
++
+                         <div className="space-y-6">
+                             {containers.map((c, index) => (
+-<<<<<<< HEAD
+                                 <div key={c.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
+                                     {/* Sub-header for Container index */}
+                                     <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-700/50">
+@@ -378,16 +391,6 @@ const CreateContainer = () => {
+                                                 {index + 1}
+                                             </div>
+                                             <h4 className="text-lg font-bold text-slate-900 dark:text-white">Container Configuration</h4>
+-=======
+-                                <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
+-                                    {/* Sub-header for Container index */}
+-                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
+-                                        <div className="flex items-center space-x-3">
+-                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
+-                                                {index + 1}
+-                                            </div>
+-                                            <h4 className="text-lg font-bold text-white">Container Configuration</h4>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                         </div>
+                                         {containers.length > 1 && (
+                                             <button
+@@ -403,67 +406,42 @@ const CreateContainer = () => {
+ 
+                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                                         <div>
+-<<<<<<< HEAD
+                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Container Name</label>
+-=======
+-                                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                             <input
+                                                 type="text"
+                                                 required
+                                                 value={c.name}
+                                                 onChange={(e) => updateContainer(c.id, 'name', e.target.value)}
+                                                 placeholder="e.g., frontend-app"
+-<<<<<<< HEAD
+                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white transition-shadow"
+-=======
+-                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                             />
+                                         </div>
+ 
+                                         <div>
+-<<<<<<< HEAD
+                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Docker Image</label>
+-=======
+-                                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                             <input
+                                                 type="text"
+                                                 required
+                                                 value={c.image}
+                                                 onChange={(e) => updateContainer(c.id, 'image', e.target.value)}
+                                                 placeholder="e.g., nginx:alpine"
+-<<<<<<< HEAD
+                                                 className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
+-=======
+-                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                             />
+                                         </div>
+                                     </div>
+ 
+                                     <div className="mb-6">
+-<<<<<<< HEAD
+                                         <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
+-=======
+-                                        <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                         <input
+                                             type="text"
+                                             value={c.portBinding}
+                                             onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
+                                             placeholder="Host_Port:Container_Port (e.g., 8080:80)"
+-<<<<<<< HEAD
+                                             className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
+-=======
+-                                            className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                         />
+                                     </div>
+ 
+                                     {/* Advanced Options Accordion for this specific container */}
+-<<<<<<< HEAD
+                                     <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
+                                         <button
+                                             type="button"
+@@ -483,27 +461,6 @@ const CreateContainer = () => {
+                                                     <div>
+                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                             <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
+-=======
+-                                    <div className="border border-slate-700 bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
+-                                        <button
+-                                            type="button"
+-                                            onClick={() => toggleAdvanced(c.id)}
+-                                            className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700/50 transition-colors"
+-                                        >
+-                                            <div className="flex items-center space-x-2">
+-                                                <Settings2 size={18} className={c.showAdvanced ? "text-brand-400" : "text-slate-400"} />
+-                                                <span className={`font-semibold ${c.showAdvanced ? 'text-white' : 'text-slate-300'}`}>Advanced Configuration</span>
+-                                            </div>
+-                                            {c.showAdvanced ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+-                                        </button>
+-
+-                                        {c.showAdvanced && (
+-                                            <div className="p-6 space-y-6 border-t border-slate-700 bg-slate-900/30">
+-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+-                                                    <div>
+-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+-                                                            <HardDrive size={16} className="text-slate-400" />
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                             <span>Memory Limit (MB)</span>
+                                                         </label>
+                                                         <input
+@@ -511,22 +468,13 @@ const CreateContainer = () => {
+                                                             value={c.memory}
+                                                             onChange={(e) => updateContainer(c.id, 'memory', e.target.value)}
+                                                             placeholder="Base: 512"
+-<<<<<<< HEAD
+                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+-=======
+-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                         />
+                                                     </div>
+ 
+                                                     <div>
+-<<<<<<< HEAD
+                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                             <Cpu size={16} className="text-slate-500 dark:text-slate-400" />
+-=======
+-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+-                                                            <Cpu size={16} className="text-slate-400" />
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                             <span>CPU Limit (Cores)</span>
+                                                         </label>
+                                                         <input
+@@ -535,34 +483,21 @@ const CreateContainer = () => {
+                                                             value={c.cpu}
+                                                             onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)}
+                                                             placeholder="Base: 1"
+-<<<<<<< HEAD
+                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
+-=======
+-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                         />
+                                                     </div>
+                                                 </div>
+ 
+                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                     <div>
+-<<<<<<< HEAD
+                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                             <Settings2 size={16} className="text-slate-500 dark:text-slate-400" />
+-=======
+-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+-                                                            <Settings2 size={16} className="text-slate-400" />
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                             <span>Restart Policy</span>
+                                                         </label>
+                                                         <select
+                                                             value={c.restartPolicy}
+                                                             onChange={(e) => updateContainer(c.id, 'restartPolicy', e.target.value)}
+-<<<<<<< HEAD
+                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+-=======
+-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                         >
+                                                             <option value="no">No (Default)</option>
+                                                             <option value="always">Always</option>
+@@ -572,19 +507,13 @@ const CreateContainer = () => {
+                                                     </div>
+ 
+                                                     <div>
+-<<<<<<< HEAD
+                                                         <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                                             <Network size={16} className="text-slate-500 dark:text-slate-400" />
+-=======
+-                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
+-                                                            <Network size={16} className="text-slate-400" />
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                             <span>Network Mode</span>
+                                                         </label>
+                                                         <select
+                                                             value={c.networkMode}
+                                                             onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
+-<<<<<<< HEAD
+                                                             className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
+                                                         >
+                                                             <option value="bridge">Bridge (Secure)</option>
+@@ -642,59 +571,25 @@ const CreateContainer = () => {
+                                                     <div className="space-y-3 mb-3">
+                                                         {c.envVars.map((env, eIdx) => (
+                                                             <div key={eIdx} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
+-=======
+-                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
+-                                                        >
+-                                                            <option value="bridge">Bridge (Secure)</option>
+-                                                            <option value="none">None (Isolated)</option>
+-                                                        </select>
+-                                                    </div>
+-                                                </div>
+-
+-                                                {/* Environment Variables Section */}
+-                                                <div className="pt-4 border-t border-slate-700/50">
+-                                                    <label className="flex flex-col mb-4">
+-                                                        <span className="text-sm font-medium text-slate-300">Environment Variables</span>
+-                                                        <span className="text-xs text-slate-500">Add custom KEY=VALUE pairs injected on runtime.</span>
+-                                                    </label>
+-
+-                                                    <div className="space-y-3 mb-3">
+-                                                        {c.envVars.map((env, eIdx) => (
+-                                                            <div key={eIdx} className="flex items-center space-x-3">
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                                 <input
+                                                                     type="text"
+                                                                     placeholder="e.g. NODE_ENV"
+                                                                     value={env.key}
+                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)}
+-<<<<<<< HEAD
+                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
+                                                                 />
+                                                                 <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
+-=======
+-                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
+-                                                                />
+-                                                                <span className="text-slate-500 font-bold">=</span>
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                                 <input
+                                                                     type="text"
+                                                                     placeholder="e.g. production"
+                                                                     value={env.value}
+                                                                     onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
+-<<<<<<< HEAD
+                                                                     className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
+-=======
+-                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                                 />
+                                                                 <button
+                                                                     type="button"
+                                                                     onClick={() => removeEnvVar(c.id, eIdx)}
+-<<<<<<< HEAD
+                                                                     className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+-=======
+-                                                                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                                                                 >
+                                                                     <Trash2 size={16} />
+                                                                 </button>
+@@ -720,19 +615,11 @@ const CreateContainer = () => {
+                         </div>
+ 
+                         {/* Actions */}
+-<<<<<<< HEAD
+                         <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
+                             <button
+                                 type="button"
+                                 onClick={handleAddContainer}
+                                 className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/5 focus:outline-none text-brand-500 dark:text-brand-400 font-semibold transition-all"
+-=======
+-                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-700/50">
+-                            <button
+-                                type="button"
+-                                onClick={handleAddContainer}
+-                                className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-600 hover:border-brand-500 hover:bg-brand-500/5 focus:outline-none text-brand-400 font-semibold transition-all"
+->>>>>>> 71fa28673cecb662531889aa67e855dbc321d0c8
+                             >
+                                 <Plus size={20} />
+                                 <span>Add Another Container</span>
+@@ -740,9 +627,9 @@ const CreateContainer = () => {
+ 
+                             <button
+                                 type="submit"
+-                                disabled={loading}
++                                disabled={loading || isExceedingLimits}
+                                 className={`flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
+-                                    ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
++                                    ${(loading || isExceedingLimits) ? 'bg-slate-600 cursor-not-allowed opacity-70' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
+                                 `}
+                             >
+                                 {loading ? (
+
+commit 6dd0ed33a32e8de88b24a84581f4e9fca8fc1674
+Merge: 90003de 71fa286
+Author: pjimenez17 <a22pabjimpri@inspedralbes.cat>
+Date:   Thu Mar 5 17:03:37 2026 +0100
+
+    Merge branch 'main' of https://github.com/pablojimenez17/dockermanager
+
+commit 90003de9e1d501eab1d4ccfec69406071de9c818
+Author: pjimenez17 <a22pabjimpri@inspedralbes.cat>
+Date:   Thu Mar 5 17:02:35 2026 +0100
+
+    commit
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index b760ec4..d1efab0 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -1,4 +1,4 @@
+-import React, { useState } from 'react';
++import React, { useState, useEffect } from 'react';
+ import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
+ import axios from 'axios';
+ import { useNavigate } from 'react-router-dom';
+@@ -54,6 +54,7 @@ const getEmptyContainer = () => ({
+     cpu: '1',
+     restartPolicy: 'no',
+     networkMode: 'bridge',
++    ipv4Address: '',
+     envVars: [{ key: '', value: '' }],
+     showAdvanced: false
+ });
+@@ -64,9 +65,26 @@ const CreateContainer = () => {
+     const [activePreset, setActivePreset] = useState('custom');
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState('');
++    const [availableNetworks, setAvailableNetworks] = useState([]);
+ 
+     const navigate = useNavigate();
+ 
++    useEffect(() => {
++        const fetchNetworks = async () => {
++            try {
++                const token = localStorage.getItem('token');
++                if (!token) return;
++                const res = await axios.get('http://localhost:5000/api/networks', {
++                    headers: { Authorization: `Bearer ${token}` }
++                });
++                setAvailableNetworks(res.data);
++            } catch (err) {
++                console.error("Failed to fetch networks:", err);
++            }
++        };
++        fetchNetworks();
++    }, []);
++
+     const handleSelectPredefined = (preset) => {
+         setActivePreset(preset.id);
+ 
+@@ -204,7 +222,8 @@ const CreateContainer = () => {
+                     memory: c.memory,
+                     cpu: c.cpu,
+                     restartPolicy: c.restartPolicy,
+-                    networkMode: c.networkMode
++                    networkMode: c.networkMode,
++                    ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined
+                 };
+             });
+ 
+@@ -216,19 +235,21 @@ const CreateContainer = () => {
+ 
+             navigate('/app/containers');
+         } catch (err) {
+-            setError(err.response?.data?.message || 'Error deploying stack');
++            const specificError = err.response?.data?.error;
++            const generalMessage = err.response?.data?.message;
++            setError(specificError || generalMessage || 'Error deploying stack');
+             setLoading(false);
+         }
+     };
+ 
+     return (
+-        <div className="p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
++        <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
+             <div className="mb-10">
+-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
+-                <p className="text-slate-600 dark:text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
++                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
++                <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+             </div>
+ 
+-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
++            <div className="flex flex-col-reverse lg:grid lg:grid-cols-12 gap-10">
+ 
+                 {/* Left Side: Presets (Moved to left for natural flow) */}
+                 <div className="lg:col-span-4 space-y-4">
+@@ -418,8 +439,28 @@ const CreateContainer = () => {
+                                                         >
+                                                             <option value="bridge">Bridge (Secure)</option>
+                                                             <option value="none">None (Isolated)</option>
++                                                            {availableNetworks.filter(n => !['bridge', 'host', 'none'].includes(n.Name)).map(net => (
++                                                                <option key={net.Id} value={net.Name}>Custom: {net.Name}</option>
++                                                            ))}
+                                                         </select>
+                                                     </div>
++
++                                                    {c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' && (
++                                                        <div>
++                                                            <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                                <Network size={16} className="text-slate-500 dark:text-slate-400" />
++                                                                <span>IPv4 Address (Optional)</span>
++                                                            </label>
++                                                            <input
++                                                                type="text"
++                                                                value={c.ipv4Address || ''}
++                                                                onChange={(e) => updateContainer(c.id, 'ipv4Address', e.target.value)}
++                                                                placeholder="e.g. 172.18.0.22"
++                                                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
++                                                            />
++                                                            <p className="text-xs text-slate-500 mt-1">Leave empty to auto-assign from subnet.</p>
++                                                        </div>
++                                                    )}
+                                                 </div>
+ 
+                                                 {/* Environment Variables Section */}
+@@ -450,7 +491,7 @@ const CreateContainer = () => {
+ 
+                                                     <div className="space-y-3 mb-3">
+                                                         {c.envVars.map((env, eIdx) => (
+-                                                            <div key={eIdx} className="flex items-center space-x-3">
++                                                            <div key={eIdx} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
+                                                                 <input
+                                                                     type="text"
+                                                                     placeholder="e.g. NODE_ENV"
+
+commit c8e1d9a0f4ecca3170ce6ea35f24ef8fcc00aea5
+Author: pjimenez17 <a22pabjimpri@inspedralbes.cat>
+Date:   Thu Mar 5 17:02:31 2026 +0100
+
+    I need the actual file changes (diffs) to generate a summary. Please provide the content of the files or the diffs.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index 9dc81da..b760ec4 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -1,36 +1,187 @@
+ import React, { useState } from 'react';
+-import { Box, Code, Database, Globe, Play, Server, AlertCircle } from 'lucide-react';
++import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap } from 'lucide-react';
+ import axios from 'axios';
+ import { useNavigate } from 'react-router-dom';
+ 
+ const predefinedImages = [
++    { id: 'custom', name: 'Custom Stack', image: 'custom', icon: <Layers size={24} />, desc: 'Build your own multi-container architecture from scratch' },
+     { id: 'ubuntu', name: 'Ubuntu Latest', image: 'ubuntu:latest', icon: <Server size={24} />, desc: 'Base Ubuntu OS image for raw Linux setup' },
+     { id: 'node', name: 'Node.js', image: 'node:18-alpine', icon: <Code size={24} />, desc: 'Lightweight Node 18 environment' },
+     { id: 'nginx', name: 'Nginx', image: 'nginx:alpine', icon: <Globe size={24} />, desc: 'High-performance web server & reverse proxy' },
+-    { id: 'wp-mysql', name: 'WordPress', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'WordPress CMS (Requires DB separate linking)' },
+-    { id: 'mongo', name: 'MongoDB', image: 'mongo:latest', icon: <Database size={24} />, desc: 'NoSQL Document Database' },
++    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
+ ];
+ 
++const APP_ENV_PRESETS = {
++    mysql: [
++        { key: 'MYSQL_ROOT_PASSWORD', value: 'secret' },
++        { key: 'MYSQL_DATABASE', value: 'mydb' },
++        { key: 'MYSQL_USER', value: 'user' },
++        { key: 'MYSQL_PASSWORD', value: 'password' }
++    ],
++    postgres: [
++        { key: 'POSTGRES_USER', value: 'user' },
++        { key: 'POSTGRES_PASSWORD', value: 'secret' },
++        { key: 'POSTGRES_DB', value: 'mydb' }
++    ],
++    wordpress: [
++        { key: 'WORDPRESS_DB_HOST', value: 'mysql-container:3306' },
++        { key: 'WORDPRESS_DB_USER', value: 'user' },
++        { key: 'WORDPRESS_DB_PASSWORD', value: 'password' },
++        { key: 'WORDPRESS_DB_NAME', value: 'mydb' }
++    ],
++    mongo: [
++        { key: 'MONGO_INITDB_ROOT_USERNAME', value: 'root' },
++        { key: 'MONGO_INITDB_ROOT_PASSWORD', value: 'secret' }
++    ]
++};
++
++const getSuggestedEnvVars = (imageStr) => {
++    if (!imageStr) return null;
++    const lower = imageStr.toLowerCase();
++    if (lower.includes('mysql') || lower.includes('mariadb')) return { label: 'MySQL / MariaDB', vars: APP_ENV_PRESETS.mysql };
++    if (lower.includes('postgres')) return { label: 'PostgreSQL', vars: APP_ENV_PRESETS.postgres };
++    if (lower.includes('wordpress')) return { label: 'WordPress', vars: APP_ENV_PRESETS.wordpress };
++    if (lower.includes('mongo')) return { label: 'MongoDB', vars: APP_ENV_PRESETS.mongo };
++    return null;
++};
++
++const getEmptyContainer = () => ({
++    id: crypto.randomUUID(),
++    name: '',
++    image: '',
++    portBinding: '',
++    memory: '512',
++    cpu: '1',
++    restartPolicy: 'no',
++    networkMode: 'bridge',
++    envVars: [{ key: '', value: '' }],
++    showAdvanced: false
++});
++
+ const CreateContainer = () => {
+-    const [name, setName] = useState('');
+-    const [image, setImage] = useState('');
+-    const [portBinding, setPortBinding] = useState('');
++    // Array of container configs
++    const [containers, setContainers] = useState([getEmptyContainer()]);
++    const [activePreset, setActivePreset] = useState('custom');
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState('');
+ 
+     const navigate = useNavigate();
+ 
+-    const handleSelectPredefined = (img) => {
+-        setImage(img.image);
+-        if (!name) {
+-            setName(`${img.id}-${Math.floor(Math.random() * 1000)}`);
++    const handleSelectPredefined = (preset) => {
++        setActivePreset(preset.id);
++
++        if (preset.id === 'custom') {
++            setContainers([getEmptyContainer()]);
++            return;
+         }
+-        // Set some default ports if helpful
+-        if (img.id === 'nginx') setPortBinding('8080:80');
+-        if (img.id === 'mongo') setPortBinding('27017:27017');
+-        if (img.id === 'wp-mysql') setPortBinding('8000:80');
++
++        if (preset.id === 'wp-mysql') {
++            // Create two containers
++            setContainers([
++                {
++                    ...getEmptyContainer(),
++                    name: ``,
++                    image: 'wordpress:latest',
++                    portBinding: '8000:80',
++                    networkMode: 'bridge',
++                    envVars: [] // Managed by backend automatically
++                },
++                {
++                    ...getEmptyContainer(),
++                    name: ``,
++                    image: 'mysql:5.7',
++                    portBinding: '', // usually don't need to expose DB to host
++                    networkMode: 'bridge',
++                    envVars: []
++                }
++            ]);
++            return;
++        }
++
++        // Single container presets
++        const single = getEmptyContainer();
++        single.image = preset.image;
++        single.name = '';
++        if (preset.id === 'nginx') single.portBinding = '8080:80';
++        setContainers([single]);
++    };
++
++    const handleAddContainer = () => {
++        setContainers([...containers, getEmptyContainer()]);
++        setActivePreset('custom'); // User is customizing now
++    };
++
++    const handleRemoveContainer = (id) => {
++        if (containers.length === 1) return; // Prevent deleting the last one
++        setContainers(containers.filter(c => c.id !== id));
++        setActivePreset('custom');
++    };
++
++    const updateContainer = (id, field, value) => {
++        setContainers(containers.map(c =>
++            c.id === id ? { ...c, [field]: value } : c
++        ));
++    };
++
++    const toggleAdvanced = (id) => {
++        setContainers(containers.map(c =>
++            c.id === id ? { ...c, showAdvanced: !c.showAdvanced } : c
++        ));
++    };
++
++    // --- Environment Variables Helpers ---
++    const updateEnvVar = (containerId, envIndex, field, value) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                const newEnvVars = [...c.envVars];
++                newEnvVars[envIndex] = { ...newEnvVars[envIndex], [field]: value };
++                return { ...c, envVars: newEnvVars };
++            }
++            return c;
++        }));
++    };
++
++    const addEnvVar = (containerId) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                return { ...c, envVars: [...c.envVars, { key: '', value: '' }] };
++            }
++            return c;
++        }));
+     };
+ 
++    const removeEnvVar = (containerId, envIndex) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
++                // Ensure at least one empty box
++                if (newEnvVars.length === 0) newEnvVars.push({ key: '', value: '' });
++                return { ...c, envVars: newEnvVars };
++            }
++            return c;
++        }));
++    };
++
++    const injectEnvVars = (containerId, suggestedVars) => {
++        const allPresetKeys = new Set(Object.values(APP_ENV_PRESETS).flat().map(v => v.key));
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                // Filter out any keys that belong to other known presets
++                const existingValid = c.envVars.filter(env => env.key.trim() !== '' && !allPresetKeys.has(env.key));
++                const existingKeys = new Set(existingValid.map(env => env.key));
++                const newVars = suggestedVars.filter(v => !existingKeys.has(v.key));
++
++                const mergedVars = [...existingValid, ...newVars];
++                if (mergedVars.length === 0 || mergedVars[mergedVars.length - 1].key !== '') {
++                    mergedVars.push({ key: '', value: '' });
++                }
++                return { ...c, envVars: mergedVars };
++            }
++            return c;
++        }));
++    };
++    // -------------------------------------
++
+     const handleSubmit = async (e) => {
+         e.preventDefault();
+         setError('');
+@@ -38,136 +189,345 @@ const CreateContainer = () => {
+ 
+         try {
+             const token = localStorage.getItem('token');
+-            // Format ports: array of "host:container"
+-            const ports = portBinding ? [portBinding] : [];
+-
+-            await axios.post('http://localhost:5000/api/containers', {
+-                name,
+-                image,
+-                ports,
+-                env: []
+-            }, {
++            // Format payload
++            const payload = containers.map(c => {
++                // Filter out empty EnvVars and format as ["KEY=VALUE"]
++                const validEnvVars = c.envVars
++                    .filter(env => env.key.trim() !== '')
++                    .map(env => `${env.key.trim()}=${env.value.trim()}`);
++
++                return {
++                    name: c.name,
++                    image: c.image,
++                    ports: c.portBinding ? [c.portBinding] : [],
++                    env: validEnvVars,
++                    memory: c.memory,
++                    cpu: c.cpu,
++                    restartPolicy: c.restartPolicy,
++                    networkMode: c.networkMode
++                };
++            });
++
++            // Since our backend logic was previously updated to handle "host" vs "bridge",
++            // we will send the format as { stack: payload }
++            await axios.post('http://localhost:5000/api/containers', { stack: payload }, {
+                 headers: { Authorization: `Bearer ${token}` }
+             });
++
+             navigate('/app/containers');
+         } catch (err) {
+-            setError(err.response?.data?.message || 'Error creating container');
++            setError(err.response?.data?.message || 'Error deploying stack');
+             setLoading(false);
+         }
+     };
+ 
+     return (
+-        <div className="p-8 pb-20 text-white max-w-5xl mx-auto">
++        <div className="p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
+             <div className="mb-10">
+-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Container</h1>
+-                <p className="text-slate-400 text-lg">Pick a preset or pull any image straight from Docker Hub.</p>
++                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
++                <p className="text-slate-600 dark:text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+             </div>
+ 
+-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+-
+-                {/* Left Side: Form */}
+-                <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl h-fit">
+-                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+-                        <Box className="text-brand-400" />
+-                        <span>Configuration</span>
+-                    </h3>
+-
+-                    <form onSubmit={handleSubmit} className="space-y-6">
+-                        {error && (
+-                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+-                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+-                                <span>{error}</span>
+-                            </div>
+-                        )}
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
+-                            <input
+-                                type="text"
+-                                required
+-                                value={name}
+-                                onChange={(e) => setName(e.target.value)}
+-                                placeholder="my-awesome-app"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
+-                            />
+-                        </div>
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
+-                            <input
+-                                type="text"
+-                                required
+-                                value={image}
+-                                onChange={(e) => setImage(e.target.value)}
+-                                placeholder="e.g., redis:alpine"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
+-                            />
+-                            <p className="text-xs text-slate-500 mt-2">Any image available on Docker Hub works here.</p>
+-                        </div>
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
+-                            <input
+-                                type="text"
+-                                value={portBinding}
+-                                onChange={(e) => setPortBinding(e.target.value)}
+-                                placeholder="Host_Port:Container_Port (e.g., 8080:80)"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
+-                            />
+-                        </div>
++            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+ 
+-                        <button
+-                            type="submit"
+-                            disabled={loading}
+-                            className={`w-full flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
+-                ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_30px_rgba(14,165,233,0.5)]'}
+-              `}
+-                        >
+-                            {loading ? (
+-                                <span className="flex items-center space-x-2">
+-                                    <span className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
+-                                    <span>Deploying...</span>
+-                                </span>
+-                            ) : (
+-                                <>
+-                                    <span>Create Container</span>
+-                                    <Play size={18} />
+-                                </>
+-                            )}
+-                        </button>
+-                    </form>
+-                </div>
+-
+-                {/* Right Side: Presets */}
+-                <div>
+-                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+-                        <Server className="text-purple-400" />
++                {/* Left Side: Presets (Moved to left for natural flow) */}
++                <div className="lg:col-span-4 space-y-4">
++                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 text-slate-900 dark:text-white">
++                        <Server className="text-purple-600 dark:text-purple-400" />
+                         <span>Quick Presets</span>
+                     </h3>
++
+                     <div className="grid gap-4">
+                         {predefinedImages.map(img => (
+                             <div
+                                 key={img.id}
+                                 onClick={() => handleSelectPredefined(img)}
+                                 className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
+-                  ${image === img.image
+-                                        ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
+-                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
+-                `}
++                                    ${activePreset === img.id
++                                        ? 'bg-brand-50 border-brand-300 shadow-[0_0_15px_rgba(14,165,233,0.05)] dark:bg-brand-500/10 dark:border-brand-500 dark:shadow-[0_0_15px_rgba(14,165,233,0.15)]'
++                                        : 'bg-white border-slate-200 hover:border-slate-300 dark:bg-slate-800 dark:border-slate-700 dark:hover:border-slate-500'}
++                                `}
+                             >
+-                                <div className={`p-3 rounded-xl ${image === img.image ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
++                                <div className={`p-3 rounded-xl shrink-0 ${activePreset === img.id ? 'bg-brand-500 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'}`}>
+                                     {img.icon}
+                                 </div>
+                                 <div>
+-                                    <h4 className="font-bold text-white text-lg">{img.name}</h4>
+-                                    <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>
+-                                    <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
++                                    <h4 className="font-bold text-slate-900 dark:text-white text-lg">{img.name}</h4>
++                                    {img.image !== 'custom' && <p className="text-sm font-mono text-brand-600 dark:text-brand-300 my-1">{img.image}</p>}
++                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{img.desc}</p>
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+ 
++                {/* Right Side: Stack Builder */}
++                <div className="lg:col-span-8">
++                    <div className="flex justify-between items-center mb-6">
++                        <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
++                            <Layers className="text-brand-500 dark:text-brand-400" />
++                            <span>Stack Builder</span>
++                        </h3>
++                        <div className="text-sm text-slate-600 bg-white border-slate-200 dark:text-slate-400 dark:bg-slate-800 px-4 py-2 rounded-xl border dark:border-slate-700">
++                            {containers.length} Container{containers.length !== 1 ? 's' : ''} Selected
++                        </div>
++                    </div>
++
++                    <form onSubmit={handleSubmit} className="space-y-6">
++                        {error && (
++                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
++                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
++                                <span>{error}</span>
++                            </div>
++                        )}
++
++                        <div className="space-y-6">
++                            {containers.map((c, index) => (
++                                <div key={c.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
++                                    {/* Sub-header for Container index */}
++                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-200 dark:border-slate-700/50">
++                                        <div className="flex items-center space-x-3">
++                                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center font-bold text-slate-500 dark:text-slate-300">
++                                                {index + 1}
++                                            </div>
++                                            <h4 className="text-lg font-bold text-slate-900 dark:text-white">Container Configuration</h4>
++                                        </div>
++                                        {containers.length > 1 && (
++                                            <button
++                                                type="button"
++                                                onClick={() => handleRemoveContainer(c.id)}
++                                                className="text-slate-500 hover:text-rose-400 transition-colors p-2 hover:bg-rose-500/10 rounded-lg"
++                                                title="Remove container"
++                                            >
++                                                <Trash2 size={20} />
++                                            </button>
++                                        )}
++                                    </div>
++
++                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
++                                        <div>
++                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Container Name</label>
++                                            <input
++                                                type="text"
++                                                required
++                                                value={c.name}
++                                                onChange={(e) => updateContainer(c.id, 'name', e.target.value)}
++                                                placeholder="e.g., frontend-app"
++                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white transition-shadow"
++                                            />
++                                        </div>
++
++                                        <div>
++                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Docker Image</label>
++                                            <input
++                                                type="text"
++                                                required
++                                                value={c.image}
++                                                onChange={(e) => updateContainer(c.id, 'image', e.target.value)}
++                                                placeholder="e.g., nginx:alpine"
++                                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
++                                            />
++                                        </div>
++                                    </div>
++
++                                    <div className="mb-6">
++                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Port Binding (Optional)</label>
++                                        <input
++                                            type="text"
++                                            value={c.portBinding}
++                                            onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
++                                            placeholder="Host_Port:Container_Port (e.g., 8080:80)"
++                                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-slate-900 dark:text-white font-mono text-sm"
++                                        />
++                                    </div>
++
++                                    {/* Advanced Options Accordion for this specific container */}
++                                    <div className="border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
++                                        <button
++                                            type="button"
++                                            onClick={() => toggleAdvanced(c.id)}
++                                            className="w-full flex items-center justify-between p-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700/50 transition-colors"
++                                        >
++                                            <div className="flex items-center space-x-2">
++                                                <Settings2 size={18} className={c.showAdvanced ? "text-brand-500 dark:text-brand-400" : "text-slate-500 dark:text-slate-400"} />
++                                                <span className={`font-semibold ${c.showAdvanced ? 'text-slate-900 dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>Advanced Configuration</span>
++                                            </div>
++                                            {c.showAdvanced ? <ChevronUp size={20} className="text-slate-500 dark:text-slate-400" /> : <ChevronDown size={20} className="text-slate-500 dark:text-slate-400" />}
++                                        </button>
++
++                                        {c.showAdvanced && (
++                                            <div className="p-6 space-y-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/30">
++                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                            <HardDrive size={16} className="text-slate-500 dark:text-slate-400" />
++                                                            <span>Memory Limit (MB)</span>
++                                                        </label>
++                                                        <input
++                                                            type="number"
++                                                            value={c.memory}
++                                                            onChange={(e) => updateContainer(c.id, 'memory', e.target.value)}
++                                                            placeholder="Base: 512"
++                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
++                                                        />
++                                                    </div>
++
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                            <Cpu size={16} className="text-slate-500 dark:text-slate-400" />
++                                                            <span>CPU Limit (Cores)</span>
++                                                        </label>
++                                                        <input
++                                                            type="number"
++                                                            step="0.1"
++                                                            value={c.cpu}
++                                                            onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)}
++                                                            placeholder="Base: 1"
++                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
++                                                        />
++                                                    </div>
++                                                </div>
++
++                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                            <Settings2 size={16} className="text-slate-500 dark:text-slate-400" />
++                                                            <span>Restart Policy</span>
++                                                        </label>
++                                                        <select
++                                                            value={c.restartPolicy}
++                                                            onChange={(e) => updateContainer(c.id, 'restartPolicy', e.target.value)}
++                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
++                                                        >
++                                                            <option value="no">No (Default)</option>
++                                                            <option value="always">Always</option>
++                                                            <option value="unless-stopped">Unless Stopped</option>
++                                                            <option value="on-failure">On Failure</option>
++                                                        </select>
++                                                    </div>
++
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
++                                                            <Network size={16} className="text-slate-500 dark:text-slate-400" />
++                                                            <span>Network Mode</span>
++                                                        </label>
++                                                        <select
++                                                            value={c.networkMode}
++                                                            onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
++                                                            className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
++                                                        >
++                                                            <option value="bridge">Bridge (Secure)</option>
++                                                            <option value="none">None (Isolated)</option>
++                                                        </select>
++                                                    </div>
++                                                </div>
++
++                                                {/* Environment Variables Section */}
++                                                <div className="pt-4 border-t border-slate-200 dark:border-slate-700/50">
++                                                    <label className="flex flex-col mb-4">
++                                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Environment Variables</span>
++                                                        <span className="text-xs text-slate-500">Add custom KEY=VALUE pairs injected on runtime.</span>
++                                                    </label>
++
++                                                    {getSuggestedEnvVars(c.image) && (
++                                                        <div className="mb-4 p-4 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/20 rounded-xl flex items-center justify-between shadow-sm">
++                                                            <div className="flex items-center space-x-3 text-indigo-700 dark:text-indigo-400">
++                                                                <Zap size={20} className="animate-pulse" />
++                                                                <div>
++                                                                    <p className="text-sm font-bold">Smart Configuration</p>
++                                                                    <p className="text-xs text-indigo-600/80 dark:text-indigo-400/80 mt-0.5">Missing required configuration for {getSuggestedEnvVars(c.image).label}.</p>
++                                                                </div>
++                                                            </div>
++                                                            <button
++                                                                type="button"
++                                                                onClick={() => injectEnvVars(c.id, getSuggestedEnvVars(c.image).vars)}
++                                                                className="text-xs px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 dark:bg-indigo-500 dark:hover:bg-indigo-400 transition-colors font-medium shadow-md hover:shadow-lg whitespace-nowrap"
++                                                            >
++                                                                Auto-Fill Variables
++                                                            </button>
++                                                        </div>
++                                                    )}
++
++                                                    <div className="space-y-3 mb-3">
++                                                        {c.envVars.map((env, eIdx) => (
++                                                            <div key={eIdx} className="flex items-center space-x-3">
++                                                                <input
++                                                                    type="text"
++                                                                    placeholder="e.g. NODE_ENV"
++                                                                    value={env.key}
++                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)}
++                                                                    className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
++                                                                />
++                                                                <span className="text-slate-400 dark:text-slate-500 font-bold">=</span>
++                                                                <input
++                                                                    type="text"
++                                                                    placeholder="e.g. production"
++                                                                    value={env.value}
++                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
++                                                                    className="flex-1 px-4 py-2 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white font-mono text-sm"
++                                                                />
++                                                                <button
++                                                                    type="button"
++                                                                    onClick={() => removeEnvVar(c.id, eIdx)}
++                                                                    className="p-2 text-slate-400 dark:text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
++                                                                >
++                                                                    <Trash2 size={16} />
++                                                                </button>
++                                                            </div>
++                                                        ))}
++                                                    </div>
++
++                                                    <button
++                                                        type="button"
++                                                        onClick={() => addEnvVar(c.id)}
++                                                        className="text-sm font-medium text-brand-400 hover:text-brand-300 flex items-center space-x-1"
++                                                    >
++                                                        <Plus size={16} />
++                                                        <span>Add Variable</span>
++                                                    </button>
++                                                </div>
++
++                                            </div>
++                                        )}
++                                    </div>
++                                </div>
++                            ))}
++                        </div>
++
++                        {/* Actions */}
++                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
++                            <button
++                                type="button"
++                                onClick={handleAddContainer}
++                                className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-500 hover:bg-brand-50 dark:hover:bg-brand-500/5 focus:outline-none text-brand-500 dark:text-brand-400 font-semibold transition-all"
++                            >
++                                <Plus size={20} />
++                                <span>Add Another Container</span>
++                            </button>
++
++                            <button
++                                type="submit"
++                                disabled={loading}
++                                className={`flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
++                                    ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
++                                `}
++                            >
++                                {loading ? (
++                                    <span className="flex items-center space-x-2">
++                                        <span className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
++                                        <span>Deploying Stack...</span>
++                                    </span>
++                                ) : (
++                                    <>
++                                        <span>Deploy Full Stack</span>
++                                        <Play size={18} />
++                                    </>
++                                )}
++                            </button>
++                        </div>
++                    </form>
++                </div>
++
+             </div>
+         </div>
+     );
+
+commit 71fa28673cecb662531889aa67e855dbc321d0c8
+Author: pjimenez17 <a22pabjimpri@inspedralbes.cat>
+Date:   Fri Feb 27 20:34:38 2026 +0100
+
+    I need the actual file changes (diffs) to generate a summary. Please provide the content of the files or the diffs.
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+index 9dc81da..581294c 100644
+--- a/frontend/src/pages/CreateContainer.jsx
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -1,36 +1,132 @@
+ import React, { useState } from 'react';
+-import { Box, Code, Database, Globe, Play, Server, AlertCircle } from 'lucide-react';
++import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers } from 'lucide-react';
+ import axios from 'axios';
+ import { useNavigate } from 'react-router-dom';
+ 
+ const predefinedImages = [
++    { id: 'custom', name: 'Custom Stack', image: 'custom', icon: <Layers size={24} />, desc: 'Build your own multi-container architecture from scratch' },
+     { id: 'ubuntu', name: 'Ubuntu Latest', image: 'ubuntu:latest', icon: <Server size={24} />, desc: 'Base Ubuntu OS image for raw Linux setup' },
+     { id: 'node', name: 'Node.js', image: 'node:18-alpine', icon: <Code size={24} />, desc: 'Lightweight Node 18 environment' },
+     { id: 'nginx', name: 'Nginx', image: 'nginx:alpine', icon: <Globe size={24} />, desc: 'High-performance web server & reverse proxy' },
+-    { id: 'wp-mysql', name: 'WordPress', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'WordPress CMS (Requires DB separate linking)' },
+-    { id: 'mongo', name: 'MongoDB', image: 'mongo:latest', icon: <Database size={24} />, desc: 'NoSQL Document Database' },
++    { id: 'wp-mysql', name: 'WordPress + MySQL', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'Full CMS Stack with automatically linked Database' },
+ ];
+ 
++const getEmptyContainer = () => ({
++    id: crypto.randomUUID(),
++    name: '',
++    image: '',
++    portBinding: '',
++    memory: '512',
++    cpu: '1',
++    restartPolicy: 'no',
++    networkMode: 'bridge',
++    envVars: [{ key: '', value: '' }],
++    showAdvanced: false
++});
++
+ const CreateContainer = () => {
+-    const [name, setName] = useState('');
+-    const [image, setImage] = useState('');
+-    const [portBinding, setPortBinding] = useState('');
++    // Array of container configs
++    const [containers, setContainers] = useState([getEmptyContainer()]);
++    const [activePreset, setActivePreset] = useState('custom');
+     const [loading, setLoading] = useState(false);
+     const [error, setError] = useState('');
+ 
+     const navigate = useNavigate();
+ 
+-    const handleSelectPredefined = (img) => {
+-        setImage(img.image);
+-        if (!name) {
+-            setName(`${img.id}-${Math.floor(Math.random() * 1000)}`);
++    const handleSelectPredefined = (preset) => {
++        setActivePreset(preset.id);
++
++        if (preset.id === 'custom') {
++            setContainers([getEmptyContainer()]);
++            return;
+         }
+-        // Set some default ports if helpful
+-        if (img.id === 'nginx') setPortBinding('8080:80');
+-        if (img.id === 'mongo') setPortBinding('27017:27017');
+-        if (img.id === 'wp-mysql') setPortBinding('8000:80');
++
++        if (preset.id === 'wp-mysql') {
++            // Create two containers
++            setContainers([
++                {
++                    ...getEmptyContainer(),
++                    name: ``,
++                    image: 'wordpress:latest',
++                    portBinding: '8000:80',
++                    networkMode: 'bridge',
++                    envVars: [] // Managed by backend automatically
++                },
++                {
++                    ...getEmptyContainer(),
++                    name: ``,
++                    image: 'mysql:5.7',
++                    portBinding: '', // usually don't need to expose DB to host
++                    networkMode: 'bridge',
++                    envVars: []
++                }
++            ]);
++            return;
++        }
++
++        // Single container presets
++        const single = getEmptyContainer();
++        single.image = preset.image;
++        single.name = '';
++        if (preset.id === 'nginx') single.portBinding = '8080:80';
++        setContainers([single]);
++    };
++
++    const handleAddContainer = () => {
++        setContainers([...containers, getEmptyContainer()]);
++        setActivePreset('custom'); // User is customizing now
++    };
++
++    const handleRemoveContainer = (id) => {
++        if (containers.length === 1) return; // Prevent deleting the last one
++        setContainers(containers.filter(c => c.id !== id));
++        setActivePreset('custom');
++    };
++
++    const updateContainer = (id, field, value) => {
++        setContainers(containers.map(c =>
++            c.id === id ? { ...c, [field]: value } : c
++        ));
++    };
++
++    const toggleAdvanced = (id) => {
++        setContainers(containers.map(c =>
++            c.id === id ? { ...c, showAdvanced: !c.showAdvanced } : c
++        ));
++    };
++
++    // --- Environment Variables Helpers ---
++    const updateEnvVar = (containerId, envIndex, field, value) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                const newEnvVars = [...c.envVars];
++                newEnvVars[envIndex] = { ...newEnvVars[envIndex], [field]: value };
++                return { ...c, envVars: newEnvVars };
++            }
++            return c;
++        }));
+     };
+ 
++    const addEnvVar = (containerId) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                return { ...c, envVars: [...c.envVars, { key: '', value: '' }] };
++            }
++            return c;
++        }));
++    };
++
++    const removeEnvVar = (containerId, envIndex) => {
++        setContainers(containers.map(c => {
++            if (c.id === containerId) {
++                const newEnvVars = c.envVars.filter((_, idx) => idx !== envIndex);
++                return { ...c, envVars: newEnvVars };
++            }
++            return c;
++        }));
++    };
++    // -------------------------------------
++
+     const handleSubmit = async (e) => {
+         e.preventDefault();
+         setError('');
+@@ -38,129 +134,71 @@ const CreateContainer = () => {
+ 
+         try {
+             const token = localStorage.getItem('token');
+-            // Format ports: array of "host:container"
+-            const ports = portBinding ? [portBinding] : [];
+-
+-            await axios.post('http://localhost:5000/api/containers', {
+-                name,
+-                image,
+-                ports,
+-                env: []
+-            }, {
++            // Format payload
++            const payload = containers.map(c => {
++                // Filter out empty EnvVars and format as ["KEY=VALUE"]
++                const validEnvVars = c.envVars
++                    .filter(env => env.key.trim() !== '')
++                    .map(env => `${env.key.trim()}=${env.value.trim()}`);
++
++                return {
++                    name: c.name,
++                    image: c.image,
++                    ports: c.portBinding ? [c.portBinding] : [],
++                    env: validEnvVars,
++                    memory: c.memory,
++                    cpu: c.cpu,
++                    restartPolicy: c.restartPolicy,
++                    networkMode: c.networkMode
++                };
++            });
++
++            // Since our backend logic was previously updated to handle "host" vs "bridge",
++            // we will send the format as { stack: payload }
++            await axios.post('http://localhost:5000/api/containers', { stack: payload }, {
+                 headers: { Authorization: `Bearer ${token}` }
+             });
++
+             navigate('/app/containers');
+         } catch (err) {
+-            setError(err.response?.data?.message || 'Error creating container');
++            setError(err.response?.data?.message || 'Error deploying stack');
+             setLoading(false);
+         }
+     };
+ 
+     return (
+-        <div className="p-8 pb-20 text-white max-w-5xl mx-auto">
++        <div className="p-8 pb-20 text-white max-w-7xl mx-auto">
+             <div className="mb-10">
+-                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Container</h1>
+-                <p className="text-slate-400 text-lg">Pick a preset or pull any image straight from Docker Hub.</p>
++                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Stack</h1>
++                <p className="text-slate-400 text-lg">Deploy single containers or orchestrate multi-container apps gracefully.</p>
+             </div>
+ 
+-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
++            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+ 
+-                {/* Left Side: Form */}
+-                <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl h-fit">
+-                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+-                        <Box className="text-brand-400" />
+-                        <span>Configuration</span>
+-                    </h3>
+-
+-                    <form onSubmit={handleSubmit} className="space-y-6">
+-                        {error && (
+-                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+-                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
+-                                <span>{error}</span>
+-                            </div>
+-                        )}
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
+-                            <input
+-                                type="text"
+-                                required
+-                                value={name}
+-                                onChange={(e) => setName(e.target.value)}
+-                                placeholder="my-awesome-app"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
+-                            />
+-                        </div>
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
+-                            <input
+-                                type="text"
+-                                required
+-                                value={image}
+-                                onChange={(e) => setImage(e.target.value)}
+-                                placeholder="e.g., redis:alpine"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
+-                            />
+-                            <p className="text-xs text-slate-500 mt-2">Any image available on Docker Hub works here.</p>
+-                        </div>
+-
+-                        <div>
+-                            <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
+-                            <input
+-                                type="text"
+-                                value={portBinding}
+-                                onChange={(e) => setPortBinding(e.target.value)}
+-                                placeholder="Host_Port:Container_Port (e.g., 8080:80)"
+-                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
+-                            />
+-                        </div>
+-
+-                        <button
+-                            type="submit"
+-                            disabled={loading}
+-                            className={`w-full flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
+-                ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_30px_rgba(14,165,233,0.5)]'}
+-              `}
+-                        >
+-                            {loading ? (
+-                                <span className="flex items-center space-x-2">
+-                                    <span className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
+-                                    <span>Deploying...</span>
+-                                </span>
+-                            ) : (
+-                                <>
+-                                    <span>Create Container</span>
+-                                    <Play size={18} />
+-                                </>
+-                            )}
+-                        </button>
+-                    </form>
+-                </div>
+-
+-                {/* Right Side: Presets */}
+-                <div>
++                {/* Left Side: Presets (Moved to left for natural flow) */}
++                <div className="lg:col-span-4 space-y-4">
+                     <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
+                         <Server className="text-purple-400" />
+                         <span>Quick Presets</span>
+                     </h3>
++
+                     <div className="grid gap-4">
+                         {predefinedImages.map(img => (
+                             <div
+                                 key={img.id}
+                                 onClick={() => handleSelectPredefined(img)}
+                                 className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
+-                  ${image === img.image
++                                    ${activePreset === img.id
+                                         ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
+                                         : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
+-                `}
++                                `}
+                             >
+-                                <div className={`p-3 rounded-xl ${image === img.image ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
++                                <div className={`p-3 rounded-xl shrink-0 ${activePreset === img.id ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
+                                     {img.icon}
+                                 </div>
+                                 <div>
+                                     <h4 className="font-bold text-white text-lg">{img.name}</h4>
+-                                    <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>
++                                    {img.image !== 'custom' && <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>}
+                                     <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
+                                 </div>
+                             </div>
+@@ -168,6 +206,254 @@ const CreateContainer = () => {
+                     </div>
+                 </div>
+ 
++                {/* Right Side: Stack Builder */}
++                <div className="lg:col-span-8">
++                    <div className="flex justify-between items-center mb-6">
++                        <h3 className="text-xl font-bold flex items-center space-x-2">
++                            <Layers className="text-brand-400" />
++                            <span>Stack Builder</span>
++                        </h3>
++                        <div className="text-sm text-slate-400 bg-slate-800 px-4 py-2 rounded-xl border border-slate-700">
++                            {containers.length} Container{containers.length !== 1 ? 's' : ''} Selected
++                        </div>
++                    </div>
++
++                    <form onSubmit={handleSubmit} className="space-y-6">
++                        {error && (
++                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
++                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
++                                <span>{error}</span>
++                            </div>
++                        )}
++
++                        <div className="space-y-6">
++                            {containers.map((c, index) => (
++                                <div key={c.id} className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl relative animate-fade-in">
++                                    {/* Sub-header for Container index */}
++                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-700/50">
++                                        <div className="flex items-center space-x-3">
++                                            <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center font-bold text-slate-300">
++                                                {index + 1}
++                                            </div>
++                                            <h4 className="text-lg font-bold text-white">Container Configuration</h4>
++                                        </div>
++                                        {containers.length > 1 && (
++                                            <button
++                                                type="button"
++                                                onClick={() => handleRemoveContainer(c.id)}
++                                                className="text-slate-500 hover:text-rose-400 transition-colors p-2 hover:bg-rose-500/10 rounded-lg"
++                                                title="Remove container"
++                                            >
++                                                <Trash2 size={20} />
++                                            </button>
++                                        )}
++                                    </div>
++
++                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
++                                        <div>
++                                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
++                                            <input
++                                                type="text"
++                                                required
++                                                value={c.name}
++                                                onChange={(e) => updateContainer(c.id, 'name', e.target.value)}
++                                                placeholder="e.g., frontend-app"
++                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
++                                            />
++                                        </div>
++
++                                        <div>
++                                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
++                                            <input
++                                                type="text"
++                                                required
++                                                value={c.image}
++                                                onChange={(e) => updateContainer(c.id, 'image', e.target.value)}
++                                                placeholder="e.g., nginx:alpine"
++                                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
++                                            />
++                                        </div>
++                                    </div>
++
++                                    <div className="mb-6">
++                                        <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
++                                        <input
++                                            type="text"
++                                            value={c.portBinding}
++                                            onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
++                                            placeholder="Host_Port:Container_Port (e.g., 8080:80)"
++                                            className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white font-mono text-sm"
++                                        />
++                                    </div>
++
++                                    {/* Advanced Options Accordion for this specific container */}
++                                    <div className="border border-slate-700 bg-slate-800/50 rounded-2xl overflow-hidden transition-all duration-300">
++                                        <button
++                                            type="button"
++                                            onClick={() => toggleAdvanced(c.id)}
++                                            className="w-full flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-700/50 transition-colors"
++                                        >
++                                            <div className="flex items-center space-x-2">
++                                                <Settings2 size={18} className={c.showAdvanced ? "text-brand-400" : "text-slate-400"} />
++                                                <span className={`font-semibold ${c.showAdvanced ? 'text-white' : 'text-slate-300'}`}>Advanced Configuration</span>
++                                            </div>
++                                            {c.showAdvanced ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
++                                        </button>
++
++                                        {c.showAdvanced && (
++                                            <div className="p-6 space-y-6 border-t border-slate-700 bg-slate-900/30">
++                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
++                                                            <HardDrive size={16} className="text-slate-400" />
++                                                            <span>Memory Limit (MB)</span>
++                                                        </label>
++                                                        <input
++                                                            type="number"
++                                                            value={c.memory}
++                                                            onChange={(e) => updateContainer(c.id, 'memory', e.target.value)}
++                                                            placeholder="Base: 512"
++                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
++                                                        />
++                                                    </div>
++
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
++                                                            <Cpu size={16} className="text-slate-400" />
++                                                            <span>CPU Limit (Cores)</span>
++                                                        </label>
++                                                        <input
++                                                            type="number"
++                                                            step="0.1"
++                                                            value={c.cpu}
++                                                            onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)}
++                                                            placeholder="Base: 1"
++                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white placeholder-slate-500"
++                                                        />
++                                                    </div>
++                                                </div>
++
++                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
++                                                            <Settings2 size={16} className="text-slate-400" />
++                                                            <span>Restart Policy</span>
++                                                        </label>
++                                                        <select
++                                                            value={c.restartPolicy}
++                                                            onChange={(e) => updateContainer(c.id, 'restartPolicy', e.target.value)}
++                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
++                                                        >
++                                                            <option value="no">No (Default)</option>
++                                                            <option value="always">Always</option>
++                                                            <option value="unless-stopped">Unless Stopped</option>
++                                                            <option value="on-failure">On Failure</option>
++                                                        </select>
++                                                    </div>
++
++                                                    <div>
++                                                        <label className="flex items-center space-x-2 text-sm font-medium text-slate-300 mb-2">
++                                                            <Network size={16} className="text-slate-400" />
++                                                            <span>Network Mode</span>
++                                                        </label>
++                                                        <select
++                                                            value={c.networkMode}
++                                                            onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
++                                                            className="w-full px-4 py-2.5 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white"
++                                                        >
++                                                            <option value="bridge">Bridge (Secure)</option>
++                                                            <option value="none">None (Isolated)</option>
++                                                        </select>
++                                                    </div>
++                                                </div>
++
++                                                {/* Environment Variables Section */}
++                                                <div className="pt-4 border-t border-slate-700/50">
++                                                    <label className="flex flex-col mb-4">
++                                                        <span className="text-sm font-medium text-slate-300">Environment Variables</span>
++                                                        <span className="text-xs text-slate-500">Add custom KEY=VALUE pairs injected on runtime.</span>
++                                                    </label>
++
++                                                    <div className="space-y-3 mb-3">
++                                                        {c.envVars.map((env, eIdx) => (
++                                                            <div key={eIdx} className="flex items-center space-x-3">
++                                                                <input
++                                                                    type="text"
++                                                                    placeholder="e.g. NODE_ENV"
++                                                                    value={env.key}
++                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)}
++                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
++                                                                />
++                                                                <span className="text-slate-500 font-bold">=</span>
++                                                                <input
++                                                                    type="text"
++                                                                    placeholder="e.g. production"
++                                                                    value={env.value}
++                                                                    onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)}
++                                                                    className="flex-1 px-4 py-2 bg-slate-900 border border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-white font-mono text-sm"
++                                                                />
++                                                                <button
++                                                                    type="button"
++                                                                    onClick={() => removeEnvVar(c.id, eIdx)}
++                                                                    className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
++                                                                >
++                                                                    <Trash2 size={16} />
++                                                                </button>
++                                                            </div>
++                                                        ))}
++                                                    </div>
++
++                                                    <button
++                                                        type="button"
++                                                        onClick={() => addEnvVar(c.id)}
++                                                        className="text-sm font-medium text-brand-400 hover:text-brand-300 flex items-center space-x-1"
++                                                    >
++                                                        <Plus size={16} />
++                                                        <span>Add Variable</span>
++                                                    </button>
++                                                </div>
++
++                                            </div>
++                                        )}
++                                    </div>
++                                </div>
++                            ))}
++                        </div>
++
++                        {/* Actions */}
++                        <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-700/50">
++                            <button
++                                type="button"
++                                onClick={handleAddContainer}
++                                className="flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl border-2 border-dashed border-slate-600 hover:border-brand-500 hover:bg-brand-500/5 focus:outline-none text-brand-400 font-semibold transition-all"
++                            >
++                                <Plus size={20} />
++                                <span>Add Another Container</span>
++                            </button>
++
++                            <button
++                                type="submit"
++                                disabled={loading}
++                                className={`flex-1 flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
++                                    ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)]'}
++                                `}
++                            >
++                                {loading ? (
++                                    <span className="flex items-center space-x-2">
++                                        <span className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
++                                        <span>Deploying Stack...</span>
++                                    </span>
++                                ) : (
++                                    <>
++                                        <span>Deploy Full Stack</span>
++                                        <Play size={18} />
++                                    </>
++                                )}
++                            </button>
++                        </div>
++                    </form>
++                </div>
++
+             </div>
+         </div>
+     );
+
+commit 0bc470e257a215f2ef2eeb375c4d42f257f8cb23
+Author: pjimenez17 <a22pabjimpri@inspedralbes.cat>
+Date:   Wed Feb 25 18:56:25 2026 +0100
+
+    first commit
+
+diff --git a/frontend/src/pages/CreateContainer.jsx b/frontend/src/pages/CreateContainer.jsx
+new file mode 100644
+index 0000000..9dc81da
+--- /dev/null
++++ b/frontend/src/pages/CreateContainer.jsx
+@@ -0,0 +1,176 @@
++import React, { useState } from 'react';
++import { Box, Code, Database, Globe, Play, Server, AlertCircle } from 'lucide-react';
++import axios from 'axios';
++import { useNavigate } from 'react-router-dom';
++
++const predefinedImages = [
++    { id: 'ubuntu', name: 'Ubuntu Latest', image: 'ubuntu:latest', icon: <Server size={24} />, desc: 'Base Ubuntu OS image for raw Linux setup' },
++    { id: 'node', name: 'Node.js', image: 'node:18-alpine', icon: <Code size={24} />, desc: 'Lightweight Node 18 environment' },
++    { id: 'nginx', name: 'Nginx', image: 'nginx:alpine', icon: <Globe size={24} />, desc: 'High-performance web server & reverse proxy' },
++    { id: 'wp-mysql', name: 'WordPress', image: 'wordpress:latest', icon: <Box size={24} />, desc: 'WordPress CMS (Requires DB separate linking)' },
++    { id: 'mongo', name: 'MongoDB', image: 'mongo:latest', icon: <Database size={24} />, desc: 'NoSQL Document Database' },
++];
++
++const CreateContainer = () => {
++    const [name, setName] = useState('');
++    const [image, setImage] = useState('');
++    const [portBinding, setPortBinding] = useState('');
++    const [loading, setLoading] = useState(false);
++    const [error, setError] = useState('');
++
++    const navigate = useNavigate();
++
++    const handleSelectPredefined = (img) => {
++        setImage(img.image);
++        if (!name) {
++            setName(`${img.id}-${Math.floor(Math.random() * 1000)}`);
++        }
++        // Set some default ports if helpful
++        if (img.id === 'nginx') setPortBinding('8080:80');
++        if (img.id === 'mongo') setPortBinding('27017:27017');
++        if (img.id === 'wp-mysql') setPortBinding('8000:80');
++    };
++
++    const handleSubmit = async (e) => {
++        e.preventDefault();
++        setError('');
++        setLoading(true);
++
++        try {
++            const token = localStorage.getItem('token');
++            // Format ports: array of "host:container"
++            const ports = portBinding ? [portBinding] : [];
++
++            await axios.post('http://localhost:5000/api/containers', {
++                name,
++                image,
++                ports,
++                env: []
++            }, {
++                headers: { Authorization: `Bearer ${token}` }
++            });
++            navigate('/app/containers');
++        } catch (err) {
++            setError(err.response?.data?.message || 'Error creating container');
++            setLoading(false);
++        }
++    };
++
++    return (
++        <div className="p-8 pb-20 text-white max-w-5xl mx-auto">
++            <div className="mb-10">
++                <h1 className="text-4xl font-extrabold tracking-tight mb-2">Deploy a Container</h1>
++                <p className="text-slate-400 text-lg">Pick a preset or pull any image straight from Docker Hub.</p>
++            </div>
++
++            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
++
++                {/* Left Side: Form */}
++                <div className="bg-slate-800 border border-slate-700 rounded-3xl p-8 shadow-xl h-fit">
++                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
++                        <Box className="text-brand-400" />
++                        <span>Configuration</span>
++                    </h3>
++
++                    <form onSubmit={handleSubmit} className="space-y-6">
++                        {error && (
++                            <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
++                                <AlertCircle size={20} className="shrink-0 mt-0.5" />
++                                <span>{error}</span>
++                            </div>
++                        )}
++
++                        <div>
++                            <label className="block text-sm font-medium text-slate-300 mb-2">Container Name</label>
++                            <input
++                                type="text"
++                                required
++                                value={name}
++                                onChange={(e) => setName(e.target.value)}
++                                placeholder="my-awesome-app"
++                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow"
++                            />
++                        </div>
++
++                        <div>
++                            <label className="block text-sm font-medium text-slate-300 mb-2">Docker Image</label>
++                            <input
++                                type="text"
++                                required
++                                value={image}
++                                onChange={(e) => setImage(e.target.value)}
++                                placeholder="e.g., redis:alpine"
++                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
++                            />
++                            <p className="text-xs text-slate-500 mt-2">Any image available on Docker Hub works here.</p>
++                        </div>
++
++                        <div>
++                            <label className="block text-sm font-medium text-slate-300 mb-2">Port Binding (Optional)</label>
++                            <input
++                                type="text"
++                                value={portBinding}
++                                onChange={(e) => setPortBinding(e.target.value)}
++                                placeholder="Host_Port:Container_Port (e.g., 8080:80)"
++                                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 focus:outline-none text-white transition-shadow font-mono text-sm"
++                            />
++                        </div>
++
++                        <button
++                            type="submit"
++                            disabled={loading}
++                            className={`w-full flex justify-center items-center space-x-2 py-4 px-4 rounded-xl shadow-lg text-sm font-bold text-white transition-all
++                ${loading ? 'bg-slate-600 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600 shadow-[0_0_20px_rgba(14,165,233,0.3)] hover:shadow-[0_0_30px_rgba(14,165,233,0.5)]'}
++              `}
++                        >
++                            {loading ? (
++                                <span className="flex items-center space-x-2">
++                                    <span className="animate-spin w-5 h-5 border-2 border-white/20 border-t-white rounded-full"></span>
++                                    <span>Deploying...</span>
++                                </span>
++                            ) : (
++                                <>
++                                    <span>Create Container</span>
++                                    <Play size={18} />
++                                </>
++                            )}
++                        </button>
++                    </form>
++                </div>
++
++                {/* Right Side: Presets */}
++                <div>
++                    <h3 className="text-xl font-bold mb-6 flex items-center space-x-2">
++                        <Server className="text-purple-400" />
++                        <span>Quick Presets</span>
++                    </h3>
++                    <div className="grid gap-4">
++                        {predefinedImages.map(img => (
++                            <div
++                                key={img.id}
++                                onClick={() => handleSelectPredefined(img)}
++                                className={`p-5 rounded-2xl border cursor-pointer transition-all flex items-start space-x-4
++                  ${image === img.image
++                                        ? 'bg-brand-500/10 border-brand-500 shadow-[0_0_15px_rgba(14,165,233,0.15)]'
++                                        : 'bg-slate-800 border-slate-700 hover:border-slate-500'}
++                `}
++                            >
++                                <div className={`p-3 rounded-xl ${image === img.image ? 'bg-brand-500 text-white' : 'bg-slate-700 text-slate-300'}`}>
++                                    {img.icon}
++                                </div>
++                                <div>
++                                    <h4 className="font-bold text-white text-lg">{img.name}</h4>
++                                    <p className="text-sm font-mono text-brand-300 my-1">{img.image}</p>
++                                    <p className="text-sm text-slate-400 leading-snug">{img.desc}</p>
++                                </div>
++                            </div>
++                        ))}
++                    </div>
++                </div>
++
++            </div>
++        </div>
++    );
++};
++
++export default CreateContainer;

@@ -5,7 +5,7 @@ import axios from 'axios';
 const ChatAssistant = () => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { role: 'assistant', text: 'Hi! I am the Docker Manager AI. I can see your running containers and answer any questions you have. How can I help?' }
+        { role: 'assistant', text: 'Hi! I am the Orbit AI Assistant. I can see your running containers and answer any questions you have. How can I help?' }
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);

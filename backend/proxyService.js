@@ -33,6 +33,7 @@ export const initProxyService = async () => {
         // For Docker Desktop on Windows, the Linux VM actually provides /var/run/docker.sock 
         // to the containers seamlessly. Mounting the Windows named pipe directly into the Linux container fails.
         const socketBind = '/var/run/docker.sock:/var/run/docker.sock';
+        const acmeVolume = 'dockermanager_letsencrypt:/letsencrypt';
 
         const proxyConfig = {
             Image: 'traefik:v2.10',
@@ -41,18 +42,22 @@ export const initProxyService = async () => {
                 '--api.insecure=true',
                 '--providers.docker=true',
                 '--providers.docker.exposedbydefault=false',
-                '--entrypoints.web.address=:80'
+                '--entrypoints.web.address=:80',
+                '--entrypoints.websecure.address=:443',
+                // Let's Encrypt ACME resolver config
+                '--certificatesresolvers.myresolver.acme.httpchallenge=true',
+                '--certificatesresolvers.myresolver.acme.httpchallenge.entrypoint=web',
+                `--certificatesresolvers.myresolver.acme.email=${process.env.ACME_EMAIL || 'admin@example.com'}`,
+                '--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json'
             ],
             HostConfig: {
                 PortBindings: {
                     '80/tcp': [{ HostPort: '80' }],
+                    '443/tcp': [{ HostPort: '443' }],
                     '8080/tcp': [{ HostPort: '8080' }] // Traefik Dashboard (optional)
                 },
-                Binds: [socketBind],
+                Binds: [socketBind, acmeVolume],
                 RestartPolicy: { Name: 'always' },
-                // Create a shared explicit network later if needed, but for port forwarding, bridge is fine initially 
-                // However, Traefik needs to be on the same network as the containers if it proxies them by IP.
-                // Best practice is to run them all on a shared proxy network, or let Traefik route via the default bridge.
                 NetworkMode: 'bridge'
             }
         };

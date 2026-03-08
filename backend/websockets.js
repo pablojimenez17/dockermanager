@@ -186,6 +186,104 @@ export const setupSockets = (server) => {
         });
 
         // -------------------------------------------------------------
+        // LIVE CONTAINER METRICS (Grafana style)
+        // -------------------------------------------------------------
+        let statsStream = null;
+
+        socket.on('subscribe_stats', async (data) => {
+            try {
+                const { containerId: dockerId } = data;
+
+                // 1. Verify Ownership
+                const dbContainer = await Container.findOne({ dockerId });
+                if (!dbContainer || (dbContainer.userId.toString() !== socket.user.userId && socket.user.role !== 'admin')) {
+                    socket.emit('stats_error', 'Forbidden: You do not own this container');
+                    return;
+                }
+
+                if (statsStream) {
+                    statsStream.destroy();
+                    statsStream = null;
+                }
+
+                const container = docker.getContainer(dockerId);
+
+                // Get the continuous stats stream
+                statsStream = await container.stats({ stream: true });
+
+                statsStream.on('data', (chunk) => {
+                    try {
+                        const raw = chunk.toString('utf8');
+                        // Docker can sometimes send multiple JSON objects tight together in a fast stream
+                        const jsons = raw.split('\n').filter(Boolean);
+
+                        for (const j of jsons) {
+                            const stats = JSON.parse(j);
+
+                            // CPU % calculation based on Docker CLI formula
+                            let cpuPercent = 0;
+                            const cpuDelta = stats.cpu_stats.cpu_usage.total_usage - (stats.precpu_stats.cpu_usage?.total_usage || 0);
+                            const systemDelta = stats.cpu_stats.system_cpu_usage - (stats.precpu_stats?.system_cpu_usage || 0);
+
+                            if (systemDelta > 0 && cpuDelta > 0) {
+                                const cpus = stats.cpu_stats.online_cpus || 1;
+                                cpuPercent = (cpuDelta / systemDelta) * cpus * 100.0;
+                            }
+
+                            // Memory Usage Calculation
+                            let memUsage = 0;
+                            let memLimit = 0;
+                            let memPercent = 0;
+                            if (stats.memory_stats && stats.memory_stats.usage) {
+                                const cache = stats.memory_stats.stats?.cache || 0;
+                                memUsage = stats.memory_stats.usage - cache;
+                                memLimit = stats.memory_stats.limit;
+                                memPercent = (memUsage / memLimit) * 100.0;
+                            }
+
+                            // Network I/O
+                            let netRx = 0;
+                            let netTx = 0;
+                            if (stats.networks) {
+                                Object.values(stats.networks).forEach(nw => {
+                                    netRx += nw.rx_bytes;
+                                    netTx += nw.tx_bytes;
+                                });
+                            }
+
+                            socket.emit('stats_update', {
+                                timestamp: new Date(stats.read).getTime(),
+                                cpuPercent: parseFloat(cpuPercent.toFixed(2)),
+                                memUsageBytes: memUsage,
+                                memLimitBytes: memLimit,
+                                memPercent: parseFloat(memPercent.toFixed(2)),
+                                netRxBytes: netRx,
+                                netTxBytes: netTx
+                            });
+                        }
+                    } catch (err) {
+                        // ignore malformed chunk parses, stream continues
+                    }
+                });
+
+                statsStream.on('error', (err) => {
+                    console.error('[Stats Stream Error]', err);
+                });
+
+            } catch (err) {
+                console.error('[WebSocket Stats Error]', err);
+                socket.emit('stats_error', `Failed to attach to stats: ${err.message}`);
+            }
+        });
+
+        socket.on('unsubscribe_stats', () => {
+            if (statsStream) {
+                statsStream.destroy();
+                statsStream = null;
+            }
+        });
+
+        // -------------------------------------------------------------
         // GENERAL CLEANUP
         // -------------------------------------------------------------
         socket.on('disconnect', () => {
@@ -197,6 +295,10 @@ export const setupSockets = (server) => {
             if (execStream) {
                 execStream.end();
                 execStream = null;
+            }
+            if (statsStream) {
+                statsStream.destroy();
+                statsStream = null;
             }
         });
     });
