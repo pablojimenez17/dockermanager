@@ -26,6 +26,18 @@ const containerSchema = new mongoose.Schema({
     domain: {
         type: String,
         trim: true
+    },
+    deployedViaGit: {
+        type: Boolean,
+        default: false
+    },
+    gitRepositoryUrl: {
+        type: String, // e.g., https://github.com/user/repo
+        trim: true
+    },
+    gitWebhookSecret: {
+        type: String, // Random secret generated during deployment
+        trim: true
     }
 }, { timestamps: true });
 

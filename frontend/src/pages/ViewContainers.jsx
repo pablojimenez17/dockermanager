@@ -3,6 +3,7 @@ import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, Alert
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
+import LiveLogsModal from '../components/LiveLogsModal';
 import { useToast } from '../components/ToastContext';
 
 const ViewContainers = () => {
@@ -13,6 +14,7 @@ const ViewContainers = () => {
     const [selectedLogs, setSelectedLogs] = useState(null);
     const [logSearchQuery, setLogSearchQuery] = useState('');
     const [activeTerminal, setActiveTerminal] = useState(null);
+    const [liveLogsTerminal, setLiveLogsTerminal] = useState(null);
     const [expandedContainers, setExpandedContainers] = useState({});
     const [containerStats, setContainerStats] = useState({});
 
@@ -21,6 +23,7 @@ const ViewContainers = () => {
     const [editingContainer, setEditingContainer] = useState(null);
     const [editDomain, setEditDomain] = useState('');
     const [editPort, setEditPort] = useState('');
+    const [redeployConfirm, setRedeployConfirm] = useState(null);
 
     const { addToast } = useToast();
 
@@ -47,7 +50,7 @@ const ViewContainers = () => {
         const interval = setInterval(fetchContainers, 30000); // Poll every 30s
 
         // Setup Real-time Docker events socket
-        const socket = io('http://localhost:5000');
+        const socket = io('http://localhost:5000', { withCredentials: true });
 
         socket.on('container:status_change', ({ dockerId, status }) => {
             console.log('[React Socket] Received container event:', dockerId, status);
@@ -97,7 +100,7 @@ const ViewContainers = () => {
 
             const method = action === 'delete' ? 'delete' : 'post';
 
-            await axios[method](endpoint, action === 'delete' ? {  } : {});
+            await axios[method](endpoint, action === 'delete' ? {} : {});
 
             if (action === 'start') {
                 addToast('Container Started', `${cName} successfully started.`, 'success');
@@ -159,12 +162,8 @@ const ViewContainers = () => {
     };
 
     const fetchLogs = async (id, name) => {
-        try {
-            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`);
-            setSelectedLogs({ name, content: res.data });
-        } catch (err) {
-            setSelectedLogs({ name, content: "Error fetching logs or container not running." });
-        }
+        // Now opens the realtime WebSocket modal instead of the old static fetch
+        setLiveLogsTerminal({ id, name });
     };
 
     const toggleExpand = async (container) => {
@@ -393,7 +392,7 @@ const ViewContainers = () => {
                                         </button>
 
                                         <button
-                                            onClick={() => handleRedeploy(container._id, container.name, container.image)}
+                                            onClick={() => setRedeployConfirm({ id: container._id, name: container.name, image: container.image })}
                                             className="group relative flex-1 min-w-[100px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 border border-indigo-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
                                         >
                                             <RefreshCw size={16} /> <span>Redeploy</span>
@@ -511,32 +510,13 @@ const ViewContainers = () => {
                 </div>
             )}
 
-            {/* Logs Modal */}
-            {selectedLogs && (
-                <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[85vh]">
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <h3 className="font-bold flex items-center text-lg text-slate-900 dark:text-white shrink-0">
-                                <Terminal className="mr-2 text-brand-500 dark:text-brand-400" /> Logs: {selectedLogs.name}
-                            </h3>
-                            <div className="flex items-center space-x-3 w-full sm:w-auto">
-                                <input
-                                    type="text"
-                                    placeholder="Filter logs..."
-                                    value={logSearchQuery}
-                                    onChange={(e) => setLogSearchQuery(e.target.value)}
-                                    className="w-full sm:w-64 px-3 py-1.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-lg text-sm focus:ring-1 focus:ring-brand-500 outline-none dark:text-white transition-shadow"
-                                />
-                                <button onClick={() => { setSelectedLogs(null); setLogSearchQuery(''); }} className="shrink-0 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
-                                    Close
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4 overflow-y-auto flex-1 font-mono text-sm bg-slate-50 text-slate-800 dark:bg-[#0f172a] dark:text-slate-300 leading-relaxed">
-                            {selectedLogs.content ? selectedLogs.content.split('\n').map((line, i) => renderLogLine(line, i)) : 'No logs available.'}
-                        </div>
-                    </div>
-                </div>
+            {/* Live Logs Terminal Modal */}
+            {liveLogsTerminal && (
+                <LiveLogsModal
+                    containerId={liveLogsTerminal.id}
+                    containerName={liveLogsTerminal.name}
+                    onClose={() => setLiveLogsTerminal(null)}
+                />
             )}
 
             {/* Terminal Modal */}
@@ -611,6 +591,48 @@ const ViewContainers = () => {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Redeploy Confirmation Modal */}
+            {redeployConfirm && (
+                <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center">
+                            <AlertTriangle className="mr-3 text-amber-500" size={24} />
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                Confirm Redeployment
+                            </h3>
+                        </div>
+                        <div className="p-6 text-slate-600 dark:text-slate-300 space-y-4 text-sm leading-relaxed">
+                            <p>
+                                You are about to initiate a Zero-Downtime update for <strong className="text-slate-900 dark:text-white">{redeployConfirm.name}</strong> using the latest version of <code className="bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded font-mono text-xs">{redeployConfirm.image}</code>.
+                            </p>
+                            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-4 rounded-xl text-amber-800 dark:text-amber-400">
+                                <h4 className="font-bold mb-2 text-amber-900 dark:text-amber-300">⚠️ Important Considerations:</h4>
+                                <ul className="list-disc pl-5 space-y-2">
+                                    <li><strong>Zero-Downtime:</strong> A Green container will boot up. Traffic switches instantly once it is healthy.</li>
+                                    <li><strong>Ephemeral Data Loss:</strong> Data stored directly inside the container filesystem (not mapped to a persistent <strong>Volume</strong>) will be permanently destroyed.</li>
+                                    <li><strong>Databases:</strong> Do not redeploy databases (MySQL, Postgres) via this method without strictly mapped volumes, or you will lose your records.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 mt-2 flex justify-end space-x-3">
+                            <button
+                                onClick={() => setRedeployConfirm(null)}
+                                className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    handleRedeploy(redeployConfirm.id, redeployConfirm.name, redeployConfirm.image);
+                                    setRedeployConfirm(null);
+                                }}
+                                className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform active:scale-95 flex items-center">
+                                <RefreshCw size={18} className="mr-2" /> Yes, Redeploy Now
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

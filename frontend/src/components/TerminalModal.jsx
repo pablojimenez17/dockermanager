@@ -13,7 +13,7 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
 
     useEffect(() => {
         // Initialize socket connection
-        socketRef.current = io('http://localhost:5000');
+        socketRef.current = io('http://localhost:5000', { withCredentials: true });
 
         // Initialize xterm.js
         const term = new Terminal({
@@ -36,7 +36,15 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
 
         // Open terminal in the container div
         term.open(terminalRef.current);
-        fitAddon.fit();
+
+        // Defer fit so the DOM has time to render the modal sizes
+        setTimeout(() => {
+            try {
+                fitAddon.fit();
+            } catch (e) {
+                console.warn('Fit addon failed initially', e);
+            }
+        }, 100);
 
         term.writeln(`Connecting to ${containerName} (${containerId.substring(0, 12)})...`);
 
@@ -50,10 +58,17 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
             term.writeln(`\x1b[32mSuccessfully attached to ${containerName}\x1b[0m\r\n`);
 
             // Trigger initial resize
-            const dims = fitAddon.proposeDimensions();
-            if (dims) {
-                socketRef.current.emit('exec:resize', { cols: dims.cols, rows: dims.rows });
-            }
+            setTimeout(() => {
+                try {
+                    fitAddon.fit();
+                    const dims = fitAddon.proposeDimensions();
+                    if (dims && dims.cols && dims.rows) {
+                        socketRef.current.emit('exec:resize', { cols: dims.cols, rows: dims.rows });
+                    }
+                } catch (e) {
+                    console.warn('Resize failed', e);
+                }
+            }, 100);
         });
 
         socketRef.current.on('exec:output', (data) => {
@@ -67,10 +82,14 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
 
         // Handle window resizing
         const handleResize = () => {
-            fitAddon.fit();
-            const dims = fitAddon.proposeDimensions();
-            if (dims && socketRef.current) {
-                socketRef.current.emit('exec:resize', { cols: dims.cols, rows: dims.rows });
+            try {
+                fitAddon.fit();
+                const dims = fitAddon.proposeDimensions();
+                if (dims && dims.cols && dims.rows && socketRef.current) {
+                    socketRef.current.emit('exec:resize', { cols: dims.cols, rows: dims.rows });
+                }
+            } catch (err) {
+                // Ignore resize errors during unmounts
             }
         };
         window.addEventListener('resize', handleResize);

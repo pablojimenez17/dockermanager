@@ -1,124 +1,202 @@
 import { Server } from 'socket.io';
 import Docker from 'dockerode';
+import User from './models/User.js';
+import Container from './models/Container.js';
+import jwt from 'jsonwebtoken';
 
 const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 export const setupSockets = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: '*', // Adjust in production
-            methods: ['GET', 'POST']
+            origin: 'http://localhost:5173',
+            methods: ['GET', 'POST'],
+            credentials: true
         }
     });
 
-    // --- Global Docker Event Listener ---
-    docker.getEvents({
-        filters: { type: ['container'] }
-    }, (err, stream) => {
-        if (err) {
-            console.error('[Socket] Failed to attach to Docker events:', err.message);
-            return;
+    // Basic authentication middleware for sockets
+    io.use(async (socket, next) => {
+        try {
+            // First try to authenticate via a token sent in the handshake auth
+            // This is easier for React clients to send explicitly
+            let token = socket.handshake.auth.token;
+
+            // Fallback: Check HTTP-Only cookies sent by the browser
+            if (!token && socket.handshake.headers.cookie) {
+                const cookieString = socket.handshake.headers.cookie;
+                const match = cookieString.match(new RegExp('(^| )' + 'token' + '=([^;]+)'));
+                if (match) token = match[2];
+            }
+
+            if (!token) {
+                return next(new Error('Authentication token missing'));
+            }
+
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkey');
+
+            // Attach user info to the socket instance for later use
+            socket.user = { userId: decoded.userId, role: decoded.role };
+            next();
+        } catch (err) {
+            console.error('[Websocket Auth Error]', err.message);
+            next(new Error('Authentication failed'));
         }
+    });
 
-        stream.on('data', (chunk) => {
+    io.on('connection', (socket) => {
+        console.log(`[WebSocket] Client connected: ${socket.id} (User: ${socket.user.userId})`);
+
+        let logStream = null;
+
+        socket.on('subscribe_logs', async (data) => {
             try {
-                // Docker events can sometimes arrive chunked together
-                const lines = chunk.toString('utf8').trim().split('\n');
+                const { containerId } = data;
 
-                lines.forEach(line => {
-                    if (!line) return;
-                    const event = JSON.parse(line);
+                // 1. Verify Ownership / Permissions
+                const dbContainer = await Container.findOne({ _id: containerId });
+                if (!dbContainer) {
+                    socket.emit('log_error', 'Container not found in database');
+                    return;
+                }
 
-                    const actionableEvents = ['start', 'die', 'stop', 'pause', 'unpause'];
+                if (dbContainer.userId.toString() !== socket.user.userId && socket.user.role !== 'admin') {
+                    socket.emit('log_error', 'Forbidden: You do not own this container');
+                    return;
+                }
 
-                    if (event.Type === 'container' && actionableEvents.includes(event.Action)) {
-                        const newStatus = event.Action === 'die' || event.Action === 'stop' ? 'stopped' :
-                            event.Action === 'start' || event.Action === 'unpause' ? 'running' :
-                                event.Action;
+                // 2. Cleanup previous streams if the user switches containers without disconnecting
+                if (logStream) {
+                    logStream.destroy();
+                    logStream = null;
+                }
 
-                        console.log(`[Socket] Broadcasting state change: ${event.id.substring(0, 12)} -> ${newStatus}`);
+                socket.emit('log_stdout', `\\033[36m[*] Connected to live logs for ${dbContainer.name}...\\033[0m\r\n\r\n`);
 
-                        // Broadcast globally to all connected React clients
-                        io.emit('container:status_change', {
-                            dockerId: event.id,
-                            status: newStatus
-                        });
-                    }
+                // 3. Attach to Docker Stream
+                const container = docker.getContainer(dbContainer.dockerId);
+
+                logStream = await container.logs({
+                    follow: true,     // Keep connection open
+                    stdout: true,     // Get standard output
+                    stderr: true,     // Get error output
+                    tail: 100         // Get last 100 lines initially
                 });
-            } catch (e) {
-                console.error('[Socket] Error parsing Docker event chunk:', e.message);
+
+                // Dockerode streams multiplex stdout and stderr, we use docker.modem to demux it
+                container.modem.demuxStream(logStream,
+                    {
+                        write: (chunk) => {
+                            // Convert NodeJS buffer to text and emit to frontend
+                            socket.emit('log_stdout', chunk.toString('utf8'));
+                        }
+                    },
+                    {
+                        write: (chunk) => {
+                            // Convert standard error to text
+                            socket.emit('log_stderr', chunk.toString('utf8'));
+                        }
+                    }
+                );
+
+                logStream.on('end', () => {
+                    socket.emit('log_stdout', '\r\n\\033[31m[*] Container stream closed.\\033[0m\r\n');
+                });
+
+                logStream.on('error', (err) => {
+                    socket.emit('log_error', `Stream Error: ${err.message}`);
+                });
+
+            } catch (error) {
+                console.error('[WebSocket Log Error]', error);
+                socket.emit('log_error', `Failed to attach to logs: ${error.message}`);
             }
         });
 
-        stream.on('end', () => console.log('[Socket] Docker event stream ended'));
-    });
-    // ------------------------------------
+        socket.on('unsubscribe_logs', () => {
+            if (logStream) {
+                logStream.destroy();
+                logStream = null;
+            }
+        });
 
-    io.on('connection', (socket) => {
-        console.log(`[Socket] Client connected: ${socket.id}`);
-
+        // -------------------------------------------------------------
+        // INTERACTIVE TERMINAL STREAM (xterm.js)
+        // -------------------------------------------------------------
         let execStream = null;
+        let execObj = null;
 
-        // Listen for requests to start a terminal
-        socket.on('exec:start', async ({ containerId }) => {
-            console.log(`[Socket] Client requested terminal for container: ${containerId}`);
+        socket.on('exec:start', async (data) => {
             try {
-                const container = docker.getContainer(containerId);
+                // frontend sends container.dockerId under 'containerId' prop
+                const { containerId: dockerId } = data;
 
-                // Create an exec instance
-                const exec = await container.exec({
-                    Cmd: ['/bin/sh', '-c', 'if command -v bash >/dev/null 2>&1; then exec bash; else exec sh; fi'],
+                // 1. Verify Ownership / Permissions via Docker ID
+                const dbContainer = await Container.findOne({ dockerId });
+                if (!dbContainer || (dbContainer.userId.toString() !== socket.user.userId && socket.user.role !== 'admin')) {
+                    socket.emit('exec:output', '\r\n\x1b[31mForbidden: You do not own this container or it does not exist.\x1b[0m\r\n');
+                    return;
+                }
+
+                const container = docker.getContainer(dockerId);
+
+                // 2. Create Exec Instance
+                execObj = await container.exec({
+                    Cmd: ['/bin/sh', '-c', '([ -x /bin/bash ] && /bin/bash) || /bin/sh'],
                     AttachStdin: true,
                     AttachStdout: true,
                     AttachStderr: true,
                     Tty: true
                 });
 
-                // Start the exec instance
-                execStream = await exec.start({
-                    hijack: true,
-                    stdin: true
-                });
+                // 3. Start Stream
+                execStream = await execObj.start({ hijack: true, stdin: true });
 
-                // When Docker sends data, send it to the client
+                socket.emit('exec:ready');
+
+                // Multiplex the chunk directly back to xterm frontend
                 execStream.on('data', (chunk) => {
-                    socket.emit('exec:output', chunk.toString('utf-8'));
+                    socket.emit('exec:output', chunk.toString('utf8'));
                 });
 
                 execStream.on('end', () => {
-                    console.log(`[Socket] Exec stream ended for ${containerId}`);
-                    socket.emit('exec:output', '\r\n[Disconnected from terminal]\r\n');
+                    socket.emit('exec:output', '\r\n\x1b[31m[Session ended]\x1b[0m\r\n');
                 });
 
-                // Set up resize handler if the frontend sends resizing events
-                socket.on('exec:resize', async ({ cols, rows }) => {
-                    try {
-                        await exec.resize({ h: rows, w: cols });
-                    } catch (e) {
-                        console.log('Resize error:', e.message);
-                    }
-                });
-
-                socket.emit('exec:ready');
-                console.log(`[Socket] Terminal attached for ${containerId}`);
-
-            } catch (error) {
-                console.error(`[Socket] Error attaching terminal:`, error);
-                socket.emit('exec:output', `\r\n[Error starting terminal: ${error.message}]\r\n`);
+            } catch (e) {
+                console.error('[Terminal Error]', e);
+                socket.emit('exec:output', `\r\n\x1b[31mError starting terminal: ${e.message}\x1b[0m\r\n`);
             }
         });
 
-        // Listen for user typing in the frontend terminal
         socket.on('exec:input', (data) => {
             if (execStream) {
                 execStream.write(data);
             }
         });
 
+        socket.on('exec:resize', async (data) => {
+            if (execObj) {
+                try {
+                    await execObj.resize({ h: data.rows, w: data.cols });
+                } catch (e) {
+                    // Some old containers might panic on resize, ignore
+                }
+            }
+        });
+
+        // -------------------------------------------------------------
+        // GENERAL CLEANUP
+        // -------------------------------------------------------------
         socket.on('disconnect', () => {
-            console.log(`[Socket] Client disconnected: ${socket.id}`);
+            console.log(`[WebSocket] Client disconnected: ${socket.id}`);
+            if (logStream) {
+                logStream.destroy();
+                logStream = null;
+            }
             if (execStream) {
                 execStream.end();
+                execStream = null;
             }
         });
     });

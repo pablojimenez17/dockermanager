@@ -14,6 +14,7 @@ import gitRoutes from './routes/gitRoutes.js';
 import volumeRoutes from './routes/volumeRoutes.js';
 import secretRoutes from './routes/secretRoutes.js';
 import registryRoutes from './routes/registryRoutes.js';
+import webhookRoutes from './routes/webhookRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import User from './models/User.js';
@@ -47,6 +48,7 @@ app.use('/api/git', gitRoutes);
 app.use('/api/volumes', volumeRoutes);
 app.use('/api/secrets', secretRoutes);
 app.use('/api/registries', registryRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')

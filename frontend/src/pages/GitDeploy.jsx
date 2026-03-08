@@ -9,6 +9,7 @@ const GitDeploy = () => {
     const [error, setError] = useState('');
     const [limits, setLimits] = useState({ maxContainers: 2, maxDomains: 0 });
     const [currentUsage, setCurrentUsage] = useState({ containers: 0, domains: 0 });
+    const [webhookData, setWebhookData] = useState(null);
 
     const [form, setForm] = useState({
         name: '',
@@ -70,13 +71,60 @@ const GitDeploy = () => {
         setLoading(true);
 
         try {
-            await axios.post('http://localhost:5000/api/git/deploy', form);
-            navigate('/app/containers');
+            const res = await axios.post('http://localhost:5000/api/git/deploy', form);
+            setWebhookData({
+                url: res.data.webhookUrl,
+                secret: res.data.webhookSecret
+            });
+            setLoading(false);
         } catch (err) {
             setError(err.response?.data?.message || 'Error deploying from Git');
             setLoading(false);
         }
     };
+
+    if (webhookData) {
+        return (
+            <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-2xl mx-auto text-center mt-12 animate-in fade-in slide-in-from-bottom-8">
+                <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_30px_rgba(34,197,94,0.4)]">
+                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                </div>
+                <h1 className="text-3xl font-extrabold mb-4">Deployment Successful!</h1>
+                <p className="text-slate-600 dark:text-slate-400 mb-8">
+                    Your code has been built and deployed globally. To enable <b>Zero-Downtime Auto-Deployments</b> every time you push to this repository, configure a Webhook in your GitHub Repository Settings using the details below.
+                </p>
+
+                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 text-left space-y-4 mb-8">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Payload URL</label>
+                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-brand-600 dark:text-brand-400 break-all select-all">
+                            {webhookData.url}
+                        </code>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Secret (HMAC SHA-256)</label>
+                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-purple-600 dark:text-purple-400 break-all select-all">
+                            {webhookData.secret}
+                        </code>
+                        <p className="text-xs text-amber-500 mt-2 font-medium">⚠️ Copy this secret now. It is encrypted in our database and will never be shown again.</p>
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Content Type</label>
+                        <code className="block w-full p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm dark:text-slate-300">
+                            application/json
+                        </code>
+                    </div>
+                </div>
+
+                <button
+                    onClick={() => navigate('/app/containers')}
+                    className="bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-xl font-bold w-full transition-colors shadow-lg shadow-brand-500/30"
+                >
+                    I have saved the Webhook, take me to my Container
+                </button>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">

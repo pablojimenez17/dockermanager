@@ -120,13 +120,18 @@ router.post('/deploy', async (req, res) => {
         await container.start();
 
         // Save to Database
+        const webhookSecret = crypto.randomBytes(32).toString('hex');
+
         const dbContainer = new Container({
             name,
             image: imageTag,
             dockerId: container.id,
             userId: req.user.userId,
             status: 'running',
-            domain: domain && domainPort ? domain.trim() : undefined
+            domain: domain && domainPort ? domain.trim() : undefined,
+            deployedViaGit: true,
+            gitRepositoryUrl: gitUrl,
+            gitWebhookSecret: webhookSecret
         });
 
         await dbContainer.save();
@@ -138,7 +143,12 @@ router.post('/deploy', async (req, res) => {
             details: `Deployed from Git: ${gitUrl}`
         });
 
-        res.status(201).json(dbContainer);
+        // Return the secret and webhook URL back to the frontend ONE TIME so the user can copy it
+        res.status(201).json({
+            container: dbContainer,
+            webhookSecret,
+            webhookUrl: `${req.protocol}://${req.get('host')}/api/webhooks/github`
+        });
 
     } catch (error) {
         console.error(`[ERROR] Git Deploy Failed:`, error);
