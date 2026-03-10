@@ -27,7 +27,10 @@ const Buckets = () => {
             ]);
 
             setBuckets(bucketRes.data || []);
-            setUserLimits(userRes.data?.limits || { maxBuckets: 1 });
+
+            const currentLimits = userRes.data?.limits || { maxBuckets: 1 };
+            setUserLimits(currentLimits);
+            localStorage.setItem('planType', userRes.data?.planType || 'free'); // Sync the cache 
         } catch (error) {
             console.error('Failed to load buckets from MinIO:', error);
             addToast('Error loading buckets.', 'error');

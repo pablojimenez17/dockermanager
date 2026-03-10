@@ -10,26 +10,29 @@ const Snapshots = () => {
     const { addToast } = useToast();
 
     useEffect(() => {
-        const storedPlan = localStorage.getItem('planType') || 'free';
-        setUserPlan(storedPlan);
-
-        if (storedPlan !== 'free') {
-            fetchSnapshots();
-        } else {
-            setLoading(false);
-        }
+        fetchData();
     }, []);
 
-    const fetchSnapshots = async () => {
+    const fetchData = async () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const res = await axios.get('http://localhost:5000/api/snapshots', {
+            const userRes = await axios.get('http://localhost:5000/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setSnapshots(res.data || []);
+
+            const currentPlan = userRes.data?.planType || 'free';
+            setUserPlan(currentPlan);
+            localStorage.setItem('planType', currentPlan); // sync just in case
+
+            if (currentPlan !== 'free') {
+                const snapRes = await axios.get('http://localhost:5000/api/snapshots', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setSnapshots(snapRes.data || []);
+            }
         } catch (error) {
-            console.error('Failed to load snapshots:', error);
+            console.error('Failed to load snapshot dashboard data:', error);
             addToast('Error loading your snapshot gallery.', 'error');
         } finally {
             setLoading(false);
@@ -86,7 +89,7 @@ const Snapshots = () => {
                     </p>
                 </div>
                 <button
-                    onClick={fetchSnapshots}
+                    onClick={fetchData}
                     disabled={loading}
                     className="p-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white hover:bg-indigo-50 border border-slate-200 dark:bg-slate-800 dark:hover:bg-indigo-500/10 dark:border-slate-700 rounded-xl transition-colors disabled:opacity-50"
                     title="Refresh Gallery"

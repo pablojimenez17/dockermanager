@@ -126,8 +126,8 @@ const Sidebar = () => {
                                         title={item.name}
                                         className={({ isActive }) =>
                                             `flex items-center space-x-3 px-3 py-2.5 rounded-r-xl transition-all duration-200 ${isActive
-                                                ? 'bg-brand-50 text-brand-600 border-l-2 border-brand-500 dark:bg-brand-500/10 dark:text-brand-400'
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-2 border-transparent dark:text-slate-400 dark:hover:bg-slate-700/30 dark:hover:text-slate-200'
+                                                ? 'bg-slate-100 text-brand-700 border-l-4 border-brand-600 dark:bg-brand-500/20 dark:text-brand-300 dark:border-brand-400 font-semibold'
+                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent dark:text-slate-400 dark:hover:bg-slate-700/30 dark:hover:text-slate-200'
                                             }`
                                         }
                                     >

@@ -167,8 +167,8 @@ const ChatAssistant = () => {
             {/* Floating Action Button */}
             <button
                 onClick={() => setIsOpen(!isOpen)}
-                className={`flex items-center justify-center w-14 h-14 rounded-full shadow-lg shadow-brand-500/30 transition-all duration-300 hover:scale-105 active:scale-95 z-50
-                    ${isOpen ? 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white rotate-90' : 'bg-brand-500 hover:bg-brand-600 text-white'}`}
+                className={`flex items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 hover:scale-105 active:scale-95 z-50
+                    ${isOpen ? 'bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 text-white rotate-90 shadow-slate-900/20' : 'bg-indigo-700 hover:bg-indigo-800 dark:bg-brand-600 dark:hover:bg-brand-500 text-white shadow-indigo-900/30'}`}
             >
                 {isOpen ? <X size={24} className="-rotate-90 transition-transform" /> : <MessageSquare size={24} />}
             </button>
