@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard';
 import CreateContainer from './pages/CreateContainer';
 import ViewContainers from './pages/ViewContainers';
 import Networks from './pages/Networks';
+import Buckets from './pages/Buckets';
+import Snapshots from './pages/Snapshots';
 import Settings from './pages/Settings';
 import AdminDashboard from './pages/AdminDashboard';
 import Plans from './pages/Plans';
@@ -23,16 +25,19 @@ import ChatAssistant from './components/ChatAssistant';
 // Global Axios config for HTTP-Only Cookies
 axios.defaults.withCredentials = true;
 
-// Interceptor to auto-logout on 401 Unauthorized
+// Interceptor to auto-logout on 401 Unauthorized, excluding auth check endpoints
 axios.interceptors.response.use(
   response => response,
   error => {
+    // If the error comes from /auth/me or login, do not nuke the session globally
+    const url = error.config?.url || '';
+
+    // We are deliberately keeping the token in localStorage and NO LONGER logging the user out.
+    // If a 401 happens, the specific UI component will show a notification.
     if (error.response && error.response.status === 401) {
-      localStorage.clear();
-      if (window.location.pathname !== '/login' && window.location.pathname !== '/') {
-        window.location.href = '/login';
-      }
+      console.warn(`[Axios] Received 401 Unauthorized from ${url}. Ignoring global logout to prevent session drops.`);
     }
+
     return Promise.reject(error);
   }
 );
@@ -65,6 +70,8 @@ const App = () => {
           <Route path="registries" element={<Registries />} />
           <Route path="volumes" element={<Volumes />} />
           <Route path="networks" element={<Networks />} />
+          <Route path="buckets" element={<Buckets />} />
+          <Route path="snapshots" element={<Snapshots />} />
           <Route path="admin" element={<AdminDashboard />} />
           <Route path="plans" element={<Plans />} />
           <Route path="settings" element={<Settings />} />

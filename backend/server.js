@@ -16,8 +16,11 @@ import secretRoutes from './routes/secretRoutes.js';
 import registryRoutes from './routes/registryRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
+import bucketRoutes from './routes/bucketRoutes.js';
+import snapshotRoutes from './routes/snapshotRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
+import { initMinio } from './services/minioService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 
@@ -51,6 +54,8 @@ app.use('/api/secrets', secretRoutes);
 app.use('/api/registries', registryRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/templates', templateRoutes);
+app.use('/api/buckets', bucketRoutes);
+app.use('/api/snapshots', snapshotRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')
@@ -59,6 +64,13 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanag
 
         // Boot the Proxy Service
         await initProxyService();
+
+        // Boot MinIO Service
+        try {
+            await initMinio();
+        } catch (minioErr) {
+            console.error('Failed to initialize MinIO during boot:', minioErr);
+        }
 
         // Seed default admin user if no admins
         try {

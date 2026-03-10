@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Box, Briefcase } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Box, Briefcase, Database, Camera } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 import axios from 'axios';
 
@@ -44,8 +44,10 @@ const Sidebar = () => {
             title: 'Resources',
             icon: <HardDrive size={18} />,
             items: [
-                { name: 'Volumes (Disks)', path: '/app/volumes', icon: <HardDrive size={18} /> },
-                { name: 'Networks', path: '/app/networks', icon: <Network size={18} /> },
+                { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
+                { name: 'Snapshots', path: '/app/snapshots', icon: <Camera size={20} /> },
+                { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
+                { name: 'Buckets', path: '/app/buckets', icon: <Database size={20} /> },
                 { name: 'Secret Manager', path: '/app/secrets', icon: <Lock size={18} /> },
                 { name: 'Private Registries', path: '/app/registries', icon: <ShieldCheck size={18} /> },
             ]
@@ -58,7 +60,6 @@ const Sidebar = () => {
             icon: <ShieldAlert size={18} />,
             items: [
                 { name: 'Administration', path: '/app/admin', icon: <ShieldAlert size={18} /> },
-                { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={18} /> },
             ]
         });
     }
@@ -67,6 +68,7 @@ const Sidebar = () => {
         title: 'User',
         icon: <Settings size={18} />,
         items: [
+            { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={18} /> },
             { name: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
         ]
     });

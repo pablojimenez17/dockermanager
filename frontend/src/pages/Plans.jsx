@@ -62,6 +62,7 @@ const Plans = () => {
                 '1 GB RAM quota',
                 '1 CPU Core equivalent',
                 '1 GB Persistent Storage (1 Disk)',
+                '1 S3-Compatible Bucket',
                 'No Custom Domains',
                 'Community Support'
             ],
@@ -80,6 +81,7 @@ const Plans = () => {
                 '8 GB RAM quota',
                 '4 CPU Cores equivalent',
                 '10 GB Persistent Storage (5 Disks)',
+                '5 S3-Compatible Buckets',
                 '3 Custom Domains',
                 'Priority Support',
                 'Advanced Network Modes'
@@ -99,6 +101,7 @@ const Plans = () => {
                 '32 GB RAM quota',
                 '16 CPU Cores equivalent',
                 '100 GB Persistent Storage (20 Disks)',
+                'Unlimited S3-Compatible Buckets',
                 'Unlimited Custom Domains',
                 '24/7 Dedicated Support',
                 'Custom Node Mapping'

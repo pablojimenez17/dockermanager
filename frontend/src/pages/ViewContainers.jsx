@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network, Info, Settings, Globe } from 'lucide-react';
+import { Server, Play, Square, Trash2, Cpu, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, HardDrive, Network, Info, Settings, Globe, Camera } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -25,6 +25,14 @@ const ViewContainers = () => {
     const [editPort, setEditPort] = useState('');
     const [redeployConfirm, setRedeployConfirm] = useState(null);
 
+    // Snapshot Modal State
+    const [snapshotModalOpen, setSnapshotModalOpen] = useState(false);
+    const [snapshotContainer, setSnapshotContainer] = useState(null);
+    const [snapshotName, setSnapshotName] = useState('');
+
+    // User Context
+    const [userLimits, setUserLimits] = useState({ maxSnapshots: 0 });
+
     const { addToast } = useToast();
 
     // We use a ref to hold the latest containers so socket closures can read it
@@ -36,6 +44,13 @@ const ViewContainers = () => {
             setRefreshing(true);
             const res = await axios.get('http://localhost:5000/api/containers');
             setContainers(res.data);
+
+            // Also fetch basic user profile for limits
+            const userRes = await axios.get('http://localhost:5000/api/auth/me', {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+            setUserLimits(userRes.data?.limits || { maxSnapshots: 0 });
+
             setError('');
         } catch (err) {
             setError(err.response?.data?.message || 'Error fetching containers');
@@ -161,6 +176,36 @@ const ViewContainers = () => {
         }
     };
 
+    const openSnapshotModal = (container) => {
+        if (!userLimits || userLimits.maxSnapshots === 0) {
+            addToast('Upgrade Required', 'Snapshots are only available on Professional and Enterprise plans. Head to the Plans billing page to upgrade.', 'warning');
+            return;
+        }
+
+        setSnapshotContainer(container);
+        setSnapshotName(`${container.image.split(':')[0]}-backup-${new Date().toISOString().split('T')[0]}`);
+        setSnapshotModalOpen(true);
+    };
+
+    const submitSnapshot = async (e) => {
+        e.preventDefault();
+        try {
+            addToast('Creating Snapshot', `Committing image for ${snapshotContainer.name}. This may take a few seconds...`, 'info');
+            setSnapshotModalOpen(false);
+
+            await axios.post(`http://localhost:5000/api/containers/${snapshotContainer.dockerId}/snapshot`, {
+                snapshotName: snapshotName
+            }, {
+                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+            });
+
+            addToast('Snapshot Saved', `Successfully created image ${snapshotName}`, 'success');
+        } catch (err) {
+            console.error('Error creating snapshot:', err);
+            addToast('Snapshot Failed', err.response?.data?.message || 'Could not commit image.', 'error');
+        }
+    };
+
     const fetchLogs = async (id, name) => {
         // Now opens the realtime WebSocket modal instead of the old static fetch
         setLiveLogsTerminal({ id, name });
@@ -263,6 +308,13 @@ const ViewContainers = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center space-x-3">
+                                    <button
+                                        onClick={() => openSnapshotModal(container)}
+                                        className="p-2 text-slate-400 hover:text-indigo-500 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-500/10 rounded-xl transition-all"
+                                        title="Snapshot / Backup to Image"
+                                    >
+                                        <Camera size={20} />
+                                    </button>
                                     <button
                                         onClick={() => openEditModal(container)}
                                         className="p-2 text-slate-400 hover:text-brand-500 bg-slate-50 hover:bg-brand-50 dark:bg-slate-800 dark:hover:bg-brand-500/10 rounded-xl transition-all"
@@ -633,6 +685,58 @@ const ViewContainers = () => {
                                 <RefreshCw size={18} className="mr-2" /> Yes, Redeploy Now
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Snapshot Modal */}
+            {snapshotModalOpen && snapshotContainer && (
+                <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center">
+                            <Camera className="mr-3 text-indigo-500" size={24} />
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
+                                Create Snapshot
+                            </h3>
+                        </div>
+
+                        <form onSubmit={submitSnapshot} className="p-6">
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">
+                                Creating a snapshot saves the current state of <strong className="text-slate-900 dark:text-white">{snapshotContainer.name}</strong> as a reusable Docker Image.
+                            </p>
+
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                                Snapshot Tag Name <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                type="text"
+                                required
+                                value={snapshotName}
+                                onChange={(e) => setSnapshotName(e.target.value)}
+                                placeholder="e.g. my-app-backup:v1"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm font-mono"
+                            />
+                            <p className="text-[11px] text-slate-500 mt-2">
+                                Stored locally in your Docker Engine. You can deploy this exact image later exactly as it is now.
+                            </p>
+
+                            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-700/50 flex justify-end space-x-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setSnapshotModalOpen(false)}
+                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={!snapshotName}
+                                    className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform active:scale-95 flex items-center"
+                                >
+                                    Save Image
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             )}

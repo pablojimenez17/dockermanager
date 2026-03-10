@@ -5,6 +5,7 @@ import User from '../models/User.js';
 import Secret, { decrypt } from '../models/Secret.js';
 import Registry, { decrypt as decryptRegistry } from '../models/Registry.js';
 import AuditLog from '../models/AuditLog.js';
+import Snapshot from '../models/Snapshot.js'; // Added this line
 import authMiddleware from '../middleware/auth.js';
 import path from 'path';
 import fs from 'fs';
@@ -953,6 +954,67 @@ router.post('/template', async (req, res) => {
     } catch (error) {
         console.error('[Template Deploy Error]', error);
         res.status(500).json({ message: 'Error deploying template', error: error.message });
+    }
+});
+
+// Snapshot (Commit) a container to an image
+router.post('/:id/snapshot', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { snapshotName } = req.body; // e.g., 'myapp-backup:v1'
+
+        if (!snapshotName) {
+            return res.status(400).json({ message: 'snapshotName is required.' });
+        }
+
+        // 1. Verify Ownership & Get limits
+        const user = await User.findById(req.user.userId);
+        const maxSnapshots = user.limits?.maxSnapshots || 0;
+
+        if (maxSnapshots === 0) {
+            return res.status(403).json({ message: 'Snapshots are only available on Professional and Enterprise plans.' });
+        }
+
+        // Check current snapshot count
+        const currentSnapshots = await Snapshot.countDocuments({ userId: req.user.userId });
+        if (currentSnapshots >= maxSnapshots) {
+            return res.status(403).json({ message: `Quota Exceeded: Your plan limits you to ${maxSnapshots} snapshots.` });
+        }
+
+        const dbContainer = await Container.findOne({ dockerId: id, userId: req.user.userId });
+        if (!dbContainer) {
+            return res.status(404).json({ message: 'Container not found or access denied.' });
+        }
+
+        // 2. Perform Docker Commit
+        const container = docker.getContainer(id);
+        const commitResult = await container.commit({
+            repo: snapshotName,
+            comment: `Snapshot created via Docker Manager by ${user.email}`
+        });
+
+        // 3. Save to database for tracking
+        const newSnapshot = new Snapshot({
+            userId: user._id,
+            containerId: id,
+            containerName: dbContainer.name,
+            snapshotName: snapshotName,
+            imageId: commitResult.Id
+        });
+        await newSnapshot.save();
+
+        res.json({
+            message: 'Snapshot created successfully.',
+            imageId: commitResult.Id,
+            snapshotName
+        });
+    } catch (error) {
+        console.error('Snapshot Error:', error);
+        // Handle MongoDB duplicate key error nicely
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'A snapshot with this exact name already exists.' });
+        }
+        res.status(500).json({ message: 'Failed to create snapshot', error: error.message });
     }
 });
 
