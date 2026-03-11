@@ -21,6 +21,7 @@ import snapshotRoutes from './routes/snapshotRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import { initMinio } from './services/minioService.js';
+import { initOllama } from './services/ollamaService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 
@@ -70,6 +71,13 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanag
             await initMinio();
         } catch (minioErr) {
             console.error('Failed to initialize MinIO during boot:', minioErr);
+        }
+
+        // Boot Ollama Local AI Service
+        try {
+            await initOllama();
+        } catch (ollamaErr) {
+            console.error('Failed to initialize Ollama during boot:', ollamaErr);
         }
 
         // Seed default admin user if no admins

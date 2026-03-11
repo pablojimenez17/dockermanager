@@ -43,7 +43,7 @@ const ChatAssistant = () => {
             setMessages(prev => [...prev, { role: 'assistant', text: response.data.reply }]);
         } catch (error) {
             console.error('Chat error:', error);
-            const errorMsg = error.response?.data?.error || 'Failed to connect to AI server. Please check your API key.';
+            const errorMsg = error.response?.data?.error || 'Failed to connect to local AI server. It might be downloading the model.';
             setMessages(prev => [...prev, {
                 role: 'assistant',
                 text: `**Error:** ${errorMsg}`,
@@ -157,7 +157,7 @@ const ChatAssistant = () => {
                             </button>
                         </form>
                         <div className="text-center mt-2">
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500">Gemini AI can make mistakes. Verify commands.</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">Local AI runs natively on your server. Speed depends on CPU/RAM.</p>
                         </div>
                     </div>
 
