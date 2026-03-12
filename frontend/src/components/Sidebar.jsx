@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Box, Briefcase, Database, Camera } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Briefcase, Database, Camera, X } from 'lucide-react';
 import { useTheme } from './ThemeContext';
 import axios from 'axios';
 
-const Sidebar = () => {
+const Sidebar = ({ isOpen, setIsOpen }) => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
 
@@ -37,7 +37,6 @@ const Sidebar = () => {
                 { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={18} /> },
                 { name: 'Deploy from Git', path: '/app/git-deploy', icon: <GitBranch size={18} /> },
                 { name: 'Templates', path: '/app/marketplace', icon: <Briefcase size={18} /> },
-                { name: 'Running Apps', path: '/app/containers', icon: <Server size={18} /> },
             ]
         },
         {
@@ -91,12 +90,21 @@ const Sidebar = () => {
     };
 
     return (
-        <div className="w-64 bg-white dark:bg-slate-800 h-full flex flex-col border-r border-slate-200 dark:border-slate-700 shadow-xl transition-colors duration-200 shrink-0 overflow-hidden">
-            <div className="p-6 flex items-center space-x-3 shrink-0">
-                <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center border border-brand-500/20 text-brand-500 dark:text-brand-400">
-                    <Aperture size={20} className="animate-[spin_10s_linear_infinite]" />
+        <div className={`w-64 bg-white/50 dark:bg-slate-900/40 backdrop-blur-2xl h-full flex flex-col border-r border-white/80 dark:border-white/10 shadow-[4px_0_32px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_32px_rgba(0,0,0,0.2)] transition-transform duration-300 overflow-hidden z-40 fixed md:relative left-0 top-0 bottom-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+            <div className="p-6 flex items-center justify-between shrink-0">
+                <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center border border-brand-500/20 text-brand-500 dark:text-brand-400">
+                        <Aperture size={20} className="animate-[spin_10s_linear_infinite]" />
+                    </div>
+                    <span className="text-xl font-bold text-slate-800 dark:text-white whitespace-nowrap tracking-wide">Orbit</span>
                 </div>
-                <span className="text-xl font-bold text-slate-800 dark:text-white whitespace-nowrap tracking-wide">Orbit</span>
+                {/* Mobile Close Button */}
+                <button
+                    onClick={() => setIsOpen(false)}
+                    className="md:hidden p-2 rounded-lg bg-slate-200/50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-95 transition-all"
+                >
+                    <X size={20} />
+                </button>
             </div>
 
             <nav className="flex-1 px-3 space-y-1 mt-2 overflow-y-auto pb-4 custom-scrollbar">
@@ -124,6 +132,9 @@ const Sidebar = () => {
                                         to={item.path}
                                         end={item.path === '/app'}
                                         title={item.name}
+                                        onClick={() => {
+                                            if (window.innerWidth < 768) setIsOpen(false);
+                                        }}
                                         className={({ isActive }) =>
                                             `flex items-center space-x-3 px-3 py-2.5 rounded-r-xl transition-all duration-200 ${isActive
                                                 ? 'bg-slate-100 text-brand-700 border-l-4 border-brand-600 dark:bg-brand-500/20 dark:text-brand-300 dark:border-brand-400 font-semibold'

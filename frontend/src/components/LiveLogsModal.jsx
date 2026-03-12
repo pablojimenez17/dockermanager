@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Copy, Check, Download, Terminal } from 'lucide-react';
 import { io } from 'socket.io-client';
 
@@ -96,7 +97,7 @@ const LiveLogsModal = ({ containerId, containerName, onClose }) => {
         URL.revokeObjectURL(url);
     };
 
-    return (
+    return createPortal(
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-[#1e1e1e] w-full max-w-5xl h-[85vh] rounded-2xl shadow-2xl border border-slate-700/50 flex flex-col overflow-hidden">
 
@@ -167,7 +168,8 @@ const LiveLogsModal = ({ containerId, containerName, onClose }) => {
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

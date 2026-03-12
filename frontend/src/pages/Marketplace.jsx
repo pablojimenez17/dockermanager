@@ -29,13 +29,38 @@ const Marketplace = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                const [tplRes, secRes, meRes, myContainersRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/templates'),
-                    axios.get('http://localhost:5000/api/secrets'),
-                    axios.get('http://localhost:5000/api/auth/me'),
-                    axios.get('http://localhost:5000/api/containers')
+                const token = localStorage.getItem('token');
+                const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+
+                const [tplRes, secRes, meRes, myContainersRes, snapRes] = await Promise.all([
+                    axios.get('http://localhost:5000/api/templates', authOptions),
+                    axios.get('http://localhost:5000/api/secrets', authOptions),
+                    axios.get('http://localhost:5000/api/auth/me', authOptions),
+                    axios.get('http://localhost:5000/api/containers', authOptions),
+                    // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
+                    axios.get('http://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] }))
                 ]);
-                setTemplates(tplRes.data);
+
+                // Map snapshots into the expected "Template" format
+                const mappedSnapshots = (snapRes.data || []).map(snap => ({
+                    id: snap._id,
+                    name: snap.snapshotName,
+                    description: `Custom backup snapshot taken from ${snap.containerName}. Contains all modified files and configurations.`,
+                    category: 'My Snapshots',
+                    // Default snapshot/backup icon
+                    icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
+                    containers: [
+                        {
+                            name_prefix: snap.snapshotName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(),
+                            image: snap.imageId,
+                            // Default port 80 to allow domain exposure if the original image used web ports
+                            ports: [{ host: "", container: 80 }],
+                            env: [] // Existing envs are baked into the snapshot image automatically
+                        }
+                    ]
+                }));
+
+                setTemplates([...tplRes.data, ...mappedSnapshots]);
                 setAvailableSecrets(secRes.data || []);
 
                 if (meRes.data.limits) setLimits(meRes.data.limits);

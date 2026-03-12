@@ -260,7 +260,7 @@ const ViewContainers = () => {
                 <div className="flex w-full sm:w-auto space-x-3">
                     <button
                         onClick={() => addToast('Test System', 'If you see this, Toast CSS works', 'success')}
-                        className="bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-xl transition-all font-bold"
+                        className="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl shadow-lg hover:shadow-brand-500/25 transition-all duration-300 font-bold hover:-translate-y-0.5"
                     >
                         Test Notification
                     </button>
@@ -295,19 +295,19 @@ const ViewContainers = () => {
             ) : (
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {containers.map(container => (
-                        <div key={container._id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-slate-400 dark:hover:border-slate-500 transition-colors">
+                        <div key={container._id} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-lg hover:shadow-xl hover:-translate-y-1 hover:border-brand-400/50 dark:hover:border-brand-500/50 transition-all duration-300">
                             <div className="flex justify-between items-start mb-6">
-                                <div className="flex items-center space-x-4">
-                                    <div className={`p-4 rounded-2xl ${container.state === 'running' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
+                                <div className="flex items-center space-x-4 flex-1 min-w-0 pr-4">
+                                    <div className={`p-4 rounded-2xl shrink-0 ${container.state === 'running' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
                                         }`}>
                                         {container.state === 'running' ? <Activity size={28} /> : <Square size={28} />}
                                     </div>
-                                    <div>
-                                        <h3 className="text-xl font-bold text-slate-900 dark:text-white">{container.name}</h3>
-                                        <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1">{container.image}</p>
+                                    <div className="min-w-0 flex-1">
+                                        <h3 className="text-xl font-bold text-slate-900 dark:text-white truncate" title={container.name}>{container.name}</h3>
+                                        <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1 truncate" title={container.image}>{container.image}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center space-x-3">
+                                <div className="flex items-center space-x-3 shrink-0">
                                     <button
                                         onClick={() => openSnapshotModal(container)}
                                         className="p-2 text-slate-400 hover:text-indigo-500 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-500/10 rounded-xl transition-all"

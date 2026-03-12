@@ -113,10 +113,15 @@ const Buckets = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {buckets.length === 0 ? (
-                        <div className="col-span-1 md:col-span-2 lg:col-span-3 text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                            <Database className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500 mb-4 opacity-50" />
-                            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">No buckets found</h3>
-                            <p className="text-slate-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">Get started by creating your first bucket to store and manage private objects.</p>
+                        <div className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                            <div className="w-24 h-24 mb-6 relative">
+                                <div className="absolute inset-0 bg-brand-500/20 blur-2xl rounded-full"></div>
+                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-3xl flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
+                                    <Database size={40} className="text-brand-500 drop-shadow-sm" />
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">No buckets found</h3>
+                            <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm text-lg">Get started by creating your first S3-compatible storage bucket to store and manage private objects.</p>
                         </div>
                     ) : (
                         buckets.map(bucket => (

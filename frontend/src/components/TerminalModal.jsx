@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import { io } from 'socket.io-client';
@@ -102,21 +103,21 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
         };
     }, [containerId, containerName]);
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm p-4 animate-fade-in">
-            <div className="bg-white dark:bg-slate-900 w-full max-w-5xl h-[80vh] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden">
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 dark:bg-black/80 backdrop-blur-md p-4 animate-fade-in">
+            <div className="bg-white/50 dark:bg-slate-900/60 backdrop-blur-2xl w-full max-w-5xl h-[80vh] rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/80 dark:border-white/10 ring-1 ring-slate-900/5 flex flex-col overflow-hidden">
 
                 {/* Header */}
-                <div className="flex justify-between items-center px-6 py-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50">
+                <div className="flex justify-between items-center px-6 py-4 border-b border-white/40 dark:border-slate-800 bg-white/30 dark:bg-slate-900/50">
                     <div className="flex items-center space-x-3">
-                        <div className="w-3 h-3 rounded-full bg-brand-500 animate-pulse"></div>
-                        <h3 className="text-slate-900 dark:text-white font-mono font-bold tracking-wide">
+                        <div className="w-3 h-3 rounded-full bg-brand-500 shadow-[0_0_10px_rgba(14,165,233,0.8)] animate-pulse"></div>
+                        <h3 className="text-slate-900 dark:text-white font-mono font-bold tracking-wide drop-shadow-sm">
                             {containerName} terminal session
                         </h3>
                     </div>
                     <button
                         onClick={onClose}
-                        className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-2 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-lg"
+                        className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors p-2 hover:bg-white/50 dark:hover:bg-slate-800 rounded-lg"
                     >
                         <X size={20} />
                     </button>
@@ -128,7 +129,8 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
                     className="flex-1 p-4 bg-[#0f172a] overflow-hidden"
                 />
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

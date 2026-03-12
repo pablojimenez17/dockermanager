@@ -66,8 +66,8 @@ const Plans = () => {
                 'No Custom Domains',
                 'Community Support'
             ],
-            color: 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200',
-            buttonColor: 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:hover:bg-slate-600'
+            color: 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-800 dark:text-slate-200 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300',
+            buttonColor: 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200 dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:hover:bg-slate-600 hover:-translate-y-0.5 shadow-md'
         },
         {
             id: 'pro',
@@ -86,8 +86,8 @@ const Plans = () => {
                 'Priority Support',
                 'Advanced Network Modes'
             ],
-            color: 'bg-brand-50 border-brand-200 dark:bg-brand-900/20 dark:border-brand-500/30 text-brand-900 dark:text-brand-100 transform md:-translate-y-4 shadow-xl relative',
-            buttonColor: 'bg-brand-500 border-brand-500 text-white hover:bg-brand-600 shadow-lg shadow-brand-500/30'
+            color: 'bg-brand-50/90 border-brand-200 dark:bg-brand-900/40 dark:border-brand-500/30 backdrop-blur-xl text-brand-900 dark:text-brand-100 transform md:-translate-y-4 shadow-xl hover:-translate-y-6 hover:shadow-2xl hover:shadow-brand-500/20 relative transition-all duration-300',
+            buttonColor: 'bg-gradient-to-r from-brand-600 to-indigo-600 border-transparent text-white hover:from-brand-500 hover:to-indigo-500 shadow-lg shadow-brand-500/30 hover:-translate-y-0.5'
         },
         {
             id: 'enterprise',
@@ -106,8 +106,8 @@ const Plans = () => {
                 '24/7 Dedicated Support',
                 'Custom Node Mapping'
             ],
-            color: 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200',
-            buttonColor: 'bg-purple-500 border-purple-500 text-white hover:bg-purple-600'
+            color: 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-800 dark:text-slate-200 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300',
+            buttonColor: 'bg-gradient-to-r from-purple-600 to-fuchsia-600 border-transparent text-white hover:from-purple-500 hover:to-fuchsia-500 shadow-lg shadow-purple-500/30 hover:-translate-y-0.5'
         }
     ];
 

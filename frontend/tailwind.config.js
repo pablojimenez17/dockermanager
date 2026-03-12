@@ -7,6 +7,9 @@ export default {
     darkMode: 'class',
     theme: {
         extend: {
+            fontFamily: {
+                sans: ['Outfit', 'sans-serif'],
+            },
             colors: {
                 brand: {
                     50: '#f0f9ff',

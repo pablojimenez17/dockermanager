@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { Camera, Trash2, HardDrive, RefreshCw, Cpu, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 
@@ -105,10 +106,18 @@ const Snapshots = () => {
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {snapshots.length === 0 ? (
-                        <div className="col-span-1 lg:col-span-2 text-center py-20 bg-white dark:bg-slate-800/50 rounded-3xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                            <ImageIcon className="mx-auto h-16 w-16 text-slate-300 dark:text-slate-600 mb-6" />
-                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Your gallery is empty</h3>
-                            <p className="text-slate-500 dark:text-slate-400 mb-6">Head over to 'My Containers' and click the Camera icon to take your first snapshot.</p>
+                        <div className="col-span-1 lg:col-span-2 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                            <div className="w-24 h-24 mb-6 relative">
+                                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full"></div>
+                                <div className="relative w-full h-full bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shadow-inner">
+                                    <Camera size={40} className="text-indigo-500 drop-shadow-sm" />
+                                </div>
+                            </div>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Your gallery is empty</h3>
+                            <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm text-lg">Save your container's exact current state. Create a snapshot to easily clone or deploy it later.</p>
+                            <Link to="/app/containers" className="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white px-8 py-3.5 rounded-xl shadow-lg hover:shadow-brand-500/25 transition-all duration-300 font-bold hover:-translate-y-0.5 inline-flex items-center">
+                                Go to My Containers
+                            </Link>
                         </div>
                     ) : (
                         snapshots.map(snap => (

@@ -96,68 +96,81 @@ const Networks = () => {
                 </div>
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                    {networks.map(net => {
-                        const isDefault = ['bridge', 'host', 'none'].includes(net.Name);
-                        // Extract IPAM details
-                        const ipamConfig = net.IPAM?.Config?.[0] || {};
-                        const subnet = ipamConfig.Subnet || 'Auto-assigned';
-                        const gateway = ipamConfig.Gateway || 'Auto-assigned';
-
-                        return (
-                            <div key={net.Id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-slate-400 dark:hover:border-slate-500 transition-colors flex flex-col group h-full">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div className="flex items-center space-x-4 w-full">
-                                        <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
-                                            <Network size={28} />
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2 break-all">
-                                                <span>{net.Name}</span>
-                                                {isDefault && (
-                                                    <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border border-slate-200 dark:border-slate-600 shrink-0">
-                                                        SYSTEM
-                                                    </span>
-                                                )}
-                                            </h3>
-                                            <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1">Driver: {net.Driver}</p>
-                                        </div>
-                                    </div>
+                    {networks.length === 0 ? (
+                        <div className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                            <div className="w-24 h-24 mb-6 relative">
+                                <div className="absolute inset-0 bg-brand-500/20 blur-2xl rounded-full"></div>
+                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-3xl flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
+                                    <Network size={40} className="text-brand-500 drop-shadow-sm" />
                                 </div>
-
-                                <div className="grid grid-cols-2 gap-4 mb-6 mt-auto">
-                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-                                        <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Subnet</p>
-                                        <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all">
-                                            {subnet}
-                                        </p>
-                                    </div>
-                                    <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-                                        <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Gateway</p>
-                                        <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all" title={gateway}>
-                                            {gateway}
-                                        </p>
-                                    </div>
-                                </div>
-
-                                {!isDefault ? (
-                                    <div className="flex items-center space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto">
-                                        <button
-                                            onClick={() => handleDeleteNetwork(net.Id, net.Name)}
-                                            className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-rose-600 dark:text-rose-400 border border-rose-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
-                                        >
-                                            <Trash2 size={16} /> <span>Remove Network</span>
-                                        </button>
-                                    </div>
-                                ) : (
-                                    <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto opacity-50">
-                                        <button disabled className="w-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
-                                            <Trash2 size={16} /> <span>Protected</span>
-                                        </button>
-                                    </div>
-                                )}
                             </div>
-                        );
-                    })}
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">No custom networks</h3>
+                            <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm text-lg">You haven't created any custom subnets yet. Create one to logically isolate and link your containers.</p>
+                        </div>
+                    ) : (
+                        networks.map(net => {
+                            const isDefault = ['bridge', 'host', 'none'].includes(net.Name);
+                            // Extract IPAM details
+                            const ipamConfig = net.IPAM?.Config?.[0] || {};
+                            const subnet = ipamConfig.Subnet || 'Auto-assigned';
+                            const gateway = ipamConfig.Gateway || 'Auto-assigned';
+
+                            return (
+                                <div key={net.Id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-slate-400 dark:hover:border-slate-500 transition-colors flex flex-col group h-full">
+                                    <div className="flex justify-between items-start mb-6">
+                                        <div className="flex items-center space-x-4 w-full">
+                                            <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
+                                                <Network size={28} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-xl font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-2 break-all">
+                                                    <span>{net.Name}</span>
+                                                    {isDefault && (
+                                                        <span className="px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider border border-slate-200 dark:border-slate-600 shrink-0">
+                                                            SYSTEM
+                                                        </span>
+                                                    )}
+                                                </h3>
+                                                <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1">Driver: {net.Driver}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4 mb-6 mt-auto">
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+                                            <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Subnet</p>
+                                            <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all">
+                                                {subnet}
+                                            </p>
+                                        </div>
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+                                            <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Gateway</p>
+                                            <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all" title={gateway}>
+                                                {gateway}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {!isDefault ? (
+                                        <div className="flex items-center space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto">
+                                            <button
+                                                onClick={() => handleDeleteNetwork(net.Id, net.Name)}
+                                                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-rose-600 dark:text-rose-400 border border-rose-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            >
+                                                <Trash2 size={16} /> <span>Remove Network</span>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto opacity-50">
+                                            <button disabled className="w-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
+                                                <Trash2 size={16} /> <span>Protected</span>
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    )}
                 </div>
             )}
 
