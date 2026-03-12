@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Server, Play, ShieldAlert, Trash2 } from 'lucide-react';
+import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 
 const Marketplace = () => {
@@ -18,6 +18,17 @@ const Marketplace = () => {
     // Unified env inputs: { KEY: { type: 'raw'|'secret', value: '' } }
     const [envFields, setEnvFields] = useState({});
 
+    // Advanced Resource State
+    const [networks, setNetworks] = useState([]);
+    const [selectedNetwork, setSelectedNetwork] = useState('bridge');
+    const [memoryLimit, setMemoryLimit] = useState(512); // MB
+    const [cpuLimit, setCpuLimit] = useState(1); // Cores
+
+    // Volume Mounts State
+    const [availableVolumes, setAvailableVolumes] = useState([]);
+    const [volumeMounts, setVolumeMounts] = useState([]);
+
+
     // Plan Limits
     const [limits, setLimits] = useState({ maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
     const [currentContainerCount, setCurrentContainerCount] = useState(0);
@@ -32,13 +43,15 @@ const Marketplace = () => {
                 const token = localStorage.getItem('token');
                 const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
-                const [tplRes, secRes, meRes, myContainersRes, snapRes] = await Promise.all([
+                const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
                     axios.get('http://localhost:5000/api/templates', authOptions),
                     axios.get('http://localhost:5000/api/secrets', authOptions),
                     axios.get('http://localhost:5000/api/auth/me', authOptions),
                     axios.get('http://localhost:5000/api/containers', authOptions),
                     // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
-                    axios.get('http://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] }))
+                    axios.get('http://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] })),
+                    axios.get('http://localhost:5000/api/networks', authOptions).catch(() => ({ data: [] })),
+                    axios.get('http://localhost:5000/api/volumes', authOptions).catch(() => ({ data: [] }))
                 ]);
 
                 // Map snapshots into the expected "Template" format
@@ -62,6 +75,17 @@ const Marketplace = () => {
 
                 setTemplates([...tplRes.data, ...mappedSnapshots]);
                 setAvailableSecrets(secRes.data || []);
+
+                // Map Docker networks
+                if (netRes?.data) {
+                    const mappedNetworks = netRes.data.map(n => n.Name);
+                    if (!mappedNetworks.includes('bridge')) mappedNetworks.push('bridge');
+                    setNetworks(mappedNetworks);
+                }
+
+                if (volRes?.data) {
+                    setAvailableVolumes(volRes.data);
+                }
 
                 if (meRes.data.limits) setLimits(meRes.data.limits);
                 setCurrentContainerCount(myContainersRes.data.length);
@@ -106,15 +130,39 @@ const Marketplace = () => {
         });
 
         setEnvFields(initial);
+
+        // Map template volume requirement defaults
+        const initialVols = [];
+        template.containers.forEach((c, cIdx) => {
+            if (c.volumes) {
+                c.volumes.forEach(v => {
+                    initialVols.push({
+                        id: Math.random().toString(36).substring(7),
+                        nodeIndex: cIdx,
+                        nodeName: c.name_prefix,
+                        containerPath: v.containerPath,
+                        volumeName: '',
+                        isPredefined: true,
+                        hostPath: v.hostPath
+                    });
+                });
+            }
+        });
+        setVolumeMounts(initialVols);
+
         setSelectedTemplate(template);
         setCustomAppName('');
         setDomainBase('');
+        setMemoryLimit(512);
+        setCpuLimit(1);
+        setSelectedNetwork('bridge');
     };
 
     const closeModal = () => {
         setSelectedTemplate(null);
         setCustomAppName('');
         setEnvFields({});
+        setVolumeMounts([]);
         setDomainBase('');
     };
 
@@ -162,6 +210,17 @@ const Marketplace = () => {
                     });
                 }
 
+                // Compile volume mounts
+                const finalVolumes = [];
+                volumeMounts.filter(m => m.nodeIndex === selectedTemplate.containers.indexOf(cDef) && m.volumeName !== '').forEach(m => {
+                    if (m.containerPath && m.containerPath.trim() !== '') {
+                        finalVolumes.push({
+                            source: m.volumeName,
+                            target: m.containerPath.trim()
+                        });
+                    }
+                });
+
                 // If this is the primary web app, apply domain specifics
                 const isWebApp = cDef.ports?.some(p => p.container === 80 || p.container === 2368 || p.container === 8080);
 
@@ -171,9 +230,10 @@ const Marketplace = () => {
                     replicas: 1, // templates don't define replicas yet
                     ports: cDef.ports?.map(p => `${p.host || ''}:${p.container}`),
                     env: finalEnv,
-                    memory: "512", // Default for templates context, auto-adjusts logic in backend
-                    cpu: "1",
-                    networkMode: "bridge",
+                    volumes: finalVolumes,
+                    memory: memoryLimit.toString(),
+                    cpu: cpuLimit.toString(),
+                    networkMode: selectedNetwork,
                     restartPolicy: "unless-stopped",
                     exposeDomain: isWebApp && domainBase ? true : false,
                     domain: (isWebApp && domainBase) ? domainBase : undefined,
@@ -411,6 +471,167 @@ const Marketplace = () => {
                                         </p>
                                     </div>
                                 )}
+
+                                {/* Section 3: Resources & Network */}
+                                <div>
+                                    <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">3. Resources & Network</h3>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Network</label>
+                                            <select
+                                                value={selectedNetwork}
+                                                onChange={e => setSelectedNetwork(e.target.value)}
+                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                            >
+                                                {networks.length > 0 ? (
+                                                    networks.map(net => (
+                                                        <option key={net} value={net}>{net}</option>
+                                                    ))
+                                                ) : (
+                                                    <option value="bridge">bridge</option>
+                                                )}
+                                            </select>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Memory Limit (MB)</label>
+                                                <input
+                                                    type="number"
+                                                    min="128"
+                                                    max={limits.maxRamMb}
+                                                    value={memoryLimit}
+                                                    onChange={e => setMemoryLimit(Number(e.target.value))}
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">CPU Limit (Cores)</label>
+                                                <input
+                                                    type="number"
+                                                    min="0.1"
+                                                    step="0.1"
+                                                    max={limits.maxCpuCores}
+                                                    value={cpuLimit}
+                                                    onChange={e => setCpuLimit(Number(e.target.value))}
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Section 4: Output Volumes */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-4 mt-6">
+                                        <h3 className="text-lg font-bold text-slate-900 dark:text-white">4. Persistent Volumes</h3>
+                                        <button
+                                            type="button"
+                                            onClick={() => setVolumeMounts([...volumeMounts, {
+                                                id: Math.random().toString(36).substring(7),
+                                                nodeIndex: 0,
+                                                nodeName: selectedTemplate.containers[0].name_prefix,
+                                                containerPath: '',
+                                                volumeName: '',
+                                                isPredefined: false
+                                            }])}
+                                            className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded-lg font-medium flex items-center transition-colors text-slate-700 dark:text-slate-300"
+                                        >
+                                            <Plus size={14} className="mr-1" /> Add Mount
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Select existing Disks to persist database and application data. Unmounted data is lost upon container destruction. You can map custom paths or attach to default application directories.</p>
+
+                                    {volumeMounts.length === 0 ? (
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 text-center border border-slate-200 dark:border-slate-700">
+                                            <p className="text-sm text-slate-500">No volumes attached. Data will be ephemeral.</p>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-4">
+                                            {volumeMounts.map((vol, idx) => (
+                                                <div key={vol.id} className="flex flex-col sm:flex-row sm:space-x-4 items-start sm:items-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 relative group">
+
+                                                    {!vol.isPredefined && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setVolumeMounts(volumeMounts.filter(v => v.id !== vol.id))}
+                                                            className="absolute -top-2 -right-2 bg-red-100 dark:bg-red-500/20 text-red-500 rounded-full p-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                                                        >
+                                                            <Trash2 size={12} />
+                                                        </button>
+                                                    )}
+
+                                                    <div className="flex-1 mb-3 sm:mb-0 w-full">
+                                                        {selectedTemplate.containers.length > 1 ? (
+                                                            <div className="mb-2">
+                                                                <select
+                                                                    disabled={vol.isPredefined}
+                                                                    value={vol.nodeIndex}
+                                                                    onChange={e => {
+                                                                        const newIdx = Number(e.target.value);
+                                                                        const updated = [...volumeMounts];
+                                                                        updated[idx].nodeIndex = newIdx;
+                                                                        updated[idx].nodeName = selectedTemplate.containers[newIdx].name_prefix;
+                                                                        setVolumeMounts(updated);
+                                                                    }}
+                                                                    className={`text-xs font-semibold px-2 py-1 rounded bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-none outline-none ${vol.isPredefined ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                >
+                                                                    {selectedTemplate.containers.map((c, i) => (
+                                                                        <option key={i} value={i}>{c.name_prefix}</option>
+                                                                    ))}
+                                                                </select>
+                                                                {vol.isPredefined && <span className="text-xs text-slate-400 font-normal ml-2">({vol.hostPath})</span>}
+                                                            </div>
+                                                        ) : (
+                                                            <div className="font-semibold text-slate-800 dark:text-slate-200 text-xs mb-2">
+                                                                {vol.nodeName} {vol.isPredefined && <span className="text-slate-400 font-normal">({vol.hostPath})</span>}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="flex items-center w-full">
+                                                            <HardDrive size={14} className="mr-2 text-slate-400 shrink-0" />
+                                                            {vol.isPredefined ? (
+                                                                <code className="bg-slate-200 dark:bg-slate-800 px-2 py-1 rounded text-xs truncate max-w-[200px] text-slate-700 dark:text-slate-300">
+                                                                    {vol.containerPath}
+                                                                </code>
+                                                            ) : (
+                                                                <input
+                                                                    type="text"
+                                                                    placeholder="/app/data/custom"
+                                                                    value={vol.containerPath}
+                                                                    onChange={e => {
+                                                                        const updated = [...volumeMounts];
+                                                                        updated[idx].containerPath = e.target.value;
+                                                                        setVolumeMounts(updated);
+                                                                    }}
+                                                                    className="text-xs bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded px-2 py-1.5 w-full text-slate-900 dark:text-white"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full sm:w-64 shrink-0 mt-2 sm:mt-0">
+                                                        <select
+                                                            value={vol.volumeName}
+                                                            onChange={e => {
+                                                                const updated = [...volumeMounts];
+                                                                updated[idx].volumeName = e.target.value;
+                                                                setVolumeMounts(updated);
+                                                            }}
+                                                            className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                        >
+                                                            <option value="">-- No Persistence --</option>
+                                                            {availableVolumes.map(av => (
+                                                                <option key={av._id} value={av.name}>{av.name}</option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+
 
                             </form>
                         </div>

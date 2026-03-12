@@ -1,11 +1,35 @@
-import React, { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { ToastProvider } from './ToastContext';
 import { Menu } from 'lucide-react';
 
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+    const location = useLocation();
+
+    // Dynamically update document title based on the active route
+    useEffect(() => {
+        const routeTitles = {
+            '/app': 'Dashboard',
+            '/app/deploy': 'Create Container',
+            '/app/github': 'Deploy from Git',
+            '/app/containers': 'My Containers',
+            '/app/templates': 'Templates',
+            '/app/snapshots': 'Snapshots',
+            '/app/networks': 'Networks',
+            '/app/buckets': 'Buckets',
+            '/app/secrets': 'Secret Manager',
+            '/app/registries': 'Private Registries',
+            '/app/settings': 'Platform Settings',
+            '/app/profile': 'User Profile',
+            '/app/plans': 'Billing & Plans'
+        };
+
+        const currentPath = location.pathname.split('/').slice(0, 3).join('/'); // Match base routes handling IDs
+        const pageTitle = routeTitles[currentPath] || 'App';
+        document.title = `${pageTitle} | Orbit`;
+    }, [location]);
 
     return (
         <ToastProvider>

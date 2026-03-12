@@ -44,6 +44,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             icon: <HardDrive size={18} />,
             items: [
                 { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
+                { name: 'Volumes', path: '/app/volumes', icon: <HardDrive size={20} /> },
                 { name: 'Snapshots', path: '/app/snapshots', icon: <Camera size={20} /> },
                 { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
                 { name: 'Buckets', path: '/app/buckets', icon: <Database size={20} /> },
