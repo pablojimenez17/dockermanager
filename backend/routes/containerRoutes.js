@@ -7,6 +7,7 @@ import Registry, { decrypt as decryptRegistry } from '../models/Registry.js';
 import AuditLog from '../models/AuditLog.js';
 import Snapshot from '../models/Snapshot.js'; // Added this line
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -96,10 +97,14 @@ const resolveRegistryAuth = async (image, userId) => {
     return authconfig;
 };
 
-// Get all containers for the logged-in user
+// Get all containers for the logged-in user or organization
 router.get('/', async (req, res) => {
     try {
-        const userContainers = await Container.find({ userId: req.user.userId });
+        const query = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: req.user.userId, organizationId: { $exists: false } };
+
+        const userContainers = await Container.find(query);
 
         // Enrich with actual docker status
         const enrichedContainers = await Promise.all(userContainers.map(async (c) => {
@@ -132,7 +137,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new container stack
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { stack } = req.body;
 
@@ -140,14 +145,20 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: 'A valid stack array is required' });
         }
 
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+
         // ==========================================
         // QUOTA VALIDATION
         // ==========================================
-        const user = await User.findById(req.user.userId);
+        const user = await User.findById(ownerId);
         const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1, maxDomains: 0, maxVolumes: 1, maxVolumeSizeMb: 1024 };
 
+        const queryConstraint = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: ownerId, organizationId: { $exists: false } };
+
         // 1. Check Container Count Limits
-        const currentContainersDb = await Container.find({ userId: req.user.userId });
+        const currentContainersDb = await Container.find(queryConstraint);
         if (currentContainersDb.length + stack.length > limits.maxContainers) {
             return res.status(403).json({
                 message: `Quota Exceeded: Your plan limits you to ${limits.maxContainers} containers. You currently have ${currentContainersDb.length} and are trying to add ${stack.length}.`
@@ -219,7 +230,7 @@ router.post('/', async (req, res) => {
                 } catch (_) { }
 
                 if (!imageExists) {
-                    const authconfig = await resolveRegistryAuth(image, req.user.userId);
+                    const authconfig = await resolveRegistryAuth(image, ownerId);
                     console.log(`[DEBUG] Pulling ${image}...`);
                     await pullImageSync(image, authconfig);
                 }
@@ -257,7 +268,10 @@ router.post('/', async (req, res) => {
                         const envKey = secretMatch[1];
                         const secretName = secretMatch[2];
                         try {
-                            const secretDoc = await Secret.findOne({ userId: req.user.userId, name: secretName });
+                            const secretQuery = req.organization
+                                ? { organizationId: req.organization._id, name: secretName }
+                                : { userId: ownerId, organizationId: { $exists: false }, name: secretName };
+                            const secretDoc = await Secret.findOne(secretQuery);
                             if (secretDoc) {
                                 const decryptedValue = decrypt(secretDoc.encryptedValue, secretDoc.iv);
                                 finalEnv.push(`${envKey}=${decryptedValue}`);
@@ -375,14 +389,19 @@ router.post('/', async (req, res) => {
                 console.log(`[DEBUG] Container ${container.id} started successfully`);
 
                 // Save to database
-                const dbContainer = new Container({
+                const containerData = {
                     name: instanceName,
                     image,
                     dockerId: container.id,
                     userId: req.user.userId,
                     status: 'running',
                     domain: domain && domainPort ? domain.trim() : undefined
-                });
+                };
+                if (req.organization) {
+                    containerData.organizationId = req.organization._id;
+                }
+
+                const dbContainer = new Container(containerData);
 
                 await dbContainer.save();
                 createdRecords.push(dbContainer);
@@ -418,9 +437,13 @@ router.post('/', async (req, res) => {
 });
 
 // Stop a container
-router.post('/:id/stop', async (req, res) => {
+router.post('/:id/stop', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const dbContainer = await Container.findOne(query);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -443,9 +466,13 @@ router.post('/:id/stop', async (req, res) => {
 });
 
 // Start a mapped container
-router.post('/:id/start', async (req, res) => {
+router.post('/:id/start', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const dbContainer = await Container.findOne(query);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -486,7 +513,8 @@ router.put('/:id/redeploy', async (req, res) => {
         // Pull the latest version of the image before downtime, utilizing private credentials if available
         console.log(`[Zero-Downtime] Pulling latest image for ${dbContainer.image}`);
         try {
-            const authconfig = await resolveRegistryAuth(dbContainer.image, req.user.userId);
+            const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+            const authconfig = await resolveRegistryAuth(dbContainer.image, ownerId);
             await pullImageSync(dbContainer.image, authconfig);
         } catch (pullErr) {
             console.warn(`[Zero-Downtime] Failed to pull latest image (might be local or private without credentials): ${pullErr.message}`);
@@ -548,10 +576,15 @@ router.put('/:id/redeploy', async (req, res) => {
 });
 
 // PUT: Edit container configuration (e.g. Expose to internet)
-router.put('/:id/edit', async (req, res) => {
+router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { domain, domainPort } = req.body;
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const dbContainer = await Container.findOne(query);
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found or you do not have permission' });
         }
@@ -651,9 +684,13 @@ router.put('/:id/edit', async (req, res) => {
 });
 
 // Remove a container
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('deleteContainers'), async (req, res) => {
     try {
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const dbContainer = await Container.findOne(query);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -958,7 +995,7 @@ router.post('/template', async (req, res) => {
 });
 
 // Snapshot (Commit) a container to an image
-router.post('/:id/snapshot', async (req, res) => {
+router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { id } = req.params;
         const { snapshotName } = req.body; // e.g., 'myapp-backup:v1'
@@ -968,20 +1005,29 @@ router.post('/:id/snapshot', async (req, res) => {
         }
 
         // 1. Verify Ownership & Get limits
-        const user = await User.findById(req.user.userId);
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+        const user = await User.findById(ownerId);
         const maxSnapshots = user.limits?.maxSnapshots || 0;
 
         if (maxSnapshots === 0) {
             return res.status(403).json({ message: 'Snapshots are only available on Professional and Enterprise plans.' });
         }
 
+        const queryConstraint = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: ownerId, organizationId: { $exists: false } };
+
         // Check current snapshot count
-        const currentSnapshots = await Snapshot.countDocuments({ userId: req.user.userId });
+        const currentSnapshots = await Snapshot.countDocuments(queryConstraint);
         if (currentSnapshots >= maxSnapshots) {
             return res.status(403).json({ message: `Quota Exceeded: Your plan limits you to ${maxSnapshots} snapshots.` });
         }
 
-        const dbContainer = await Container.findOne({ dockerId: id, userId: req.user.userId });
+        const query = req.organization
+            ? { dockerId: id, organizationId: req.organization._id }
+            : { dockerId: id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const dbContainer = await Container.findOne(query);
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found or access denied.' });
         }
@@ -994,13 +1040,18 @@ router.post('/:id/snapshot', async (req, res) => {
         });
 
         // 3. Save to database for tracking
-        const newSnapshot = new Snapshot({
-            userId: user._id,
+        const snapshotData = {
+            userId: req.user.userId,
             containerId: id,
             containerName: dbContainer.name,
             snapshotName: snapshotName,
             imageId: commitResult.Id
-        });
+        };
+        if (req.organization) {
+            snapshotData.organizationId = req.organization._id;
+        }
+
+        const newSnapshot = new Snapshot(snapshotData);
         await newSnapshot.save();
 
         res.json({

@@ -4,6 +4,7 @@ import Volume from '../models/Volume.js';
 import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 import { exec } from 'child_process';
 import util from 'util';
 
@@ -41,14 +42,16 @@ const getDockerDfVolumes = async () => {
     }
 };
 
-// GET Volumes for authenticated user
+// GET Volumes for authenticated user or organization
 router.get('/', async (req, res) => {
     try {
         let dbVolumes = {};
-        if (req.user.role === 'admin') {
+        if (req.user.role === 'admin' && !req.organization) {
             dbVolumes = await Volume.find();
+        } else if (req.organization) {
+            dbVolumes = await Volume.find({ organizationId: req.organization._id });
         } else {
-            dbVolumes = await Volume.find({ userId: req.user.userId });
+            dbVolumes = await Volume.find({ userId: req.user.userId, organizationId: { $exists: false } });
         }
 
         const dockerVolumes = await getDockerDfVolumes();
@@ -72,20 +75,23 @@ router.get('/', async (req, res) => {
 });
 
 // POST Create new Volume
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageVolumes'), async (req, res) => {
     try {
         const { name } = req.body;
         if (!name) return res.status(400).json({ message: 'Volume name required' });
 
-        const safeName = `vol-${req.user.userId}-${name.replace(/[^a-zA-Z0-9_-]/g, '')}`;
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+        const orgPrefix = req.organization ? `org-${req.organization._id}-` : '';
+        const safeName = `vol-${orgPrefix}${req.user.userId}-${name.replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
         // ==========================================
         // QUOTAS VALIDATION
         // ==========================================
-        const user = await User.findById(req.user.userId);
+        const user = await User.findById(ownerId);
         const limits = user.limits || { maxVolumes: 1, maxVolumeSizeMb: 1024 };
 
-        const currentVolumesDb = await Volume.find({ userId: req.user.userId });
+        const queryConstraint = req.organization ? { organizationId: req.organization._id } : { userId: ownerId, organizationId: { $exists: false } };
+        const currentVolumesDb = await Volume.find(queryConstraint);
 
         if (currentVolumesDb.length >= limits.maxVolumes) {
             return res.status(403).json({
@@ -117,10 +123,15 @@ router.post('/', async (req, res) => {
         // ==========================================
         await docker.createVolume({ Name: safeName });
 
-        const newVolume = new Volume({
+        const volumeData = {
             name: safeName,
             userId: req.user.userId
-        });
+        };
+        if (req.organization) {
+            volumeData.organizationId = req.organization._id;
+        }
+
+        const newVolume = new Volume(volumeData);
         await newVolume.save();
 
         try {
@@ -138,14 +149,22 @@ router.post('/', async (req, res) => {
 });
 
 // DELETE a Volume
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('deleteVolumes'), async (req, res) => {
     try {
         const volumeDb = await Volume.findById(req.params.id);
         if (!volumeDb) return res.status(404).json({ message: 'Volume not found' });
 
         // Security check
-        if (req.user.role !== 'admin' && volumeDb.userId.toString() !== req.user.userId) {
-            return res.status(403).json({ message: 'Forbidden' });
+        if (req.user.role !== 'admin') {
+            if (req.organization) {
+                if (volumeDb.organizationId?.toString() !== req.organization._id.toString()) {
+                    return res.status(403).json({ message: 'Forbidden' });
+                }
+            } else {
+                if (volumeDb.userId.toString() !== req.user.userId || volumeDb.organizationId) {
+                    return res.status(403).json({ message: 'Forbidden' });
+                }
+            }
         }
 
         const dockerVol = docker.getVolume(volumeDb.name);

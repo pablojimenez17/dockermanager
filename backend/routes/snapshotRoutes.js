@@ -3,6 +3,7 @@ import Docker from 'dockerode';
 import Snapshot from '../models/Snapshot.js';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 
 const router = express.Router();
 const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
@@ -10,10 +11,14 @@ const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe
 router.use(authMiddleware);
 
 // GET /api/snapshots
-// Return all snapshots belonging to the authenticated user
+// Return all snapshots belonging to the authenticated user/organization
 router.get('/', async (req, res) => {
     try {
-        const snapshots = await Snapshot.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+        const query = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: req.user.userId, organizationId: { $exists: false } };
+
+        const snapshots = await Snapshot.find(query).sort({ createdAt: -1 });
 
         // Optionally, we could enrich this with real Docker image sizes, 
         // but for speed we'll just return the DB records.
@@ -26,11 +31,15 @@ router.get('/', async (req, res) => {
 
 // DELETE /api/snapshots/:id
 // Delete a snapshot from the database and remove the image from Docker
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { id } = req.params;
 
-        const snapshot = await Snapshot.findOne({ _id: id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: id, organizationId: req.organization._id }
+            : { _id: id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const snapshot = await Snapshot.findOne(query);
         if (!snapshot) {
             return res.status(404).json({ message: 'Snapshot not found or you do not have permission to delete it.' });
         }

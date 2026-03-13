@@ -1,6 +1,7 @@
 import express from 'express';
 import Docker from 'dockerode';
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 import NetworkModel from '../models/Network.js';
 
 const router = express.Router();
@@ -9,15 +10,18 @@ const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe
 
 router.use(authMiddleware);
 
-// Get all networks for the logged-in user
+// Get all networks for the logged-in user or organization
 router.get('/', async (req, res) => {
     try {
-        const userId = req.user.userId;
-        const userNetworks = await NetworkModel.find({ userId });
+        const query = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: req.user.userId, organizationId: { $exists: false } };
+
+        const userNetworks = await NetworkModel.find(query);
         const userNetworkIds = userNetworks.map(n => n.dockerId);
 
         const allNetworks = await docker.listNetworks();
-        // Return only the networks owned by this user
+        // Return only the networks owned by this user/org
         const filteredNetworks = allNetworks.filter(n => userNetworkIds.includes(n.Id));
 
         res.json(filteredNetworks);
@@ -28,7 +32,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new custom network
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageNetworks'), async (req, res) => {
     try {
         const { name, subnet, gateway } = req.body;
 
@@ -58,11 +62,16 @@ router.post('/', async (req, res) => {
         const networkInfo = await network.inspect();
 
         // Save to DB to establish ownership
-        const newNetworkRecord = new NetworkModel({
+        const networkData = {
             name: name,
             dockerId: network.id,
             userId: req.user.userId
-        });
+        };
+        if (req.organization) {
+            networkData.organizationId = req.organization._id;
+        }
+
+        const newNetworkRecord = new NetworkModel(networkData);
         await newNetworkRecord.save();
 
         res.status(201).json({ message: 'Network created successfully', network: networkInfo });
@@ -73,13 +82,15 @@ router.post('/', async (req, res) => {
 });
 
 // Delete a network
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('manageNetworks'), async (req, res) => {
     try {
         const networkId = req.params.id;
-        const userId = req.user.userId;
+        const query = req.organization
+            ? { dockerId: networkId, organizationId: req.organization._id }
+            : { dockerId: networkId, userId: req.user.userId, organizationId: { $exists: false } };
 
         // Verify ownership in DB
-        const networkRecord = await NetworkModel.findOne({ dockerId: networkId, userId });
+        const networkRecord = await NetworkModel.findOne(query);
         if (!networkRecord) {
             return res.status(403).json({ message: 'Unauthorized or network not found' });
         }

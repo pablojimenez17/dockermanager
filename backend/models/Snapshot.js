@@ -6,6 +6,10 @@ const snapshotSchema = new mongoose.Schema({
         ref: 'User',
         required: true
     },
+    organizationId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Organization'
+    },
     containerId: {
         type: String, // Docker container ID source
         required: true

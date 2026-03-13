@@ -6,6 +6,8 @@ import jwt from 'jsonwebtoken';
 
 const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
+let ioInstance;
+
 export const setupSockets = (server) => {
     const io = new Server(server, {
         cors: {
@@ -14,6 +16,8 @@ export const setupSockets = (server) => {
             credentials: true
         }
     });
+
+    ioInstance = io;
 
     // Basic authentication middleware for sockets
     io.use(async (socket, next) => {
@@ -46,6 +50,9 @@ export const setupSockets = (server) => {
 
     io.on('connection', (socket) => {
         console.log(`[WebSocket] Client connected: ${socket.id} (User: ${socket.user.userId})`);
+
+        // Join a dedicated room for this user to receive direct notifications
+        socket.join(socket.user.userId.toString());
 
         let logStream = null;
 
@@ -302,4 +309,11 @@ export const setupSockets = (server) => {
             }
         });
     });
+};
+
+export const getIo = () => {
+    if (!ioInstance) {
+        throw new Error("Socket.io not initialized!");
+    }
+    return ioInstance;
 };

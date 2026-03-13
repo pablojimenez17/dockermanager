@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Check, Star, Zap, Shield, AlertCircle } from 'lucide-react';
+import { Check, Star, Zap, Shield, AlertCircle, Building2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const Plans = () => {
+    const { setUserPlan } = useOrg();
     const [currentPlan, setCurrentPlan] = useState('free');
     const [loading, setLoading] = useState(true);
     const [processing, setProcessing] = useState(false);
@@ -36,6 +38,7 @@ const Plans = () => {
             setCurrentPlan(res.data.planType);
             localStorage.setItem('planType', res.data.planType);
             localStorage.setItem('limits', JSON.stringify(res.data.limits));
+            setUserPlan(res.data.planType.toLowerCase());
 
             addToast(
                 'Plan Upgraded',
@@ -108,6 +111,26 @@ const Plans = () => {
             ],
             color: 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-800 dark:text-slate-200 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300',
             buttonColor: 'bg-gradient-to-r from-purple-600 to-fuchsia-600 border-transparent text-white hover:from-purple-500 hover:to-fuchsia-500 shadow-lg shadow-purple-500/30 hover:-translate-y-0.5'
+        },
+        {
+            id: 'agency',
+            name: 'Agency / MSP',
+            price: '$199',
+            period: '/mo',
+            description: 'Provide managed Docker environments to your clients with sub-organizations.',
+            icon: <Building2 className="text-amber-500" size={32} />,
+            features: [
+                'Unlimited Containers limit',
+                '128 GB RAM quota',
+                '64 CPU Cores equivalent',
+                '1 TB Persistent Storage',
+                'Unlimited S3 Buckets & Domains',
+                'Multi-Tenant Organization Management',
+                'Custom Roles & RBAC',
+                'White-glove 24/7 Support'
+            ],
+            color: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-500/30 backdrop-blur-md text-amber-900 dark:text-amber-100 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 ring-1 ring-amber-500/20',
+            buttonColor: 'bg-gradient-to-r from-amber-600 to-orange-600 border-transparent text-white hover:from-amber-500 hover:to-orange-500 shadow-lg shadow-amber-500/30 hover:-translate-y-0.5'
         }
     ];
 
@@ -122,7 +145,7 @@ const Plans = () => {
                 </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-start">
                 {plans.map((plan) => {
                     const isActive = currentPlan === plan.id;
                     return (
@@ -135,7 +158,7 @@ const Plans = () => {
                             <div className="mb-6 flex justify-between items-start">
                                 <div>
                                     <h3 className="text-xl font-bold mb-2">{plan.name}</h3>
-                                    <p className="text-sm opacity-80 h-10">{plan.description}</p>
+                                    <p className="text-sm opacity-80 min-h-[5.5rem]">{plan.description}</p>
                                 </div>
                                 <div className="p-3 bg-white dark:bg-slate-900/50 rounded-2xl shadow-sm">
                                     {plan.icon}

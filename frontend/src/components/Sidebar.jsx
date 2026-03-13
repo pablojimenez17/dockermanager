@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Briefcase, Database, Camera, X } from 'lucide-react';
+import { LayoutDashboard, PlusSquare, Server, Settings, LogOut, ShieldAlert, Sun, Moon, Network, CreditCard, GitBranch, HardDrive, Lock, ShieldCheck, Aperture, ChevronDown, Rocket, Briefcase, Database, Camera, X, Building2, Bell } from 'lucide-react';
 import { useTheme } from './ThemeContext';
+import OrgSwitcher from './OrgSwitcher';
 import axios from 'axios';
+import { useOrg } from '../context/OrgContext';
+import { useNotifications } from '../context/NotificationContext';
+import InvitesModal from './InvitesModal';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
     const navigate = useNavigate();
     const { theme, toggleTheme } = useTheme();
+    const { unreadCount } = useNotifications();
+    const [isInvitesModalOpen, setIsInvitesModalOpen] = useState(false);
 
     const handleLogout = async () => {
         try {
@@ -20,6 +26,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
     const role = localStorage.getItem('role') || 'user';
     const location = useLocation();
+    const { organizations, userPlan } = useOrg();
+
+    const planType = userPlan || 'free';
+    const hasOrgs = organizations && organizations.length > 0;
+    const canCreateOrgs = ['agency', 'msp', 'partner'].includes(planType);
+    const shouldShowOrgSetup = hasOrgs || canCreateOrgs;
 
     // Group definition
     const navGroups = [
@@ -64,14 +76,21 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         });
     }
 
-    navGroups.push({
+    const userGroup = {
         title: 'User',
         icon: <Settings size={18} />,
         items: [
             { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={18} /> },
             { name: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
         ]
-    });
+    };
+
+    if (shouldShowOrgSetup) {
+        // Insert org settings before regular settings
+        userGroup.items.splice(1, 0, { name: 'Org Settings', path: '/app/organization', icon: <Building2 size={18} /> });
+    }
+
+    navGroups.push(userGroup);
 
     // Helper to determine if a group should be open by default based on current path
     const isGroupActive = (items) => {
@@ -107,6 +126,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     <X size={20} />
                 </button>
             </div>
+
+            {shouldShowOrgSetup && (
+                <div className="px-4 mt-2">
+                    <OrgSwitcher />
+                </div>
+            )}
 
             <nav className="flex-1 px-3 space-y-1 mt-2 overflow-y-auto pb-4 custom-scrollbar">
                 {navGroups.map((group, index) => (
@@ -155,8 +180,20 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
             <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2 shrink-0 border-b">
                 <button
+                    onClick={() => setIsInvitesModalOpen(true)}
+                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200 relative"
+                >
+                    <Bell size={20} />
+                    <span className="font-medium">Notifications</span>
+                    {unreadCount > 0 && (
+                        <span className="absolute right-4 bg-brand-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center justify-center animate-pulse">
+                            {unreadCount}
+                        </span>
+                    )}
+                </button>
+                <button
                     onClick={toggleTheme}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 top hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200"
+                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200"
                 >
                     {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                     <span className="font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
@@ -169,6 +206,8 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     <span className="font-medium">Logout</span>
                 </button>
             </div>
+
+            <InvitesModal isOpen={isInvitesModalOpen} onClose={() => setIsInvitesModalOpen(false)} />
         </div>
     );
 };

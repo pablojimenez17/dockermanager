@@ -18,6 +18,7 @@ import webhookRoutes from './routes/webhookRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
 import bucketRoutes from './routes/bucketRoutes.js';
 import snapshotRoutes from './routes/snapshotRoutes.js';
+import orgRoutes from './routes/orgRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import { initMinio } from './services/minioService.js';
@@ -57,6 +58,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/buckets', bucketRoutes);
 app.use('/api/snapshots', snapshotRoutes);
+app.use('/api/organizations', orgRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager')

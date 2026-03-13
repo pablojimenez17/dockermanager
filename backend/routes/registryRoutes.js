@@ -3,24 +3,27 @@ import Registry, { encrypt, decrypt } from '../models/Registry.js';
 import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 
 const router = express.Router();
 router.use(authMiddleware);
 
-// Middleware to check Enterprise Plan
+// Middleware to check Enterprise/Agency Plan
 const checkEnterpriseInfo = async (req, res, next) => {
     try {
-        const user = await User.findById(req.user.userId);
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+        const user = await User.findById(ownerId);
+
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        // Must be enterprise plan
-        if (user.planType !== 'enterprise') {
+        // Must be enterprise or agency plan
+        if (!['enterprise', 'agency', 'msp', 'partner'].includes(user.planType) && user.role !== 'admin') {
             return res.status(403).json({
                 message: 'Private Registries are an Enterprise exclusive feature. Please upgrade your plan to unlock.'
             });
         }
         next();
-    } catch (e) {
+    } catch (error) {
         res.status(500).json({ message: 'Server error checking plan' });
     }
 };
@@ -28,7 +31,7 @@ const checkEnterpriseInfo = async (req, res, next) => {
 router.use(checkEnterpriseInfo);
 
 // POST: Save new registry credentials
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { name, url, username, password } = req.body;
 
@@ -41,7 +44,11 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: 'Name can only contain letters, numbers, and underscores.' });
         }
 
-        const existingRegistry = await Registry.findOne({ userId: req.user.userId, $or: [{ name }, { url }] });
+        const query = req.organization
+            ? { organizationId: req.organization._id, $or: [{ name }, { url }] }
+            : { userId: req.user.userId, organizationId: { $exists: false }, $or: [{ name }, { url }] };
+
+        const existingRegistry = await Registry.findOne(query);
         if (existingRegistry) {
             return res.status(409).json({ message: 'A registry with this name or URL already exists in your vault.' });
         }
@@ -49,14 +56,19 @@ router.post('/', async (req, res) => {
         // Encrypt the password
         const { iv, encryptedData } = encrypt(password);
 
-        const newRegistry = new Registry({
+        const registryData = {
             userId: req.user.userId,
             name,
             url,
             username,
             encryptedPassword: encryptedData,
             iv
-        });
+        };
+        if (req.organization) {
+            registryData.organizationId = req.organization._id;
+        }
+
+        const newRegistry = new Registry(registryData);
 
         await newRegistry.save();
 
@@ -80,7 +92,11 @@ router.post('/', async (req, res) => {
 // GET: List registries (WITHOUT exposing passwords)
 router.get('/', async (req, res) => {
     try {
-        const registries = await Registry.find({ userId: req.user.userId })
+        const query = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: req.user.userId, organizationId: { $exists: false } };
+
+        const registries = await Registry.find(query)
             .select('-encryptedPassword -iv')
             .sort({ createdAt: -1 });
 
@@ -91,9 +107,13 @@ router.get('/', async (req, res) => {
 });
 
 // DELETE: Remove a registry
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const registry = await Registry.findOneAndDelete({ _id: req.params.id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const registry = await Registry.findOneAndDelete(query);
         if (!registry) {
             return res.status(404).json({ message: 'Registry not found or unauthorized.' });
         }

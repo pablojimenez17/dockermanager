@@ -3,12 +3,34 @@ import Secret, { encrypt, decrypt } from '../models/Secret.js';
 import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
 
 const router = express.Router();
 router.use(authMiddleware);
 
+// Middleware to check Professional+ Plan
+const checkProInfo = async (req, res, next) => {
+    try {
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+        const user = await User.findById(ownerId);
+
+        if (!user) return res.status(404).json({ message: 'User not found' });
+
+        if (!['pro', 'professional', 'enterprise', 'agency', 'msp', 'partner'].includes(user.planType) && user.role !== 'admin') {
+            return res.status(403).json({
+                message: 'Secret Manager is available starting from the Professional plan. Please upgrade to unlock.'
+            });
+        }
+        next();
+    } catch (error) {
+        res.status(500).json({ message: 'Server error checking plan', error: error.message });
+    }
+};
+
+router.use(checkProInfo);
+
 // POST: Create a new secret
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { name, value, description } = req.body;
 
@@ -21,8 +43,12 @@ router.post('/', async (req, res) => {
             return res.status(400).json({ message: 'Secret names can only contain letters, numbers, and underscores.' });
         }
 
-        // Check if secret with same name exists for this user
-        const existingSecret = await Secret.findOne({ userId: req.user.userId, name });
+        const query = req.organization
+            ? { organizationId: req.organization._id, name }
+            : { userId: req.user.userId, organizationId: { $exists: false }, name };
+
+        // Check if secret with same name exists for this user/org
+        const existingSecret = await Secret.findOne(query);
         if (existingSecret) {
             return res.status(409).json({ message: 'A secret with this name already exists.' });
         }
@@ -30,13 +56,18 @@ router.post('/', async (req, res) => {
         // Encrypt the value
         const { iv, encryptedData } = encrypt(value);
 
-        const newSecret = new Secret({
+        const secretData = {
             userId: req.user.userId,
             name,
             encryptedValue: encryptedData,
             iv,
             description
-        });
+        };
+        if (req.organization) {
+            secretData.organizationId = req.organization._id;
+        }
+
+        const newSecret = new Secret(secretData);
 
         await newSecret.save();
 
@@ -61,7 +92,11 @@ router.post('/', async (req, res) => {
 // GET: List all secrets (WITHOUT returning their values)
 router.get('/', async (req, res) => {
     try {
-        const secrets = await Secret.find({ userId: req.user.userId })
+        const query = req.organization
+            ? { organizationId: req.organization._id }
+            : { userId: req.user.userId, organizationId: { $exists: false } };
+
+        const secrets = await Secret.find(query)
             .select('-encryptedValue -iv')
             .sort({ createdAt: -1 });
 
@@ -72,9 +107,13 @@ router.get('/', async (req, res) => {
 });
 
 // DELETE: Remove a secret
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const secret = await Secret.findOneAndDelete({ _id: req.params.id, userId: req.user.userId });
+        const query = req.organization
+            ? { _id: req.params.id, organizationId: req.organization._id }
+            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
+
+        const secret = await Secret.findOneAndDelete(query);
         if (!secret) {
             return res.status(404).json({ message: 'Secret not found or unauthorized.' });
         }

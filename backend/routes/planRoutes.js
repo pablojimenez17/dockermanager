@@ -34,6 +34,16 @@ const PLANS = {
         maxVolumeSizeMb: 102400, // 100GB
         maxSnapshots: 999,
         maxBuckets: 999
+    },
+    agency: {
+        maxContainers: 999,
+        maxRamMb: 131072, // 128 GB
+        maxCpuCores: 64,
+        maxDomains: 999,
+        maxVolumes: 100,
+        maxVolumeSizeMb: 1048576, // 1TB
+        maxSnapshots: 999,
+        maxBuckets: 999
     }
 };
 
@@ -44,7 +54,7 @@ router.post('/upgrade', async (req, res) => {
     try {
         const { planType } = req.body;
 
-        if (!['free', 'pro', 'enterprise'].includes(planType)) {
+        if (!['free', 'pro', 'enterprise', 'agency'].includes(planType)) {
             return res.status(400).json({ message: 'Invalid plan type selected.' });
         }
 

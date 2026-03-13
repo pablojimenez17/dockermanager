@@ -1,8 +1,9 @@
 import express from 'express';
 import multer from 'multer';
-import authMiddleware from '../middleware/auth.js';
-import { getMinioClient } from '../services/minioService.js';
 import User from '../models/User.js';
+import authMiddleware from '../middleware/auth.js';
+import { checkPermission } from '../middleware/rbac.js';
+import { getMinioClient } from '../services/minioService.js';
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() }); // Buffer file strings in memory
@@ -17,14 +18,16 @@ router.get('/', async (req, res) => {
     try {
         const client = getMinioClient();
         const buckets = await client.listBuckets();
-        const userPrefix = `${req.user.userId}-`;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
 
-        // Only return buckets that belong to this user
+        // Only return buckets that belong to this user/org
         const userBuckets = buckets
-            .filter(b => b.name.startsWith(userPrefix))
+            .filter(b => b.name.startsWith(ownerPrefix))
             .map(b => ({
                 ...b,
-                name: b.name.replace(userPrefix, '') // Hide prefix from frontend
+                name: b.name.replace(ownerPrefix, '') // Hide prefix from frontend
             }));
 
         res.json(userBuckets);
@@ -35,21 +38,25 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new bucket
-router.post('/', async (req, res) => {
+router.post('/', checkPermission('manageVolumes'), async (req, res) => {
     try {
         const { name } = req.body;
         if (!name) return res.status(400).json({ message: 'Bucket name required' });
 
-        // Retrieve user limits
-        const user = await User.findById(req.user.userId);
+        const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
+
+        // Retrieve owner limits
+        const user = await User.findById(ownerId);
         const maxBuckets = user?.limits?.maxBuckets || 1;
 
         const client = getMinioClient();
 
         // Measure current usage
         const buckets = await client.listBuckets();
-        const userPrefix = `${req.user.userId}-`;
-        const currentCount = buckets.filter(b => b.name.startsWith(userPrefix)).length;
+        const currentCount = buckets.filter(b => b.name.startsWith(ownerPrefix)).length;
 
         if (currentCount >= maxBuckets) {
             return res.status(403).json({ message: `Quota Exceeded: Your plan limits you to ${maxBuckets} bucket(s).` });
@@ -57,7 +64,7 @@ router.post('/', async (req, res) => {
 
         // AWS S3 rules apply to minio bucket naming
         let bucketName = name.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-        const realBucketName = `${req.user.userId}-${bucketName}`;
+        const realBucketName = `${ownerPrefix}${bucketName}`;
 
         const exists = await client.bucketExists(realBucketName);
         if (exists) {
@@ -73,10 +80,13 @@ router.post('/', async (req, res) => {
 });
 
 // Delete a bucket
-router.delete('/:bucketName', async (req, res) => {
+router.delete('/:bucketName', checkPermission('deleteVolumes'), async (req, res) => {
     try {
         const { bucketName } = req.params;
-        const realBucketName = `${req.user.userId}-${bucketName}`;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
+        const realBucketName = `${ownerPrefix}${bucketName}`;
         const client = getMinioClient();
 
         await client.removeBucket(realBucketName);
@@ -93,7 +103,10 @@ router.delete('/:bucketName', async (req, res) => {
 router.get('/:bucketName/objects', async (req, res) => {
     try {
         const { bucketName } = req.params;
-        const realBucketName = `${req.user.userId}-${bucketName}`;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
+        const realBucketName = `${ownerPrefix}${bucketName}`;
         const client = getMinioClient();
 
         const objectsList = [];
@@ -114,10 +127,13 @@ router.get('/:bucketName/objects', async (req, res) => {
 });
 
 // Upload a single file into a bucket
-router.post('/:bucketName/upload', upload.single('file'), async (req, res) => {
+router.post('/:bucketName/upload', checkPermission('manageVolumes'), upload.single('file'), async (req, res) => {
     try {
         const { bucketName } = req.params;
-        const realBucketName = `${req.user.userId}-${bucketName}`;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
+        const realBucketName = `${ownerPrefix}${bucketName}`;
         const file = req.file;
 
         if (!file) return res.status(400).json({ message: 'No file provided' });
@@ -137,10 +153,13 @@ router.post('/:bucketName/upload', upload.single('file'), async (req, res) => {
 });
 
 // Delete an object from a bucket
-router.delete('/:bucketName/objects/:objectName(*)', async (req, res) => {
+router.delete('/:bucketName/objects/:objectName(*)', checkPermission('manageVolumes'), async (req, res) => {
     try {
         const { bucketName, objectName } = req.params;
-        const realBucketName = `${req.user.userId}-${bucketName}`;
+        const ownerPrefix = req.organization
+            ? `org-${req.organization._id}-`
+            : `user-${req.user.userId}-`;
+        const realBucketName = `${ownerPrefix}${bucketName}`;
         const client = getMinioClient();
 
         await client.removeObject(realBucketName, objectName);
