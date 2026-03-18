@@ -282,7 +282,7 @@ const Welcome = () => {
             {/* ── Stats ── */}
             <section id="stats" className="relative max-w-7xl mx-auto px-6 py-16">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatBadge value="50+" label="Container Templates" icon={Layers} color="bg-brand-100 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20" />
+                    <StatBadge value="30+" label="Container Templates" icon={Layers} color="bg-brand-100 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20" />
                     <StatBadge value="99.9%" label="Uptime SLA" icon={Activity} color="bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20" />
                     <StatBadge value="<4s" label="Average Deploy Time" icon={Zap} color="bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" />
                     <StatBadge value="∞" label="Scale Potential" icon={Cpu} color="bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20" />
@@ -498,7 +498,7 @@ const Welcome = () => {
                     <Aperture size={14} className="text-brand-500" />
                     <span className="font-bold text-slate-500 dark:text-slate-400">Orbit</span>
                 </div>
-                <p>© 2025 Orbit — Pablo Jiménez Prieto, Arnau Montané Verdier & Yair Santiago Mitjans Velásquez · Institut Pedralbes</p>
+                <p>© 2026 Orbit — Pablo Jiménez Prieto, Arnau Montané Verdier & Yair Santiago Mitjans Velásquez · Institut Pedralbes</p>
             </footer>
         </div>
     );

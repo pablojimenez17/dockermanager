@@ -24,8 +24,8 @@ const GitDeploy = () => {
         const fetchContext = async () => {
             try {
                 const [meRes, containersRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/auth/me'),
-                    axios.get('http://localhost:5000/api/containers')
+                    axios.get('https://localhost:5000/api/auth/me'),
+                    axios.get('https://localhost:5000/api/containers')
                 ]);
 
                 if (meRes.data.limits) setLimits(meRes.data.limits);
@@ -71,7 +71,7 @@ const GitDeploy = () => {
         setLoading(true);
 
         try {
-            const res = await axios.post('http://localhost:5000/api/git/deploy', form);
+            const res = await axios.post('https://localhost:5000/api/git/deploy', form);
             setWebhookData({
                 url: res.data.webhookUrl,
                 secret: res.data.webhookSecret

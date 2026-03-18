@@ -22,8 +22,8 @@ const Buckets = () => {
             setLoading(true);
             const token = localStorage.getItem('token');
             const [bucketRes, userRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/buckets', { headers: { Authorization: `Bearer ${token}` } }),
-                axios.get('http://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+                axios.get('https://localhost:5000/api/buckets', { headers: { Authorization: `Bearer ${token}` } }),
+                axios.get('https://localhost:5000/api/auth/me', { headers: { Authorization: `Bearer ${token}` } })
             ]);
 
             setBuckets(bucketRes.data || []);
@@ -43,7 +43,7 @@ const Buckets = () => {
         e.preventDefault();
         try {
             const token = localStorage.getItem('token');
-            await axios.post('http://localhost:5000/api/buckets', { name: newBucketName }, {
+            await axios.post('https://localhost:5000/api/buckets', { name: newBucketName }, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             addToast(`Bucket ${newBucketName} created successfully!`, 'success');
@@ -62,7 +62,7 @@ const Buckets = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/buckets/${bucketName}`, {
+            await axios.delete(`https://localhost:5000/api/buckets/${bucketName}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             addToast(`Bucket ${bucketName} deleted successfully!`, 'success');

@@ -41,11 +41,11 @@ const CreateContainer = () => {
         const fetchContext = async () => {
             try {
                 const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/networks'),
-                    axios.get('http://localhost:5000/api/auth/me'),
-                    axios.get('http://localhost:5000/api/containers'),
-                    axios.get('http://localhost:5000/api/volumes'),
-                    axios.get('http://localhost:5000/api/secrets')
+                    axios.get('https://localhost:5000/api/networks'),
+                    axios.get('https://localhost:5000/api/auth/me'),
+                    axios.get('https://localhost:5000/api/containers'),
+                    axios.get('https://localhost:5000/api/volumes'),
+                    axios.get('https://localhost:5000/api/secrets')
                 ]);
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
@@ -233,7 +233,7 @@ const CreateContainer = () => {
 
             // Since our backend logic was previously updated to handle "host" vs "bridge",
             // we will send the format as { stack: payload }
-            await axios.post('http://localhost:5000/api/containers', { stack: payload });
+            await axios.post('https://localhost:5000/api/containers', { stack: payload });
 
             navigate('/app/containers');
         } catch (err) {

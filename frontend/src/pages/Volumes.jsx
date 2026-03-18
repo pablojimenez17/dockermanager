@@ -17,8 +17,8 @@ const Volumes = () => {
         setError('');
         try {
             const [meRes, volRes] = await Promise.all([
-                axios.get('http://localhost:5000/api/auth/me'),
-                axios.get('http://localhost:5000/api/volumes')
+                axios.get('https://localhost:5000/api/auth/me'),
+                axios.get('https://localhost:5000/api/volumes')
             ]);
 
             if (meRes.data.limits) setLimits(meRes.data.limits);
@@ -49,7 +49,7 @@ const Volumes = () => {
         setError('');
         setActionLoading(true);
         try {
-            await axios.post('http://localhost:5000/api/volumes', { name: newVolumeName });
+            await axios.post('https://localhost:5000/api/volumes', { name: newVolumeName });
             setNewVolumeName('');
             await fetchVolumes();
         } catch (err) {
@@ -65,7 +65,7 @@ const Volumes = () => {
         setError('');
         setActionLoading(true);
         try {
-            await axios.delete(`http://localhost:5000/api/volumes/${id}`);
+            await axios.delete(`https://localhost:5000/api/volumes/${id}`);
             await fetchVolumes();
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to delete volume. It might be currently attached to a running container.');

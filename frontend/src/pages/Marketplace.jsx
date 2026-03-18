@@ -44,14 +44,14 @@ const Marketplace = () => {
                 const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
                 const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/templates', authOptions),
-                    axios.get('http://localhost:5000/api/secrets', authOptions),
-                    axios.get('http://localhost:5000/api/auth/me', authOptions),
-                    axios.get('http://localhost:5000/api/containers', authOptions),
+                    axios.get('https://localhost:5000/api/templates', authOptions),
+                    axios.get('https://localhost:5000/api/secrets', authOptions),
+                    axios.get('https://localhost:5000/api/auth/me', authOptions),
+                    axios.get('https://localhost:5000/api/containers', authOptions),
                     // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
-                    axios.get('http://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] })),
-                    axios.get('http://localhost:5000/api/networks', authOptions).catch(() => ({ data: [] })),
-                    axios.get('http://localhost:5000/api/volumes', authOptions).catch(() => ({ data: [] }))
+                    axios.get('https://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] })),
+                    axios.get('https://localhost:5000/api/networks', authOptions).catch(() => ({ data: [] })),
+                    axios.get('https://localhost:5000/api/volumes', authOptions).catch(() => ({ data: [] }))
                 ]);
 
                 // Map snapshots into the expected "Template" format
@@ -242,7 +242,7 @@ const Marketplace = () => {
             });
 
             // Post as a full stack using the working, reliable endpoint
-            await axios.post('http://localhost:5000/api/containers', { stack });
+            await axios.post('https://localhost:5000/api/containers', { stack });
 
             addToast(`${selectedTemplate.name} deployed successfully!`, 'success');
             closeModal();
@@ -324,31 +324,58 @@ const Marketplace = () => {
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-500"></div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {templates.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.category.toLowerCase().includes(searchTerm.toLowerCase())).map(template => (
-                        <div key={template.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group" onClick={() => openTemplate(template)}>
-                            <div className="p-6 flex-1">
-                                <div className="w-14 h-14 bg-slate-50 dark:bg-slate-900 rounded-xl flex items-center justify-center p-3 mb-4 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform">
-                                    <img
-                                        src={template.icon}
-                                        alt={template.name}
-                                        className="w-full h-full object-contain"
-                                        onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
-                                    />
-                                    <div className="w-full h-full items-center justify-center text-2xl font-bold text-slate-400 hidden">{template.name[0]}</div>
+                <div className="space-y-12">
+                    {Object.entries(
+                        templates
+                            .filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.category.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .reduce((acc, t) => {
+                                acc[t.category] = acc[t.category] || [];
+                                acc[t.category].push(t);
+                                return acc;
+                            }, {})
+                    )
+                        .sort((a, b) => a[0].localeCompare(b[0]))
+                        .map(([category, catTemplates]) => (
+                            <div key={category}>
+                                <h3 className="text-xl font-bold text-slate-800 dark:text-slate-200 mb-6 flex items-center">
+                                    {category}
+                                    <span className="ml-3 px-2.5 py-0.5 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold">
+                                        {catTemplates.length}
+                                    </span>
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                                    {catTemplates.map(template => (
+                                        <div key={template.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group" onClick={() => openTemplate(template)}>
+                                            <div className="p-6 flex-1">
+                                                <div className="w-14 h-14 bg-slate-50 dark:bg-slate-900 rounded-xl flex items-center justify-center p-3 mb-4 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform">
+                                                    <img
+                                                        src={template.icon}
+                                                        alt={template.name}
+                                                        className="w-full h-full object-contain"
+                                                        onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }}
+                                                    />
+                                                    <div className="w-full h-full items-center justify-center text-2xl font-bold text-slate-400 hidden">{template.name[0]}</div>
+                                                </div>
+                                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{template.name}</h3>
+                                                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">{template.description}</p>
+                                                <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-full">
+                                                    {template.category}
+                                                </span>
+                                            </div>
+                                            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-sm flex items-center justify-between">
+                                                <span className="flex items-center"><Server size={14} className="mr-1.5" /> {template.containers.length} Node{template.containers.length > 1 ? 's' : ''}</span>
+                                                <span className="text-brand-500 font-medium group-hover:text-brand-600">Deploy &rarr;</span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">{template.name}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4">{template.description}</p>
-                                <span className="inline-block px-3 py-1 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold rounded-full">
-                                    {template.category}
-                                </span>
                             </div>
-                            <div className="px-6 py-4 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-sm flex items-center justify-between">
-                                <span className="flex items-center"><Server size={14} className="mr-1.5" /> {template.containers.length} Node{template.containers.length > 1 ? 's' : ''}</span>
-                                <span className="text-brand-500 font-medium group-hover:text-brand-600">Deploy &rarr;</span>
-                            </div>
+                        ))}
+                    {templates.filter(t => t.name.toLowerCase().includes(searchTerm.toLowerCase()) || t.category.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
+                        <div className="text-center py-20">
+                            <p className="text-slate-500 text-lg">No templates found matching your search.</p>
                         </div>
-                    ))}
+                    )}
                 </div>
             )}
 

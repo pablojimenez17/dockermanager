@@ -125,6 +125,141 @@
         ]
     },
     {
+        "id": "mysql",
+        "name": "MySQL",
+        "icon": "https://cdn.simpleicons.org/mysql/4479A1",
+        "description": "The world's most popular open source relational database.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "mysql:8.0",
+                "name_prefix": "mysql-db",
+                "ports": [
+                    {
+                        "host": 3306,
+                        "container": 3306
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MYSQL_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "Root Password"
+                    },
+                    {
+                        "key": "MYSQL_DATABASE",
+                        "value": "default_db"
+                    },
+                    {
+                        "key": "MYSQL_USER",
+                        "value": "mysqluser",
+                        "type": "input",
+                        "label": "Database User"
+                    },
+                    {
+                        "key": "MYSQL_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "mysql_data",
+                        "containerPath": "/var/lib/mysql",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "mariadb",
+        "name": "MariaDB",
+        "icon": "https://cdn.simpleicons.org/mariadb/003545",
+        "description": "Open source relational database, a fork of MySQL.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "mariadb:10.11",
+                "name_prefix": "mariadb-db",
+                "ports": [
+                    {
+                        "host": 3306,
+                        "container": 3306
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MARIADB_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "Root Password"
+                    },
+                    {
+                        "key": "MARIADB_DATABASE",
+                        "value": "default_db"
+                    },
+                    {
+                        "key": "MARIADB_USER",
+                        "value": "mariadbuser",
+                        "type": "input",
+                        "label": "Database User"
+                    },
+                    {
+                        "key": "MARIADB_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "mariadb_data",
+                        "containerPath": "/var/lib/mysql",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "mongodb",
+        "name": "MongoDB",
+        "icon": "https://cdn.simpleicons.org/mongodb/47A248",
+        "description": "Document-oriented NoSQL database system.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "mongo:6.0",
+                "name_prefix": "mongodb",
+                "ports": [
+                    {
+                        "host": 27017,
+                        "container": 27017
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MONGO_INITDB_ROOT_USERNAME",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Root User"
+                    },
+                    {
+                        "key": "MONGO_INITDB_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "Root Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "mongo_data",
+                        "containerPath": "/data/db",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
         "id": "redis",
         "name": "Redis",
         "icon": "https://cdn.simpleicons.org/redis/DC382D",
@@ -140,10 +275,102 @@
                         "container": 6379
                     }
                 ],
+                "env": [
+                    {
+                        "key": "REDIS_PASSWORD",
+                        "type": "secret",
+                        "label": "Requirepass (optional)"
+                    }
+                ],
                 "volumes": [
                     {
                         "hostPath": "redis_data",
                         "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "memcached",
+        "name": "Memcached",
+        "icon": "https://cdn-icons-png.flaticon.com/512/873/873133.png",
+        "description": "Free & open source, high-performance, distributed memory object caching system.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "memcached:alpine",
+                "name_prefix": "memcached",
+                "ports": [
+                    {
+                        "host": 11211,
+                        "container": 11211
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MEMCACHED_MEMORY",
+                        "value": "64",
+                        "type": "input",
+                        "label": "Memory Limit in MB (e.g. 64)"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "influxdb",
+        "name": "InfluxDB",
+        "icon": "https://cdn.simpleicons.org/influxdb/22ADF6",
+        "description": "Open source time series database.",
+        "category": "Database",
+        "containers": [
+            {
+                "image": "influxdb:2",
+                "name_prefix": "influxdb",
+                "ports": [
+                    {
+                        "host": 8086,
+                        "container": 8086
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_MODE",
+                        "value": "setup"
+                    },
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_USERNAME",
+                        "value": "admin"
+                    },
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_PASSWORD",
+                        "type": "secret",
+                        "label": "Admin Password"
+                    },
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_ORG",
+                        "value": "my-org",
+                        "type": "input",
+                        "label": "Initial Org Name"
+                    },
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_BUCKET",
+                        "value": "my-bucket",
+                        "type": "input",
+                        "label": "Initial Bucket Name"
+                    },
+                    {
+                        "key": "DOCKER_INFLUXDB_INIT_ADMIN_TOKEN",
+                        "type": "secret",
+                        "label": "Initial Admin Token (optional)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "influxdb_data",
+                        "containerPath": "/var/lib/influxdb2",
                         "isNamed": true
                     }
                 ]
@@ -227,6 +454,956 @@
         ]
     },
     {
+        "id": "drupal",
+        "name": "Drupal",
+        "icon": "https://cdn.simpleicons.org/drupal/0678BE",
+        "description": "Content management software used to make many of the websites and applications you use every day.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "drupal:10",
+                "name_prefix": "drupal-app",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "DRUPAL_DB_HOST",
+                        "value": "db"
+                    },
+                    {
+                        "key": "DRUPAL_DB_USER",
+                        "value": "drupal"
+                    },
+                    {
+                        "key": "DRUPAL_DB_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "DRUPAL_DB_NAME",
+                        "value": "drupal"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "drupal_data",
+                        "containerPath": "/var/www/html/modules",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "postgres:15-alpine",
+                "name_prefix": "drupal-db",
+                "env": [
+                    {
+                        "key": "POSTGRES_USER",
+                        "value": "drupal"
+                    },
+                    {
+                        "key": "POSTGRES_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "POSTGRES_DB",
+                        "value": "drupal"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "drupal_db_data",
+                        "containerPath": "/var/lib/postgresql/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "joomla",
+        "name": "Joomla",
+        "icon": "https://cdn.simpleicons.org/joomla/5091CD",
+        "description": "Free and open-source content management system.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "joomla:latest",
+                "name_prefix": "joomla-app",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "JOOMLA_DB_HOST",
+                        "value": "db"
+                    },
+                    {
+                        "key": "JOOMLA_DB_USER",
+                        "value": "joomla"
+                    },
+                    {
+                        "key": "JOOMLA_DB_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "JOOMLA_DB_NAME",
+                        "value": "joomla"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "joomla_data",
+                        "containerPath": "/var/www/html",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "mysql:8.0",
+                "name_prefix": "joomla-db",
+                "env": [
+                    {
+                        "key": "MYSQL_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "MySQL Root Password"
+                    },
+                    {
+                        "key": "MYSQL_DATABASE",
+                        "value": "joomla"
+                    },
+                    {
+                        "key": "MYSQL_USER",
+                        "value": "joomla"
+                    },
+                    {
+                        "key": "MYSQL_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "joomla_db_data",
+                        "containerPath": "/var/lib/mysql",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "strapi",
+        "name": "Strapi",
+        "icon": "https://cdn.simpleicons.org/strapi/2F2E8B",
+        "description": "The leading open-source headless CMS. 100% JavaScript, fully customizable.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "strapi/strapi",
+                "name_prefix": "strapi",
+                "ports": [
+                    {
+                        "host": 1337,
+                        "container": 1337
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "DATABASE_CLIENT",
+                        "value": "postgres"
+                    },
+                    {
+                        "key": "DATABASE_HOST",
+                        "value": "db"
+                    },
+                    {
+                        "key": "DATABASE_PORT",
+                        "value": "5432"
+                    },
+                    {
+                        "key": "DATABASE_NAME",
+                        "value": "strapi"
+                    },
+                    {
+                        "key": "DATABASE_USERNAME",
+                        "value": "strapi"
+                    },
+                    {
+                        "key": "DATABASE_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "APP_KEYS",
+                        "type": "secret",
+                        "label": "Strapi App Keys (comma separated)"
+                    },
+                    {
+                        "key": "API_TOKEN_SALT",
+                        "type": "secret",
+                        "label": "API Token Salt"
+                    },
+                    {
+                        "key": "ADMIN_JWT_SECRET",
+                        "type": "secret",
+                        "label": "Admin JWT Secret"
+                    },
+                    {
+                        "key": "JWT_SECRET",
+                        "type": "secret",
+                        "label": "JWT Secret"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "strapi_data",
+                        "containerPath": "/srv/app",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "postgres:15-alpine",
+                "name_prefix": "strapi-db",
+                "env": [
+                    {
+                        "key": "POSTGRES_USER",
+                        "value": "strapi"
+                    },
+                    {
+                        "key": "POSTGRES_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "POSTGRES_DB",
+                        "value": "strapi"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "strapi_db_data",
+                        "containerPath": "/var/lib/postgresql/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "moodle",
+        "name": "Moodle",
+        "icon": "https://cdn.simpleicons.org/moodle/F98012",
+        "description": "Open-source learning management system.",
+        "category": "CMS",
+        "containers": [
+            {
+                "image": "bitnami/moodle:latest",
+                "name_prefix": "moodle-app",
+                "ports": [
+                    {
+                        "host": 8080,
+                        "container": 8080
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MOODLE_DATABASE_HOST",
+                        "value": "db"
+                    },
+                    {
+                        "key": "MOODLE_DATABASE_USER",
+                        "value": "moodle"
+                    },
+                    {
+                        "key": "MOODLE_DATABASE_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "MOODLE_DATABASE_NAME",
+                        "value": "moodle"
+                    },
+                    {
+                        "key": "MOODLE_USERNAME",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Admin Username"
+                    },
+                    {
+                        "key": "MOODLE_PASSWORD",
+                        "type": "secret",
+                        "label": "Admin Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "moodle_data",
+                        "containerPath": "/bitnami/moodle",
+                        "isNamed": true
+                    },
+                    {
+                        "hostPath": "moodle_moodledata",
+                        "containerPath": "/bitnami/moodledata",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "bitnami/mariadb:latest",
+                "name_prefix": "moodle-db",
+                "env": [
+                    {
+                        "key": "MARIADB_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "Root Password"
+                    },
+                    {
+                        "key": "MARIADB_USER",
+                        "value": "moodle"
+                    },
+                    {
+                        "key": "MARIADB_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "MARIADB_DATABASE",
+                        "value": "moodle"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "moodle_db_data",
+                        "containerPath": "/bitnami/mariadb",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "grafana",
+        "name": "Grafana",
+        "icon": "https://cdn.simpleicons.org/grafana/F46800",
+        "description": "The open observability platform. Create beautiful dashboards and metrics.",
+        "category": "Monitoring",
+        "containers": [
+            {
+                "image": "grafana/grafana:latest",
+                "name_prefix": "grafana",
+                "ports": [
+                    {
+                        "host": 3000,
+                        "container": 3000
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "GF_SECURITY_ADMIN_USER",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Admin Username"
+                    },
+                    {
+                        "key": "GF_SECURITY_ADMIN_PASSWORD",
+                        "type": "secret",
+                        "label": "Admin Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "grafana_data",
+                        "containerPath": "/var/lib/grafana",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "prometheus",
+        "name": "Prometheus",
+        "icon": "https://cdn.simpleicons.org/prometheus/E6522C",
+        "description": "The industry standard for metrics and alerting.",
+        "category": "Monitoring",
+        "containers": [
+            {
+                "image": "prom/prometheus:latest",
+                "name_prefix": "prometheus",
+                "ports": [
+                    {
+                        "host": 9090,
+                        "container": 9090
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "prometheus_data",
+                        "containerPath": "/prometheus",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "uptime-kuma",
+        "name": "Uptime Kuma",
+        "icon": "https://cdn-icons-png.flaticon.com/512/5753/5753176.png",
+        "description": "A fancy self-hosted monitoring tool.",
+        "category": "Monitoring",
+        "containers": [
+            {
+                "image": "louislam/uptime-kuma:1",
+                "name_prefix": "uptime-kuma",
+                "ports": [
+                    {
+                        "host": 3001,
+                        "container": 3001
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "NODE_ENV",
+                        "value": "production"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "uptime_kuma_data",
+                        "containerPath": "/app/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "nextcloud",
+        "name": "Nextcloud",
+        "icon": "https://cdn.simpleicons.org/nextcloud/0082C9",
+        "description": "A safe home for all your data. Open source file sync and share.",
+        "category": "Productivity",
+        "containers": [
+            {
+                "image": "nextcloud:latest",
+                "name_prefix": "nextcloud-app",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "POSTGRES_HOST",
+                        "value": "db"
+                    },
+                    {
+                        "key": "POSTGRES_DB",
+                        "value": "nextcloud"
+                    },
+                    {
+                        "key": "POSTGRES_USER",
+                        "value": "nextcloud"
+                    },
+                    {
+                        "key": "POSTGRES_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "NEXTCLOUD_ADMIN_USER",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Nextcloud Admin User"
+                    },
+                    {
+                        "key": "NEXTCLOUD_ADMIN_PASSWORD",
+                        "type": "secret",
+                        "label": "Nextcloud Admin Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "nextcloud_data",
+                        "containerPath": "/var/www/html",
+                        "isNamed": true
+                    }
+                ]
+            },
+            {
+                "image": "postgres:15-alpine",
+                "name_prefix": "nextcloud-db",
+                "env": [
+                    {
+                        "key": "POSTGRES_USER",
+                        "value": "nextcloud"
+                    },
+                    {
+                        "key": "POSTGRES_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "POSTGRES_DB",
+                        "value": "nextcloud"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "nextcloud_db_data",
+                        "containerPath": "/var/lib/postgresql/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "vaultwarden",
+        "name": "Vaultwarden",
+        "icon": "https://cdn.simpleicons.org/bitwarden/175DDC",
+        "description": "Unofficial Bitwarden compatible server written in Rust, perfect for self-hosted deployments.",
+        "category": "Productivity",
+        "containers": [
+            {
+                "image": "vaultwarden/server:latest",
+                "name_prefix": "vaultwarden",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "ADMIN_TOKEN",
+                        "type": "secret",
+                        "label": "Admin Panel Token (optional)"
+                    },
+                    {
+                        "key": "DOMAIN",
+                        "type": "input",
+                        "label": "Domain URL (e.g. https://vw.example.com)"
+                    },
+                    {
+                        "key": "SIGNUPS_ALLOWED",
+                        "value": "true",
+                        "type": "input",
+                        "label": "Allow New Signups (true/false)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "vaultwarden_data",
+                        "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "n8n",
+        "name": "n8n",
+        "icon": "https://cdn.simpleicons.org/n8n/FF6D5A",
+        "description": "Free and open fair-code licensed node based Workflow Automation Tool.",
+        "category": "Productivity",
+        "containers": [
+            {
+                "image": "n8nio/n8n",
+                "name_prefix": "n8n",
+                "ports": [
+                    {
+                        "host": 5678,
+                        "container": 5678
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "N8N_BASIC_AUTH_ACTIVE",
+                        "value": "true"
+                    },
+                    {
+                        "key": "N8N_BASIC_AUTH_USER",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Basic Auth User"
+                    },
+                    {
+                        "key": "N8N_BASIC_AUTH_PASSWORD",
+                        "type": "secret",
+                        "label": "Basic Auth Password"
+                    },
+                    {
+                        "key": "WEBHOOK_URL",
+                        "type": "input",
+                        "label": "Public Domain / Webhook URL"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "n8n_data",
+                        "containerPath": "/home/node/.n8n",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "metabase",
+        "name": "Metabase",
+        "icon": "https://cdn.simpleicons.org/metabase/509EE3",
+        "description": "The simplest, fastest way to share data and analytics inside your company.",
+        "category": "Productivity",
+        "containers": [
+            {
+                "image": "metabase/metabase:latest",
+                "name_prefix": "metabase",
+                "ports": [
+                    {
+                        "host": 3000,
+                        "container": 3000
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "MB_ENCRYPTION_SECRET_KEY",
+                        "type": "secret",
+                        "label": "Encryption Secret (min 16 chars)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "metabase_data",
+                        "containerPath": "/metabase-data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "gitea",
+        "name": "Gitea",
+        "icon": "https://cdn.simpleicons.org/gitea/609926",
+        "description": "Git with a cup of tea. A painless self-hosted Git service.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "gitea/gitea:latest",
+                "name_prefix": "gitea",
+                "ports": [
+                    {
+                        "host": 3000,
+                        "container": 3000
+                    },
+                    {
+                        "host": 222,
+                        "container": 22
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "USER_UID",
+                        "value": "1000"
+                    },
+                    {
+                        "key": "USER_GID",
+                        "value": "1000"
+                    },
+                    {
+                        "key": "GITEA__database__DB_TYPE",
+                        "value": "sqlite3"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "gitea_data",
+                        "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "jenkins",
+        "name": "Jenkins",
+        "icon": "https://cdn.simpleicons.org/jenkins/D24939",
+        "description": "The leading open source automation server.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "jenkins/jenkins:lts",
+                "name_prefix": "jenkins",
+                "ports": [
+                    {
+                        "host": 8080,
+                        "container": 8080
+                    },
+                    {
+                        "host": 50000,
+                        "container": 50000
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "JAVA_OPTS",
+                        "value": "-Djenkins.install.runSetupWizard=false",
+                        "type": "input",
+                        "label": "Java Opts"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "jenkins_data",
+                        "containerPath": "/var/jenkins_home",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "minio",
+        "name": "MinIO",
+        "icon": "https://cdn.simpleicons.org/minio/C7202C",
+        "description": "High Performance, Kubernetes Native Object Storage.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "minio/minio",
+                "name_prefix": "minio",
+                "ports": [
+                    {
+                        "host": 9000,
+                        "container": 9000
+                    },
+                    {
+                        "host": 9001,
+                        "container": 9001
+                    }
+                ],
+                "command": [
+                    "server",
+                    "/data",
+                    "--console-address",
+                    ":9001"
+                ],
+                "env": [
+                    {
+                        "key": "MINIO_ROOT_USER",
+                        "value": "admin",
+                        "type": "input",
+                        "label": "Admin Username"
+                    },
+                    {
+                        "key": "MINIO_ROOT_PASSWORD",
+                        "type": "secret",
+                        "label": "Admin Password"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "minio_data",
+                        "containerPath": "/data",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "rabbitmq",
+        "name": "RabbitMQ",
+        "icon": "https://cdn.simpleicons.org/rabbitmq/FF6600",
+        "description": "The most widely deployed open source message broker.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "rabbitmq:3-management",
+                "name_prefix": "rabbitmq",
+                "ports": [
+                    {
+                        "host": 5672,
+                        "container": 5672
+                    },
+                    {
+                        "host": 15672,
+                        "container": 15672
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "RABBITMQ_DEFAULT_USER",
+                        "value": "guest",
+                        "type": "input",
+                        "label": "Default User"
+                    },
+                    {
+                        "key": "RABBITMQ_DEFAULT_PASS",
+                        "type": "secret",
+                        "label": "Default Password"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "phpmyadmin",
+        "name": "phpMyAdmin",
+        "icon": "https://cdn.simpleicons.org/phpmyadmin/6C78AF",
+        "description": "A web interface for MySQL and MariaDB.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "phpmyadmin/phpmyadmin",
+                "name_prefix": "phpmyadmin",
+                "ports": [
+                    {
+                        "host": 80,
+                        "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "PMA_HOST",
+                        "value": "db",
+                        "type": "input",
+                        "label": "Database Host / Container Name"
+                    },
+                    {
+                        "key": "PMA_USER",
+                        "value": "root",
+                        "type": "input",
+                        "label": "Database User"
+                    },
+                    {
+                        "key": "PMA_PASSWORD",
+                        "type": "secret",
+                        "label": "Database Password"
+                    },
+                    {
+                        "key": "UPLOAD_LIMIT",
+                        "value": "300M",
+                        "type": "input",
+                        "label": "Upload Limit"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "adminer",
+        "name": "Adminer",
+        "icon": "https://cdn-icons-png.flaticon.com/512/3003/3003299.png",
+        "description": "Database management in a single PHP file.",
+        "category": "Dev Tools",
+        "containers": [
+            {
+                "image": "adminer",
+                "name_prefix": "adminer",
+                "ports": [
+                    {
+                        "host": 8080,
+                        "container": 8080
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "ADMINER_DEFAULT_SERVER",
+                        "value": "db",
+                        "type": "input",
+                        "label": "Default Server Host"
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "ollama",
+        "name": "Ollama",
+        "icon": "https://ollama.com/public/icon-64x64.png",
+        "description": "Get up and running with large language models locally.",
+        "category": "AI",
+        "containers": [
+            {
+                "image": "ollama/ollama",
+                "name_prefix": "ollama",
+                "ports": [
+                    {
+                        "host": 11434,
+                        "container": 11434
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "OLLAMA_KEEP_ALIVE",
+                        "value": "5m",
+                        "type": "input",
+                        "label": "Keep Alive Duration (e.g. 5m)"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "ollama_data",
+                        "containerPath": "/root/.ollama",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
+        "id": "chromadb",
+        "name": "ChromaDB",
+        "icon": "https://cdn.simpleicons.org/chroma/E44D26",
+        "description": "The AI-native open-source embedding database.",
+        "category": "AI",
+        "containers": [
+            {
+                "image": "chromadb/chroma",
+                "name_prefix": "chromadb",
+                "ports": [
+                    {
+                        "host": 8000,
+                        "container": 8000
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "IS_PERSISTENT",
+                        "value": "TRUE"
+                    },
+                    {
+                        "key": "ANONYMIZED_TELEMETRY",
+                        "value": "FALSE"
+                    }
+                ],
+                "volumes": [
+                    {
+                        "hostPath": "chroma_data",
+                        "containerPath": "/chroma/chroma",
+                        "isNamed": true
+                    }
+                ]
+            }
+        ]
+    },
+    {
         "id": "nginx",
         "name": "Nginx Web Server",
         "icon": "https://cdn.simpleicons.org/nginx/009639",
@@ -240,6 +1417,14 @@
                     {
                         "host": 80,
                         "container": 80
+                    }
+                ],
+                "env": [
+                    {
+                        "key": "TZ",
+                        "value": "UTC",
+                        "type": "input",
+                        "label": "Timezone"
                     }
                 ]
             }
@@ -265,6 +1450,10 @@
                     {
                         "key": "NODE_ENV",
                         "value": "production"
+                    },
+                    {
+                        "key": "PORT",
+                        "value": "3000"
                     }
                 ]
             }
@@ -273,7 +1462,7 @@
     {
         "id": "minecraft",
         "name": "Minecraft Java Server",
-        "icon": "https://cdn.simpleicons.org/minecraft",
+        "icon": "https://cdn.simpleicons.org/minecraft/FF5500",
         "description": "Ready-to-play Minecraft Java Server (itzg).",
         "category": "Gaming",
         "containers": [
@@ -304,6 +1493,12 @@
                         "value": "2G",
                         "type": "input",
                         "label": "Server RAM Allocation (e.g. 2G, 4G)"
+                    },
+                    {
+                        "key": "MOTD",
+                        "value": "A Minecraft Server hosted on Orbit",
+                        "type": "input",
+                        "label": "Server Message of the Day"
                     }
                 ],
                 "volumes": [
@@ -332,7 +1527,14 @@
                     "-f",
                     "/dev/null"
                 ],
-                "env": []
+                "env": [
+                    {
+                        "key": "TZ",
+                        "value": "UTC",
+                        "type": "input",
+                        "label": "Timezone"
+                    }
+                ]
             }
         ]
     },
@@ -352,7 +1554,14 @@
                     "-f",
                     "/dev/null"
                 ],
-                "env": []
+                "env": [
+                    {
+                        "key": "TZ",
+                        "value": "UTC",
+                        "type": "input",
+                        "label": "Timezone"
+                    }
+                ]
             }
         ]
     }

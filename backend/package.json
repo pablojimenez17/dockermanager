@@ -16,15 +16,21 @@
     "dockerode": "^3.3.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "express-mongo-sanitize": "^2.2.0",
+    "express-rate-limit": "^8.3.1",
+    "helmet": "^8.1.0",
+    "hpp": "^0.2.3",
     "jsonwebtoken": "^9.0.2",
     "minio": "^8.0.7",
     "mongoose": "^8.3.2",
     "multer": "^2.1.1",
     "simple-git": "^3.32.3",
     "socket.io": "^4.8.3",
-    "tar-fs": "^3.1.2"
+    "tar-fs": "^3.1.2",
+    "xss-clean": "^0.1.4"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "selfsigned": "^5.5.0"
   }
 }

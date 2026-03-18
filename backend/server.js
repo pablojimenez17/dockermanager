@@ -25,21 +25,61 @@ import { initMinio } from './services/minioService.js';
 import { initOllama } from './services/ollamaService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
-
+import https from 'https';
+import fs from 'fs';
+import helmet from 'helmet';
+import mongoSanitize from 'express-mongo-sanitize';
+import xss from 'xss-clean';
+import hpp from 'hpp';
+import rateLimit from 'express-rate-limit';
 dotenv.config();
 
 const app = express();
-const server = createServer(app);
+
+// ── Security Middlewares ──
+// 1. Set security HTTP headers
+app.use(helmet());
+
+// 2. Limit requests from the same IP
+const limiter = rateLimit({
+    max: 2000, // Limit each IP to 2000 requests per `window` (here, per hour)
+    windowMs: 60 * 60 * 1000, // 1 hour
+    message: 'Too many requests from this IP, please try again in an hour!'
+});
+app.use('/api', limiter);
+
+// 3. Body parser, reading data from body into req.body
+app.use(express.json({ limit: '10kb' }));
+
+// 4. Data sanitization against NoSQL query injection
+app.use(mongoSanitize());
+
+// 5. Data sanitization against XSS
+app.use(xss());
+
+// 6. Prevent parameter pollution
+app.use(hpp());
+
+// Set up HTTPS Server
+let server;
+try {
+    const key = fs.readFileSync('./certs/key.pem');
+    const cert = fs.readFileSync('./certs/cert.pem');
+    server = https.createServer({ key, cert }, app);
+    console.log('🔒 SSL Certificates loaded successfully! Running backend in secure HTTPS mode.');
+} catch (error) {
+    console.warn('⚠️ SSL Certificates not found in /certs. Falling back to insecure HTTP mode.', error.message);
+    server = createServer(app);
+}
 
 // Initialize WebSockets for real-time Terminal
 setupSockets(server);
 
-// Middleware
+// Cors
 app.use(cors({
-    origin: 'http://localhost:5173', // Vite default port
+    origin: ['http://localhost:5173', 'https://localhost:5173'], // Allow HTTP and HTTPS frontend
     credentials: true // Required for HTTP-Only cookies
 }));
-app.use(express.json());
 app.use(cookieParser());
 
 // Routes
@@ -107,3 +147,4 @@ const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
     console.log(`Server listening on port ${PORT}`);
 });
+ 

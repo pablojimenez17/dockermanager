@@ -24,7 +24,7 @@ const Register = () => {
         }
 
         try {
-            await axios.post('http://localhost:5000/api/auth/register', { name, email, password });
+            await axios.post('https://localhost:5000/api/auth/register', { name, email, password });
             setSuccess('Registration successful. Redirecting to login...');
             setTimeout(() => navigate('/login'), 2000);
         } catch (err) {
