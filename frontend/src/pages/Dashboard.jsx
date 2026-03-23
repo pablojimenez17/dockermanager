@@ -4,8 +4,10 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
+import { useOrg } from '../context/OrgContext';
 
 const Dashboard = () => {
+    const { activeOrg } = useOrg();
     const [stats, setStats] = useState({ total: 0, running: 0, stopped: 0 });
     const [metrics, setMetrics] = useState({ cpu: 0, mem: 0, memLimit: 0 });
     const [loading, setLoading] = useState(true);
@@ -65,7 +67,7 @@ const Dashboard = () => {
             clearInterval(interval);
             socket.disconnect();
         };
-    }, []);
+    }, [activeOrg]);
 
     return (
         <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white transition-colors duration-200">

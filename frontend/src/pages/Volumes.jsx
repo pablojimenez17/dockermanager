@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { HardDrive, Trash2, Plus, ShieldAlert, AlertCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
+import { useOrg } from '../context/OrgContext';
 
 const Volumes = () => {
+    const { activeOrg } = useOrg();
     const [volumes, setVolumes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -42,7 +44,7 @@ const Volumes = () => {
 
     useEffect(() => {
         fetchVolumes();
-    }, []);
+    }, [activeOrg]);
 
     const handleCreate = async (e) => {
         e.preventDefault();

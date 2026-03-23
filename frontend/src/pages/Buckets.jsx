@@ -3,8 +3,10 @@ import axios from 'axios';
 import { Database, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import BucketView from './BucketView';
+import { useOrg } from '../context/OrgContext';
 
 const Buckets = () => {
+    const { activeOrg } = useOrg();
     const [buckets, setBuckets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -15,7 +17,7 @@ const Buckets = () => {
 
     useEffect(() => {
         fetchBuckets();
-    }, []);
+    }, [activeOrg]);
 
     const fetchBuckets = async () => {
         try {

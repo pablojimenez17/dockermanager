@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AlertTriangle, Info, CheckCircle, X, Terminal } from 'lucide-react';
 
 const ToastContext = createContext(null);
@@ -8,7 +8,11 @@ export const useToast = () => useContext(ToastContext);
 export const ToastProvider = ({ children }) => {
     const [toasts, setToasts] = useState([]);
 
-    const addToast = (title, message, type = 'info', actionLabel = null, onAction = null) => {
+    const removeToast = useCallback((id) => {
+        setToasts(prev => prev.filter(t => t.id !== id));
+    }, []);
+
+    const addToast = useCallback((title, message, type = 'info', actionLabel = null, onAction = null) => {
         console.log('[Toast System] Spawning toast:', title, message);
         const id = String(Date.now() + Math.random());
         setToasts(prev => [...prev, { id, title, message, type, actionLabel, onAction }]);
@@ -16,11 +20,7 @@ export const ToastProvider = ({ children }) => {
         if (!actionLabel) {
             setTimeout(() => removeToast(id), 6000);
         }
-    };
-
-    const removeToast = (id) => {
-        setToasts(prev => prev.filter(t => t.id !== id));
-    };
+    }, [removeToast]);
 
     return (
         <ToastContext.Provider value={{ addToast }}>

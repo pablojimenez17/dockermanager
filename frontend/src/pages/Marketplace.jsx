@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const Marketplace = () => {
+    const { activeOrg } = useOrg();
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -45,7 +47,7 @@ const Marketplace = () => {
 
                 const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
                     axios.get('https://localhost:5000/api/templates', authOptions),
-                    axios.get('https://localhost:5000/api/secrets', authOptions),
+                    axios.get('https://localhost:5000/api/secrets', authOptions).catch(() => ({ data: [] })),
                     axios.get('https://localhost:5000/api/auth/me', authOptions),
                     axios.get('https://localhost:5000/api/containers', authOptions),
                     // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
@@ -108,7 +110,7 @@ const Marketplace = () => {
             }
         };
         fetchData();
-    }, [addToast]);
+    }, [addToast, activeOrg]);
 
     // When a template is selected, initialize the envFields state with defaults
     const openTemplate = (template) => {

@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Network, Plus, Trash2, ArrowLeft, TerminalSquare } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const Networks = () => {
+    const { activeOrg } = useOrg();
     const [networks, setNetworks] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showCreateModal, setShowCreateModal] = useState(false);
@@ -19,7 +21,7 @@ const Networks = () => {
 
     useEffect(() => {
         fetchNetworks();
-    }, []);
+    }, [activeOrg]);
 
     const fetchNetworks = async () => {
         try {

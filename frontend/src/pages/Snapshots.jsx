@@ -3,8 +3,10 @@ import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { Camera, Trash2, HardDrive, RefreshCw, Cpu, Image as ImageIcon } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const Snapshots = () => {
+    const { activeOrg } = useOrg();
     const [snapshots, setSnapshots] = useState([]);
     const [loading, setLoading] = useState(true);
     const [userPlan, setUserPlan] = useState('free');
@@ -12,7 +14,7 @@ const Snapshots = () => {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [activeOrg]);
 
     const fetchData = async () => {
         try {

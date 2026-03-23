@@ -3,8 +3,10 @@ import axios from 'axios';
 import { ShieldCheck, Plus, Trash2, Globe, ShieldAlert, Eye, EyeOff, Lock, ArrowUpRight } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { Link } from 'react-router-dom';
+import { useOrg } from '../context/OrgContext';
 
 const Registries = () => {
+    const { activeOrg } = useOrg();
     const [registries, setRegistries] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isEnterprise, setIsEnterprise] = useState(true);
@@ -33,7 +35,7 @@ const Registries = () => {
 
     useEffect(() => {
         fetchRegistries();
-    }, []);
+    }, [activeOrg]);
 
     const handleCreateRegistry = async (e) => {
         e.preventDefault();

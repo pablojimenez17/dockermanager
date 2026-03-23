@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Lock, Plus, Trash2, KeyRound, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const Secrets = () => {
+    const { activeOrg } = useOrg();
     const [secrets, setSecrets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -26,7 +28,7 @@ const Secrets = () => {
 
     useEffect(() => {
         fetchSecrets();
-    }, []);
+    }, [activeOrg]);
 
     const handleCreateSecret = async (e) => {
         e.preventDefault();

@@ -5,8 +5,10 @@ import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
 import LiveLogsModal from '../components/LiveLogsModal';
 import { useToast } from '../components/ToastContext';
+import { useOrg } from '../context/OrgContext';
 
 const ViewContainers = () => {
+    const { activeOrg } = useOrg();
     const [containers, setContainers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -102,7 +104,7 @@ const ViewContainers = () => {
             clearInterval(interval);
             socket.disconnect();
         };
-    }, []);
+    }, [activeOrg]);
 
     const handleAction = async (id, action) => {
         try {
