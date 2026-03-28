@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Code, Database, Globe, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
+import { Box, Code, Database, Globe, Lock, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 
@@ -12,6 +12,7 @@ const getEmptyContainer = () => ({
     cpu: '1',
     restartPolicy: 'no',
     networkMode: 'bridge',
+    enableInternet: false,
     ipv4Address: '',
     envVars: [{ key: '', value: '', type: 'raw' }],
     showAdvanced: false,
@@ -223,6 +224,7 @@ const CreateContainer = () => {
                     cpu: c.cpu,
                     restartPolicy: c.restartPolicy,
                     networkMode: c.networkMode,
+                    enableInternet: c.enableInternet === true,
                     ipv4Address: (c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none') ? c.ipv4Address : undefined,
                     domain: c.exposeDomain ? c.domain : undefined,
                     domainPort: c.exposeDomain ? c.domainPort : undefined,
@@ -564,6 +566,7 @@ const CreateContainer = () => {
                                                     </select>
                                                 </div>
 
+                                                {/* Network Mode */}
                                                 <div>
                                                     <label className="flex items-center space-x-2 text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
                                                         <Network size={16} className="text-slate-500 dark:text-slate-400" />
@@ -574,13 +577,52 @@ const CreateContainer = () => {
                                                         onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)}
                                                         className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-1 focus:ring-brand-500 text-slate-900 dark:text-white"
                                                     >
-                                                        <option value="bridge">Bridge (Secure)</option>
-                                                        <option value="none">None (Isolated)</option>
+                                                        <option value="bridge">🛡️ Private Protected Network (VPC)</option>
+                                                        <option value="none">🔒 No Network (Total Isolation)</option>
                                                         {availableNetworks.filter(n => !['bridge', 'host', 'none'].includes(n.Name)).map(net => (
-                                                            <option key={net.Id} value={net.Name}>Custom: {net.Name}</option>
+                                                            <option key={net.Id} value={net.Name}>{net.Name}</option>
                                                         ))}
                                                     </select>
+                                                    <p className="text-xs text-slate-500 mt-1">VPC isolates you from other users. "No Network" is an air-gapped container with no connectivity.</p>
                                                 </div>
+
+                                                {/* Internet Access Toggle */}
+                                                {c.networkMode !== 'none' && (
+                                                    <div className={`col-span-1 md:col-span-2 flex items-center justify-between p-3.5 rounded-xl border transition-all ${
+                                                        c.enableInternet
+                                                            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50'
+                                                            : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-600'
+                                                    }`}>
+                                                        <div className="flex items-center space-x-3">
+                                                            {c.enableInternet
+                                                                ? <Globe size={18} className="text-amber-500 shrink-0" />
+                                                                : <Lock size={18} className="text-slate-400 shrink-0" />
+                                                            }
+                                                            <div>
+                                                                <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                                                    {c.enableInternet ? 'Internet Access Enabled' : 'Private Container'}
+                                                                </p>
+                                                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                                    {c.enableInternet
+                                                                        ? '⚠️ By enabling internet access you accept that your container may initiate external connections. Use at your own responsibility.'
+                                                                        : 'Your container is fully isolated. It can only communicate with your other services.'
+                                                                    }
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => updateContainer(c.id, 'enableInternet', !c.enableInternet)}
+                                                            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                                                                c.enableInternet ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'
+                                                            }`}
+                                                        >
+                                                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                                                                c.enableInternet ? 'translate-x-6' : 'translate-x-1'
+                                                            }`} />
+                                                        </button>
+                                                    </div>
+                                                )}
 
                                                 {c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' && (
                                                     <div>
@@ -716,6 +758,12 @@ const CreateContainer = () => {
                             </div>
                         ))}
                     </div>
+
+                    {/* Shared Responsibility Notice */}
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-2">
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">⚖️ Shared responsibility:</span>{' '}
+                        Orbit guarantees network isolation and infrastructure security. Application-level security within the container (image updates, credentials, internal configuration) remains the responsibility of the user.
+                    </p>
 
                     {/* Actions */}
                     <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-slate-200 dark:border-slate-700/50">
