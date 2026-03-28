@@ -5,7 +5,7 @@ import AuditLog from '../models/AuditLog.js';
 import Docker from 'dockerode';
 
 const router = express.Router();
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 // Open endpoint for GitHub to hit. No authMiddleware here because GitHub doesn't have a user token.
 router.post('/github', async (req, res) => {

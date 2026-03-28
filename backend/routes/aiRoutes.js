@@ -6,7 +6,7 @@ import User from '../models/User.js';
 import Network from '../models/Network.js';
 
 const router = express.Router();
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 // System Instruction optimized for 0.5b low-parameter LLMs
 const getSystemInstruction = (userName) => `You are Orbit AI, the Docker Manager assistant for ${userName}.

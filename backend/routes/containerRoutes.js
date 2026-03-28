@@ -13,7 +13,7 @@ import fs from 'fs';
 
 const router = express.Router();
 // Use Dockerode connected to local socket
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 router.use(authMiddleware);
 
@@ -289,10 +289,10 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             // -----------------------------------
 
             // Apply network settings
-            let safeNetworkMode = networkMode || 'bridge';
+            let safeNetworkMode = networkMode || 'lan_net'; // Default user deployed containers to the isolated LAN network
 
             // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
-            if (networkName && safeNetworkMode === 'bridge') {
+            if (networkName && (safeNetworkMode === 'bridge' || safeNetworkMode === 'lan_net')) {
                 safeNetworkMode = networkName;
             }
 
@@ -327,6 +327,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
                 containerConfig.Labels = {
                     'traefik.enable': 'true',
+                    'traefik.constraint-label': 'lan-proxy',
                     [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                     [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
                     'traefik.docker.network': safeNetworkMode,
@@ -609,9 +610,10 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
             newLabels = {
                 ...newLabels,
                 'traefik.enable': 'true',
+                'traefik.constraint-label': 'lan-proxy',
                 [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                 [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
-                'traefik.docker.network': 'bridge' // default assumption unless they specified another
+                'traefik.docker.network': 'lan_net' // default assumption for new architecture
             };
 
             // If it had a custom network in oldConfig, use it
@@ -624,6 +626,7 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
         } else {
             // Remove traefik labels if user cleared the domain input (un-expose)
             delete newLabels['traefik.enable'];
+            delete newLabels['traefik.constraint-label'];
             delete newLabels[`traefik.http.routers.${appId}.rule`];
             delete newLabels[`traefik.http.services.${appId}.loadbalancer.server.port`];
             delete newLabels['traefik.docker.network'];

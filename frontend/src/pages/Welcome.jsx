@@ -173,7 +173,7 @@ const Welcome = () => {
                 { text: '24/7 Dedicated Support', included: true },
                 { text: 'Custom Node Mapping', included: true },
             ],
-            cta: 'Contact Sales', highlighted: false
+            cta: 'Upgrade Now', highlighted: false
         },
         {
             name: 'Agency / MSP', price: '$199', desc: 'Provide managed Docker environments to your clients with sub-organizations.',
@@ -188,7 +188,7 @@ const Welcome = () => {
                 { text: 'Custom Roles & RBAC', included: true },
                 { text: 'White-glove 24/7 Support', included: true },
             ],
-            cta: 'Talk to Us', highlighted: false
+            cta: 'Contact Sales', highlighted: false
         }
     ];
 
@@ -498,7 +498,7 @@ const Welcome = () => {
                     <Aperture size={14} className="text-brand-500" />
                     <span className="font-bold text-slate-500 dark:text-slate-400">Orbit</span>
                 </div>
-                <p>© 2026 Orbit — Pablo Jiménez Prieto, Arnau Montané Verdier & Yair Santiago Mitjans Velásquez · Institut Pedralbes</p>
+                <p>© 2026 Orbit — Pablo Jiménez Prieto · Institut Pedralbes</p>
             </footer>
         </div>
     );

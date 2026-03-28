@@ -4,7 +4,7 @@ import Container from '../models/Container.js';
 import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 router.use(authMiddleware);
 

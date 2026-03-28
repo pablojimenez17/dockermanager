@@ -6,7 +6,7 @@ import Docker from 'dockerode';
 
 dotenv.config();
 
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 async function run() {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager');

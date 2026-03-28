@@ -29,7 +29,7 @@ import ChatAssistant from './components/ChatAssistant';
 
 // Global Axios config for HTTP-Only Cookies
 axios.defaults.withCredentials = true;
-axios.defaults.baseURL = 'https://localhost:5000';
+axios.defaults.baseURL = 'http://localhost:5000';
 
 // Interceptor to auto-logout on 401 Unauthorized, excluding auth check endpoints
 axios.interceptors.response.use(

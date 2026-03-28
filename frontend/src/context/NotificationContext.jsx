@@ -33,7 +33,7 @@ export const NotificationProvider = ({ children }) => {
         }
 
         // Setup Socket
-        const newSocket = io('https://localhost:5000', {
+        const newSocket = io('http://localhost:5000', {
             withCredentials: true,
             auth: {
                 token: localStorage.getItem('token')

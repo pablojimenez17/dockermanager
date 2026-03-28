@@ -16,7 +16,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 
     const handleLogout = async () => {
         try {
-            await axios.post('https://localhost:5000/api/auth/logout');
+            await axios.post('http://localhost:5000/api/auth/logout');
         } catch (e) {
             console.error('Logout error', e);
         }

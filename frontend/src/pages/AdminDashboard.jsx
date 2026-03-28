@@ -22,9 +22,9 @@ const AdminDashboard = () => {
     const fetchData = async () => {
         try {
             const [usersRes, containersRes, auditRes] = await Promise.all([
-                axios.get('https://localhost:5000/api/admin/users'),
-                axios.get('https://localhost:5000/api/admin/containers'),
-                axios.get('https://localhost:5000/api/admin/audit').catch(() => ({ data: [] }))
+                axios.get('http://localhost:5000/api/admin/users'),
+                axios.get('http://localhost:5000/api/admin/containers'),
+                axios.get('http://localhost:5000/api/admin/audit').catch(() => ({ data: [] }))
             ]);
             setUsers(usersRes.data);
             setContainers(containersRes.data);
@@ -41,7 +41,7 @@ const AdminDashboard = () => {
         const interval = setInterval(fetchData, 30000);
 
         // Setup Real-time Docker events socket
-        const socket = io('https://localhost:5000');
+        const socket = io('http://localhost:5000');
 
         socket.on('container:status_change', ({ dockerId, status }) => {
             const currentContainers = containersRef.current;
@@ -81,7 +81,7 @@ const AdminDashboard = () => {
 
     const fetchLogs = async (id, name) => {
         try {
-            const res = await axios.get(`https://localhost:5000/api/stats/${id}/logs`);
+            const res = await axios.get(`http://localhost:5000/api/stats/${id}/logs`);
             setSelectedLogs({ name, content: res.data });
         } catch (err) {
             setSelectedLogs({ name, content: "Error fetching logs or container not running." });
@@ -94,7 +94,7 @@ const AdminDashboard = () => {
             const targetContainer = containers.find(c => c._id === id);
             const cName = targetContainer ? targetContainer.name : 'Container';
 
-            await axios.delete(`https://localhost:5000/api/admin/containers/${id}`);
+            await axios.delete(`http://localhost:5000/api/admin/containers/${id}`);
 
             addToast('Container Deleted', `Forcefully unlinked and removed ${cName}`, 'error');
             fetchData();

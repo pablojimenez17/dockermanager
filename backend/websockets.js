@@ -4,16 +4,15 @@ import User from './models/User.js';
 import Container from './models/Container.js';
 import jwt from 'jsonwebtoken';
 
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 let ioInstance;
 
 export const setupSockets = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: 'http://localhost:5173',
-            methods: ['GET', 'POST'],
-            credentials: true
+            origin: "*",
+            methods: ['GET', 'POST']
         }
     });
 

@@ -1,0 +1,21 @@
+services:
+  backend:
+    command: npm run dev
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend:/usr/src/app
+      - /usr/src/app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+
+  frontend:
+    build:
+      context: ./frontend
+      target: build # Use the intermediate Node container stage instead of Nginx
+    command: npm run dev -- --host 0.0.0.0 --port 80
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true

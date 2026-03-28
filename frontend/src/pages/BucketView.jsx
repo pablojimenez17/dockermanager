@@ -22,7 +22,7 @@ const BucketView = ({ bucketName, onClose }) => {
     const fetchObjects = async () => {
         try {
             setLoading(true);
-            const res = await axios.get(`https://localhost:5000/api/buckets/${bucketName}/objects`, {
+            const res = await axios.get(`http://localhost:5000/api/buckets/${bucketName}/objects`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setObjects(res.data || []);
@@ -44,7 +44,7 @@ const BucketView = ({ bucketName, onClose }) => {
         try {
             setUploading(true);
             const token = localStorage.getItem('token');
-            await axios.post(`https://localhost:5000/api/buckets/${bucketName}/upload`, formData, {
+            await axios.post(`http://localhost:5000/api/buckets/${bucketName}/upload`, formData, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                     'Content-Type': 'multipart/form-data'
@@ -67,7 +67,7 @@ const BucketView = ({ bucketName, onClose }) => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`https://localhost:5000/api/buckets/${bucketName}/objects/${encodeURIComponent(objectName)}`, {
+            await axios.delete(`http://localhost:5000/api/buckets/${bucketName}/objects/${encodeURIComponent(objectName)}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             addToast(`Object ${objectName} deleted.`, 'success');
@@ -202,7 +202,7 @@ const BucketView = ({ bucketName, onClose }) => {
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end space-x-2">
                                                     <a
-                                                        href={`https://localhost:5000/api/buckets/${bucketName}/objects/${encodeURIComponent(obj.name)}/download`} // Mock route for now, typically handled via presigned URLs
+                                                        href={`http://localhost:5000/api/buckets/${bucketName}/objects/${encodeURIComponent(obj.name)}/download`} // Mock route for now, typically handled via presigned URLs
                                                         target="_blank" rel="noopener noreferrer"
                                                         className="p-1.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
                                                         title="Download API to be implemented"

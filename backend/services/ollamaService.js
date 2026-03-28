@@ -1,7 +1,7 @@
 import Docker from 'dockerode';
 import fs from 'fs';
 
-const docker = new Docker({ socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 
 const OLLAMA_CONTAINER_NAME = 'dockermanager-ollama';
 const OLLAMA_PORT = 11434;

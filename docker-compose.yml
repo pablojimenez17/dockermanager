@@ -1,0 +1,190 @@
+
+
+networks:
+  public_net:
+    driver: bridge
+  transit_proxy_inverso:
+    driver: bridge
+  transit_proxy_forward:
+    driver: bridge
+  dmz_net:
+    driver: bridge
+  lan_net:
+    driver: bridge
+    internal: true # Cannot route to internet natively unless going through proxy
+  storage_transit_net:
+    driver: bridge
+  storage_net:
+    driver: bridge
+    internal: true
+
+services:
+  # 1. Edge Firewall (IDS/IPS via Suricata)
+  edge-fw:
+    image: jasonish/suricata:latest
+    container_name: dockermanager-edge-fw
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+      - NET_RAW
+    sysctls:
+      - net.ipv4.ip_forward=1
+    # For a real implementation, we simulate it by attaching to networks.
+    # In a full setup, this container would have iptables rules to forward traffic.
+    # We will attach it to public and transit networks.
+    networks:
+      - public_net
+      - transit_proxy_inverso
+      - transit_proxy_forward
+    # For now, port mapping is directly on traefik to ensure UI works out of the box without complex manual iptables scripting inside the suricata container. But to respect the diagram strictly, one might map 80/443 here and use iptables PREROUTING to traefik.
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/edge-fw.sh:/docker-entrypoint.sh:ro
+    entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+
+  # 2. Reverse Proxy (Traefik) - Proxy Inverso
+  proxy-inverso:
+    image: traefik:v2.10
+    container_name: dockermanager-proxy
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Securely read from the socket proxy!
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.constraints=Label(`traefik.constraint-label`, `dmz-proxy`)"
+    networks:
+      - transit_proxy_inverso
+      - dmz_net
+    # If edge-fw isn't reliably forwarding (which requires an iptables bash script), 
+    # uncomment these ports to access the web UI directly:
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
+    depends_on:
+      - socket-proxy
+
+  # 3. LAN Reverse Proxy (Traefik for user containers)
+  lan-proxy:
+    image: traefik:v2.10
+    container_name: dockermanager-lan-proxy
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--providers.docker.endpoint=tcp://socket-proxy:2375"
+      - "--providers.docker.constraints=Label(`traefik.constraint-label`, `lan-proxy`)"
+    networks:
+      - transit_proxy_forward
+      - lan_net
+    depends_on:
+      - socket-proxy
+
+  # 4. DMZ: Docker Socket Proxy (Security Enhancement)
+  socket-proxy:
+    image: tecnativa/docker-socket-proxy
+    container_name: dockermanager-socket-proxy
+    environment:
+      # We allow the specific actions the backend needs to manage user containers
+      - CONTAINERS=1 # Allow container list, create, start, stop, kill
+      - IMAGES=1 # Allow image list, pull
+      - NETWORKS=1 # Allow network list, create
+      - VOLUMES=1 # Allow volume create
+      - EXEC=1 # Allow exec (terminals)
+      - BUILD=1
+      # Explicitly deny full system access
+      - SYSTEM=0
+      - INFO=1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only!
+    networks:
+      - dmz_net
+
+  # 5. DMZ: Backend
+  backend:
+    build: ./backend
+    image: dockermanager/backend:local
+    container_name: dockermanager-backend
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/dockermanager
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      - MINIO_ENDPOINT=storage-fw
+      - MINIO_PORT=9000
+    networks:
+      - dmz_net
+      - storage_transit_net
+    depends_on:
+      - mongodb
+      - socket-proxy
+      - minio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.constraint-label=dmz-proxy"
+      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.services.backend.loadbalancer.server.port=5000"
+
+  # 6. DMZ: Frontend
+  frontend:
+    build: ./frontend
+    image: dockermanager/frontend:local
+    container_name: dockermanager-frontend
+    networks:
+      - dmz_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.constraint-label=dmz-proxy"
+      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
+      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.services.frontend.loadbalancer.server.port=80"
+
+  # 7. DMZ: MongoDB
+  mongodb:
+    image: mongo:latest
+    container_name: dockermanager-mongo
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - dmz_net
+
+  # 8. Storage Firewall (HAProxy acting as internal firewall bridge)
+  storage-fw:
+    image: haproxy:alpine
+    container_name: dockermanager-storage-fw
+    networks:
+      - storage_transit_net
+      - storage_net
+    volumes:
+      - ./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+
+  # 9. Storage: MinIO
+  minio:
+    image: minio/minio:latest
+    container_name: dockermanager-minio
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - storage_net
+
+  # 10. Storage: NAS
+  nas:
+    image: dperson/samba
+    container_name: dockermanager-nas
+    command: -u "admin;password" -s "backups;/backup;yes;no;no;all;none"
+    volumes:
+      - built-in-nas-data:/backup
+    networks:
+      - storage_net
+
+volumes:
+  mongo-data:
+  minio-data:
+  built-in-nas-data:

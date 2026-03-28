@@ -23,6 +23,7 @@ import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import { initMinio } from './services/minioService.js';
 import { initOllama } from './services/ollamaService.js';
+import { startReaper } from './services/reaperService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 import https from 'https';
@@ -63,12 +64,14 @@ app.use(hpp());
 // Set up HTTPS Server
 let server;
 try {
+    // FORCE HTTP FOR DEV:
+    throw new Error('Forcing HTTP for local dev to avoid ERR_CERT_AUTHORITY_INVALID');
     const key = fs.readFileSync('./certs/key.pem');
     const cert = fs.readFileSync('./certs/cert.pem');
     server = https.createServer({ key, cert }, app);
     console.log('🔒 SSL Certificates loaded successfully! Running backend in secure HTTPS mode.');
 } catch (error) {
-    console.warn('⚠️ SSL Certificates not found in /certs. Falling back to insecure HTTP mode.', error.message);
+    console.warn('⚠️ SSL Certificates not found or disabled. Falling back to insecure HTTP mode.', error.message);
     server = createServer(app);
 }
 
@@ -77,8 +80,7 @@ setupSockets(server);
 
 // Cors
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://localhost:5173'], // Allow HTTP and HTTPS frontend
-    credentials: true // Required for HTTP-Only cookies
+  origin: "*"
 }));
 app.use(cookieParser());
 
@@ -121,6 +123,9 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
         } catch (ollamaErr) {
             console.error('Failed to initialize Ollama during boot:', ollamaErr);
         }
+
+        // Start the Reaper Service for enforcing plan limits
+        startReaper();
 
         // Seed default admin user if no admins
         try {
