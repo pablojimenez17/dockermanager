@@ -705,29 +705,36 @@ const Marketplace = () => {
                         </div>
 
                         {/* Footer */}
-                        <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 flex justify-end space-x-3">
-                            <button
-                                type="button"
-                                onClick={closeModal}
-                                className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                form="deployForm"
-                                disabled={deploying}
-                                className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
-                            >
-                                {deploying ? (
-                                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> Deploying Stack...</>
-                                ) : (
-                                    <><Play size={18} className="mr-2 fill-current" /> Deploy {selectedTemplate.name}</>
-                                )}
-                            </button>
+                        <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
+                            {/* Shared Responsibility Notice */}
+                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                                <span className="font-semibold text-slate-600 dark:text-slate-300">⚖️ Shared responsibility:</span>{' '}
+                                Orbit guarantees network isolation and infrastructure security. Application-level security within the container (image updates, credentials, internal configuration) remains the responsibility of the user.                            </p>
+                            <div className="flex justify-end space-x-3">
+                                <button
+                                    type="button"
+                                    onClick={closeModal}
+                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="deployForm"
+                                    disabled={deploying}
+                                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
+                                >
+                                    {deploying ? (
+                                        <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> Deploying Stack...</>
+                                    ) : (
+                                        <><Play size={18} className="mr-2 fill-current" /> Deploy {selectedTemplate.name}</>
+                                    )}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
+
             )}
         </div>
     );
