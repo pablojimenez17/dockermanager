@@ -17,6 +17,116 @@ const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_H
 
 router.use(authMiddleware);
 
+// ============================================================
+// VPC ISOLATION HELPERS
+// ============================================================
+
+/**
+ * Ensures a user's isolated VPC network exists.
+ * - Driver: bridge (isolated at L2)
+ * - Internal: true (no egress to internet by default)
+ * - enableInternet: false => Internal:true, enableInternet: true => Internal:false
+ * Returns the Docker network name.
+ */
+const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = false) => {
+    const networkName = `${userId}_${suffix}`;
+    try {
+        const nets = await docker.listNetworks({ filters: { name: [networkName] } });
+        const exactMatch = nets.find(n => n.Name === networkName);
+        if (!exactMatch) {
+            console.log(`[VPC] Creating isolated VPC network: ${networkName} (internal=${!enableInternet})`);
+            await docker.createNetwork({
+                Name: networkName,
+                Driver: 'bridge',
+                Internal: !enableInternet, // true = no internet egress
+                Labels: {
+                    'dockermanager.vpc': 'true',
+                    'dockermanager.owner': userId.toString(),
+                }
+            });
+        }
+    } catch (err) {
+        console.error(`[VPC] Failed to ensure VPC network ${networkName}:`, err.message);
+        throw err;
+    }
+    return networkName;
+};
+
+/**
+ * Lazily attaches the lan-proxy container to a user VPC network so
+ * Traefik can reach the user's container. Safe to call multiple times.
+ */
+const attachProxyToVpc = async (networkName) => {
+    try {
+        const containers = await docker.listContainers({
+            filters: { name: ['dockermanager-lan-proxy'] }
+        });
+        if (containers.length === 0) {
+            console.warn('[VPC] lan-proxy not found, skipping proxy attach.');
+            return;
+        }
+        const proxyId = containers[0].Id;
+        const network = docker.getNetwork(networkName);
+        const netInfo = await network.inspect();
+        const alreadyConnected = Object.keys(netInfo.Containers || {}).includes(proxyId);
+        if (!alreadyConnected) {
+            console.log(`[VPC] Attaching lan-proxy to ${networkName} for domain routing`);
+            await network.connect({ Container: proxyId });
+        }
+    } catch (err) {
+        console.warn(`[VPC] Could not attach lan-proxy to ${networkName}:`, err.message);
+    }
+};
+// ============================================================
+
+/**
+ * Prunes orphaned VPC networks belonging to a user.
+ * A VPC network is prunable when:
+ *   - It was created by DockerManager (has dockermanager.vpc label)
+ *   - It belongs to this user (dockermanager.owner matches)
+ *   - It has NO containers connected (besides possibly the lan-proxy)
+ */
+const pruneOrphanedVpcNetworks = async (userId) => {
+    try {
+        const nets = await docker.listNetworks({
+            filters: { label: [`dockermanager.vpc=true`, `dockermanager.owner=${userId}`] }
+        });
+
+        for (const netInfo of nets) {
+            try {
+                const network = docker.getNetwork(netInfo.Id);
+                const details = await network.inspect();
+
+                // Count non-proxy containers on this network
+                const containers = Object.values(details.Containers || {});
+                const userContainers = containers.filter(
+                    c => !c.Name.includes('lan-proxy')
+                );
+
+                if (userContainers.length === 0) {
+                    // Detach lan-proxy first if it's the only remaining member
+                    for (const c of containers) {
+                        if (c.Name.includes('lan-proxy')) {
+                            try {
+                                await network.disconnect({ Container: c.Name, Force: true });
+                            } catch (_) { /* ignore */ }
+                        }
+                    }
+                    await network.remove();
+                    console.log(`[VPC Reaper] Removed orphaned network: ${netInfo.Name}`);
+                }
+            } catch (e) {
+                if (e.statusCode !== 404) {
+                    console.warn(`[VPC Reaper] Could not prune network ${netInfo.Name}:`, e.message);
+                }
+            }
+        }
+    } catch (err) {
+        console.warn('[VPC Reaper] Error during network prune:', err.message);
+    }
+};
+// ============================================================
+
 // Helper to wait for image download fully before creating containers
 const pullImageSync = (image, authconfig = null) => {
     return new Promise((resolve, reject) => {
@@ -202,14 +312,16 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
         }
         // ==========================================
 
-        // Create a custom bridge network for this stack deployment
+        // ── VPC: Ensure the user's default isolated network exists ──────────
+        const userVpcName = await ensureUserVpc(ownerId);
+
+        // For multi-container stacks create a dedicated internal stack bridge
+        // so all nodes in the same template see each other by name, but still
+        // cannot escape to the internet.
         let networkName = null;
         if (stack.length > 1) {
-            networkName = `stack_net_${Math.random().toString(36).substring(7)} `;
-            await docker.createNetwork({
-                Name: networkName,
-                Driver: 'bridge'
-            });
+            const stackSuffix = `stack_${Math.random().toString(36).substring(7)}_net`;
+            networkName = await ensureUserVpc(ownerId, stackSuffix);
         }
 
         const createdRecords = [];
@@ -288,13 +400,36 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             }
             // -----------------------------------
 
-            // Apply network settings
-            let safeNetworkMode = networkMode || 'lan_net'; // Default user deployed containers to the isolated LAN network
+            // ── VPC Network Resolution ────────────────────────────────────────
+            // 'none' is preserved as-is (air-gapped container)
+            // Everything else is redirected to the user's private VPC
+            let safeNetworkMode;
+            const enableInternet = config.enableInternet === true;
 
-            // If it's a multi-container stack and they left it as bridge, use the custom stack bridge
-            if (networkName && (safeNetworkMode === 'bridge' || safeNetworkMode === 'lan_net')) {
+            if (networkMode === 'none') {
+                // Air-gapped: no network at all
+                safeNetworkMode = 'none';
+            } else if (networkName) {
+                // Multi-container stack: use dedicated internal stack network
                 safeNetworkMode = networkName;
+            } else if (networkMode && networkMode !== 'bridge' && networkMode !== 'lan_net' && networkMode !== 'dockermanager_lan_net') {
+                // User explicitly picked one of their own custom networks (prefixed).
+                // Docker does not allow changing Internal flag of an existing network,
+                // so if internet is requested we ensure a parallel '-open' sibling exists.
+                if (enableInternet) {
+                    const openSuffix = networkMode.endsWith('_open') ? networkMode : `${networkMode}_open`;
+                    safeNetworkMode = await ensureUserVpc(ownerId, openSuffix.replace(`${ownerId}_`, ''), true);
+                } else {
+                    safeNetworkMode = networkMode;
+                }
+
+            } else {
+                // Default / bridge / lan_net → redirect to user's private VPC
+                safeNetworkMode = enableInternet
+                    ? await ensureUserVpc(ownerId, 'default_vlan', true)  // Internal:false
+                    : userVpcName;                                          // Internal:true
             }
+            console.log(`[VPC] Container '${name}' will use network: ${safeNetworkMode} (internet=${enableInternet})`);
 
             // Expose domain port if not otherwise exposed
             if (domain && domain.trim() !== '' && domainPort) {
@@ -388,6 +523,13 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
 
                 await container.start();
                 console.log(`[DEBUG] Container ${container.id} started successfully`);
+
+                // ── VPC Proxy Attach ────────────────────────────────────────────
+                // Only attach the lan-proxy if the user intends to expose a domain.
+                // This is the single controlled ingress point into the user's VPC.
+                if (domain && domain.trim() !== '' && domainPort && safeNetworkMode !== 'none') {
+                    await attachProxyToVpc(safeNetworkMode);
+                }
 
                 // Save to database
                 const containerData = {
@@ -715,6 +857,9 @@ router.delete('/:id', checkPermission('deleteContainers'), async (req, res) => {
         }
 
         await Container.deleteOne({ _id: req.params.id });
+
+        // Prune any user VPC networks that are now empty
+        pruneOrphanedVpcNetworks(req.user.userId).catch(() => {});
 
         // Audit Log
         await AuditLog.create({

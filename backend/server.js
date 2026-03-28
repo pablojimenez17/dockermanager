@@ -80,7 +80,8 @@ setupSockets(server);
 
 // Cors
 app.use(cors({
-  origin: "*"
+    origin: ['http://localhost:5173', 'https://localhost:5173', 'http://localhost', 'https://localhost'],
+    credentials: true
 }));
 app.use(cookieParser());
 

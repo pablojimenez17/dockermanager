@@ -96,6 +96,8 @@ services:
       - VOLUMES=1 # Allow volume create
       - EXEC=1 # Allow exec (terminals)
       - BUILD=1
+      - POST=1 # Allow POST requests like create, start, stop, kill, pull
+      - DELETE=1 # Allow DELETE requests like rm
       # Explicitly deny full system access
       - SYSTEM=0
       - INFO=1

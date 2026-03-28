@@ -11,8 +11,9 @@ let ioInstance;
 export const setupSockets = (server) => {
     const io = new Server(server, {
         cors: {
-            origin: "*",
-            methods: ['GET', 'POST']
+            origin: ['http://localhost:5173', 'https://localhost:5173', 'http://localhost', 'https://localhost'],
+            methods: ['GET', 'POST'],
+            credentials: true
         }
     });
 

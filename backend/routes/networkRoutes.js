@@ -31,7 +31,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// Create a new custom network
+// Create a new custom network (always prefixed + internal for VPC isolation)
 router.post('/', checkPermission('manageNetworks'), async (req, res) => {
     try {
         const { name, subnet, gateway } = req.body;
@@ -40,10 +40,25 @@ router.post('/', checkPermission('manageNetworks'), async (req, res) => {
             return res.status(400).json({ message: 'Network name is required' });
         }
 
+        // Enforce user-scoped namespacing to prevent collisions between tenants
+        const prefixedName = `${req.user.userId}_${name.replace(/[^a-zA-Z0-9_-]/g, '-')}`;
+
+        // Check for duplicate in Docker
+        const existing = await docker.listNetworks({ filters: { name: [prefixedName] } });
+        if (existing.find(n => n.Name === prefixedName)) {
+            return res.status(409).json({ message: `A network named "${name}" already exists` });
+        }
+
         const networkConfig = {
-            Name: name,
+            Name: prefixedName,
             Driver: 'bridge',
             CheckDuplicate: true,
+            Internal: true, // Always internal — prevents egress outside the user's VPC
+            Labels: {
+                'dockermanager.vpc': 'true',
+                'dockermanager.owner': req.user.userId.toString(),
+                'dockermanager.display_name': name // Keep original name for UI display
+            }
         };
 
         // If user provided subnet/gateway, add IPAM config
@@ -63,7 +78,7 @@ router.post('/', checkPermission('manageNetworks'), async (req, res) => {
 
         // Save to DB to establish ownership
         const networkData = {
-            name: name,
+            name: prefixedName,
             dockerId: network.id,
             userId: req.user.userId
         };
@@ -74,12 +89,13 @@ router.post('/', checkPermission('manageNetworks'), async (req, res) => {
         const newNetworkRecord = new NetworkModel(networkData);
         await newNetworkRecord.save();
 
-        res.status(201).json({ message: 'Network created successfully', network: networkInfo });
+        res.status(201).json({ message: 'Network created successfully', network: networkInfo, displayName: name, prefixedName });
     } catch (error) {
         console.error('Error creating network:', error);
         res.status(500).json({ message: 'Error creating network', error: error.message });
     }
 });
+
 
 // Delete a network
 router.delete('/:id', checkPermission('manageNetworks'), async (req, res) => {

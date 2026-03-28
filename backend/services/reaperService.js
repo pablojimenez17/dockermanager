@@ -9,6 +9,39 @@ const docker = new Docker(
       : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' }
 );
 
+/**
+ * Prune user VPC networks that are empty (no user containers attached).
+ * Called after container stops/deletes both from the Reaper and DELETE route.
+ */
+export const pruneUserVpcNetworks = async (userId) => {
+    try {
+        const nets = await docker.listNetworks({
+            filters: { label: [`dockermanager.vpc=true`, `dockermanager.owner=${userId}`] }
+        });
+        for (const netInfo of nets) {
+            try {
+                const network = docker.getNetwork(netInfo.Id);
+                const details = await network.inspect();
+                const containers = Object.values(details.Containers || {});
+                const userContainers = containers.filter(c => !c.Name.includes('lan-proxy'));
+                if (userContainers.length === 0) {
+                    for (const c of containers) {
+                        if (c.Name.includes('lan-proxy')) {
+                            try { await network.disconnect({ Container: c.Name, Force: true }); } catch (_) {}
+                        }
+                    }
+                    await network.remove();
+                    console.log(`[VPC Reaper] Removed orphaned network: ${netInfo.Name}`);
+                }
+            } catch (e) {
+                if (e.statusCode !== 404) console.warn(`[VPC Reaper] ${netInfo.Name}:`, e.message);
+            }
+        }
+    } catch (err) {
+        console.warn('[VPC Reaper] Network prune error:', err.message);
+    }
+};
+
 // Reaper checks every 5 minutes by default
 const REAPER_INTERVAL_MS = 5 * 60 * 1000;
 const FREE_TIER_MAX_UPTIME_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -95,6 +128,19 @@ export const startReaper = () => {
             }
         } catch (err) {
             console.error('[Reaper] Error during cycle execute:', err);
+        }
+    }, REAPER_INTERVAL_MS);
+
+    // Phase 3: Sweep orphaned VPC networks for ALL users once per reaper cycle
+    setInterval(async () => {
+        try {
+            console.log('[VPC Reaper] Sweeping orphaned VPC networks...');
+            const allUsers = await User.find({}, '_id').lean();
+            for (const u of allUsers) {
+                await pruneUserVpcNetworks(u._id.toString());
+            }
+        } catch (err) {
+            console.warn('[VPC Reaper] Global sweep error:', err.message);
         }
     }, REAPER_INTERVAL_MS);
 };

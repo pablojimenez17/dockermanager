@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus } from 'lucide-react';
+import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus, Globe, Lock } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
 
@@ -22,7 +22,8 @@ const Marketplace = () => {
 
     // Advanced Resource State
     const [networks, setNetworks] = useState([]);
-    const [selectedNetwork, setSelectedNetwork] = useState('bridge');
+    const [selectedNetwork, setSelectedNetwork] = useState('bridge'); // 'bridge' = auto-VPC, 'none' = air-gapped
+    const [enableInternet, setEnableInternet] = useState(false); // Internet access toggle
     const [memoryLimit, setMemoryLimit] = useState(512); // MB
     const [cpuLimit, setCpuLimit] = useState(1); // Cores
 
@@ -83,6 +84,9 @@ const Marketplace = () => {
                     const mappedNetworks = netRes.data.map(n => n.Name);
                     if (!mappedNetworks.includes('bridge')) mappedNetworks.push('bridge');
                     setNetworks(mappedNetworks);
+                    if (mappedNetworks.includes('dockermanager_lan_net')) {
+                        setSelectedNetwork('dockermanager_lan_net');
+                    }
                 }
 
                 if (volRes?.data) {
@@ -157,6 +161,7 @@ const Marketplace = () => {
         setDomainBase('');
         setMemoryLimit(512);
         setCpuLimit(1);
+        setEnableInternet(false);
         setSelectedNetwork('bridge');
     };
 
@@ -166,6 +171,7 @@ const Marketplace = () => {
         setEnvFields({});
         setVolumeMounts([]);
         setDomainBase('');
+        setEnableInternet(false);
     };
 
     const updateEnvField = (key, field, value) => {
@@ -229,13 +235,14 @@ const Marketplace = () => {
                 return {
                     name: nodeName,
                     image: cDef.image,
-                    replicas: 1, // templates don't define replicas yet
+                    replicas: 1,
                     ports: cDef.ports?.map(p => `${p.host || ''}:${p.container}`),
                     env: finalEnv,
                     volumes: finalVolumes,
                     memory: memoryLimit.toString(),
                     cpu: cpuLimit.toString(),
                     networkMode: selectedNetwork,
+                    enableInternet, // VPC internet toggle
                     restartPolicy: "unless-stopped",
                     exposeDomain: isWebApp && domainBase ? true : false,
                     domain: (isWebApp && domainBase) ? domainBase : undefined,
@@ -505,22 +512,54 @@ const Marketplace = () => {
                                 <div>
                                     <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">3. Resources & Network</h3>
                                     <div className="space-y-4">
+                                        {/* Network Selector */}
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Network</label>
+                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Network Mode</label>
                                             <select
                                                 value={selectedNetwork}
                                                 onChange={e => setSelectedNetwork(e.target.value)}
                                                 className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                             >
-                                                {networks.length > 0 ? (
-                                                    networks.map(net => (
-                                                        <option key={net} value={net}>{net}</option>
-                                                    ))
-                                                ) : (
-                                                    <option value="bridge">bridge</option>
-                                                )}
+                                                <option value="bridge">🛡️ Red Privada Protegida (VPC)</option>
+                                                <option value="none">🔒 Sin Red (Aislado total)</option>
+                                                {networks.filter(n => !['bridge', 'host', 'none'].includes(n) && !n.startsWith('dockermanager_')).map(net => (
+                                                    <option key={net} value={net}>{net}</option>
+                                                ))}
                                             </select>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5">
+                                                La VPC te aísla de otros usuarios. "Sin Red" es una caja fuerte sin cables.
+                                            </p>
                                         </div>
+
+                                        {/* Internet Access Toggle */}
+                                        {selectedNetwork !== 'none' && (
+                                            <div className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}>
+                                                <div className="flex items-center space-x-3">
+                                                    {enableInternet
+                                                        ? <Globe size={18} className="text-amber-500 shrink-0" />
+                                                        : <Lock size={18} className="text-slate-400 shrink-0" />
+                                                    }
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                                            {enableInternet ? 'Acceso a Internet Activado' : 'Contenedor Privado'}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                            {enableInternet
+                                                                ? '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.'
+                                                                : 'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'
+                                                            }
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEnableInternet(v => !v)}
+                                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enableInternet ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                >
+                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enableInternet ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                </button>
+                                            </div>
+                                        )}
 
                                         <div className="grid grid-cols-2 gap-4">
                                             <div>
