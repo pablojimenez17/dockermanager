@@ -12,10 +12,21 @@ services:
   frontend:
     build:
       context: ./frontend
-      target: build # Use the intermediate Node container stage instead of Nginx
+      target: build
     command: npm run dev -- --host 0.0.0.0 --port 80
     volumes:
       - ./frontend:/app
       - /app/node_modules
     environment:
       - CHOKIDAR_USEPOLLING=true
+
+  # ── Dev: acceso directo a almacenamiento ──────────────────────────────────
+  # storage_net es internal:true → Docker no puede hacer port binding a redes internas.
+  # Solución: añadir dmz_net en dev para habilitar el mapeo de puertos al host.
+  minio:
+    ports:
+      - "9001:9001"   # MinIO Web Console  →  http://localhost:9001
+      - "9000:9000"   # MinIO S3 API       →  http://localhost:9000
+    networks:
+      - storage_net
+      - dmz_net

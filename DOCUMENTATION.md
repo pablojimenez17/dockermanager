@@ -4,6 +4,59 @@ DockerManager es una solución integral de "Contenedores como Servicio" (CaaS) d
 
 ---
 
+## 🔧 Entornos: `docker-compose.yml` vs `docker-compose.override.yml`
+
+El proyecto usa **dos ficheros Compose** que Docker fusiona automáticamente al ejecutar `docker compose up`:
+
+```
+docker-compose.yml          ← Definición base (producción)
+docker-compose.override.yml ← Sobreescritura local (desarrollo)
+```
+
+### ¿Cómo funciona el override?
+
+Docker Compose tiene un comportamiento incorporado: si existe un fichero llamado exactamente `docker-compose.override.yml` en el mismo directorio, **lo carga y fusiona automáticamente** con el fichero base sin que tengas que especificarlo. Es el equivalente a hacer:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml up
+```
+
+Las reglas de fusión son:
+- Las claves que existen en el override **sobreescriben** las del base.
+- Las que no existen en el override **se heredan** del base sin cambios.
+- Las listas como `ports` o `volumes` se **concatenan** (se añaden, no se reemplazan).
+
+### ¿Por qué separar los dos ficheros?
+
+| | `docker-compose.yml` (Base) | `docker-compose.override.yml` (Dev) |
+|---|---|---|
+| **Propósito** | Producción / CI | Desarrollo local |
+| **Backend** | Imagen compilada, sin hot-reload | `npm run dev` + hot-reload |
+| **Frontend** | Nginx sirviendo el build | Vite dev server con HMR |
+| **MinIO** | Sin puertos expuestos al host | Puerto `9001` expuesto (consola web) |
+| **Volúmenes** | Solo los de datos | + bind mounts del código fuente |
+
+### Flujo de trabajo
+
+```bash
+# Desarrollo (carga base + override automáticamente)
+docker compose up -d
+
+# Producción (solo el fichero base, ignora el override)
+docker compose -f docker-compose.yml up -d
+
+# Ver la configuración fusionada final que se aplicará
+docker compose config
+```
+
+> [!NOTE]
+> El fichero `docker-compose.override.yml` **nunca debe subirse a producción**. En un pipeline CI/CD, especifica explícitamente `-f docker-compose.yml` para ignorarlo.
+
+> [!TIP]
+> Puedes crear ficheros adicionales para otros entornos: `docker-compose.staging.yml`, `docker-compose.test.yml`, etc., y cargarlos manualmente con `-f`.
+
+---
+
 ## 🏗️ Arquitectura de Red: El Modelo VPC (Virtual Private Cloud)
 
 A diferencia de las soluciones estándar, DockerManager no utiliza una red compartida. Implementa un sistema de **VPC dinámico** donde cada usuario opera en una burbuja de red totalmente privada e invisible para el resto de los inquilinos.
@@ -20,19 +73,113 @@ La infraestructura se orquestra mediante un despliegue de **7 redes aisladas** p
 | `${userId}_default_vlan` (VPC del Usuario) | Redes auto-generadas con `{ Internal: true }` por defecto. Cortan el cable a internet y aíslan cada usuario del resto. |
 | `storage_transit_net` & `storage_net` | Enclave ultra-seguro para MinIO y el NAS, protegido por un firewall interno que solo permite conexiones desde el Backend. |
 
-### 🧩 Componentes Core de Infraestructura
+### 🧩 Referencia de Contenedores de Infraestructura
 
-- **`edge-fw` (Suricata IDS/IPS):** Guardián perimetral. Realiza Inspección Profunda de Paquetes (DPI) para bloquear ataques antes de que toquen la red interna. Si un usuario activa el _"Acceso a Internet"_, aplica reglas NAT que permiten la salida a la red pero prohíben estrictamente el salto hacia la DMZ.
-
-- **Dual Traefik Stack (Proxy Inverso):**
-  - **Admin Proxy:** Gestiona el acceso a la plataforma DockerManager.
-  - **LAN Proxy:** Se conecta _dinámicamente_ a las redes de los usuarios solo cuando estos exponen un dominio, actuando como el único puente de entrada permitido a sus VPCs.
-
-- **`socket-proxy` (Escudo del Daemon):** El Backend nunca toca el `/var/run/docker.sock` directamente. Se comunica vía TCP limitado con este proxy, que filtra las peticiones para evitar que un contenedor comprometido pueda tomar el control del servidor host.
-
-- **`storage-fw` (HAProxy Bridge):** Actúa como un puente de Capa 4 que cruza las peticiones de almacenamiento desde la DMZ hacia la red de Storage, verificando que el origen sea legítimo.
+El sistema se compone de **9 contenedores** fijos definidos en `docker-compose.yml`. Cada uno tiene un rol único e irremplazable:
 
 ---
+
+#### 1. `dockermanager-edge-fw` — Firewall Perimetral (Suricata IDS/IPS)
+| | |
+|---|---|
+| **Imagen** | `jasonish/suricata:latest` |
+| **Redes** | `public_net` → `transit_proxy_inverso` → `transit_proxy_forward` |
+| **Puertos expuestos** | `80`, `443` (punto de entrada único al sistema) |
+
+Actúa como el primer y único punto de contacto con Internet. Realiza **Inspección Profunda de Paquetes (DPI)** usando firmas Suricata para detectar y bloquear ataques (SQLi, XSS, escaneos de red, exploits conocidos) antes de que lleguen a ningún servicio interno. Redirige el tráfico limpio a los proxies mediante reglas `iptables` (DNAT/MASQUERADE) inyectadas por `edge-fw.sh`.
+
+---
+
+#### 2. `dockermanager-proxy` — Proxy Inverso DMZ (Traefik Admin)
+| | |
+|---|---|
+| **Imagen** | `traefik:v2.10` |
+| **Redes** | `transit_proxy_inverso` + `dmz_net` |
+| **Constraint label** | `traefik.constraint-label=dmz-proxy` |
+
+Gestiona exclusivamente el acceso a los servicios de administración: la API del Backend (`/api`) y el Frontend. **Ignora completamente** los contenedores de los usuarios. Lee la configuración de Docker vía el Socket Proxy (nunca directamente del socket).
+
+---
+
+#### 3. `dockermanager-lan-proxy` — Proxy de Usuario (Traefik LAN)
+| | |
+|---|---|
+| **Imagen** | `traefik:v2.10` |
+| **Redes** | `transit_proxy_forward` + `lan_net` + VPCs de usuarios (dinámico) |
+| **Constraint label** | `traefik.constraint-label=lan-proxy` |
+
+Proxy dedicado para el tráfico de los contenedores de clientes. Se conecta **dinámicamente** a la red VPC de un usuario solo cuando éste expone un dominio personalizado. Es el **único puente de entrada** permitido a las VPCs privadas — ningún tráfico externo puede llegar a un contenedor de usuario sin pasar por aquí.
+
+---
+
+#### 4. `dockermanager-socket-proxy` — Escudo del Daemon Docker
+| | |
+|---|---|
+| **Imagen** | `tecnativa/docker-socket-proxy` |
+| **Redes** | `dmz_net` |
+| **Socket** | `/var/run/docker.sock` (solo lectura) |
+
+El Backend **nunca** accede al socket de Docker directamente. Este proxy actúa como intermediario TCP que permite solo las operaciones explícitamente autorizadas (`CONTAINERS`, `IMAGES`, `NETWORKS`, `VOLUMES`, `EXEC`). Impide que un posible compromiso del backend escale privilegios al host.
+
+---
+
+#### 5. `dockermanager-backend` — API y Cerebro del Sistema (Node.js)
+| | |
+|---|---|
+| **Imagen** | `dockermanager/backend:local` |
+| **Redes** | `dmz_net` + `storage_transit_net` |
+| **Puerto interno** | `5000` |
+
+El núcleo de la plataforma. Gestiona autenticación, cuotas, despliegues, VPCs de usuario, y todos los servicios internos. Arranca tres servicios en segundo plano al iniciarse: el Reaper Service, el Backup Scheduler y el servicio de IA Ollama.
+
+---
+
+#### 6. `dockermanager-frontend` — Interfaz Web (React + Vite)
+| | |
+|---|---|
+| **Imagen** | `dockermanager/frontend:local` |
+| **Redes** | `dmz_net` |
+| **Puerto interno** | `80` |
+
+SPA construida en React. Se sirve desde Nginx dentro del contenedor. El proxy de admin la expone bajo la ruta `/`. Toda la comunicación con el backend se hace a través de la API en `/api`.
+
+---
+
+#### 7. `dockermanager-mongo` — Base de Datos Principal (MongoDB)
+| | |
+|---|---|
+| **Imagen** | `mongo:latest` |
+| **Redes** | `dmz_net` (inaccesible desde el exterior) |
+| **Volumen** | `mongo-data:/data/db` |
+
+Almacena todos los datos de la plataforma: usuarios, contenedores registrados, secretos cifrados, redes, audit logs, etc. Solo es accesible desde el backend dentro de la DMZ. Sus datos persisten en el volumen `mongo-data` y se respaldan automáticamente a MinIO cada 24h a través del Storage Firewall.
+
+---
+
+#### 8. `dockermanager-storage-fw` — Firewall de Almacenamiento (HAProxy)
+| | |
+|---|---|
+| **Imagen** | `haproxy:alpine` |
+| **Redes** | `storage_transit_net` + `storage_net` |
+| **Config** | `./config/haproxy.cfg` |
+
+Puente de Capa 4 que separa físicamente el Backend del almacenamiento. El backend envía peticiones a `storage-fw:9000` (MinIO API), y este proxy las cruza hacia la red `storage_net` verificando que el origen sea legítimo. MinIO es **completamente invisible** desde la DMZ sin pasar por este firewall.
+
+---
+
+#### 9. `dockermanager-minio` — Almacenamiento Unificado (MinIO S3)
+| | |
+|---|---|
+| **Imagen** | `minio/minio:latest` |
+| **Redes** | `storage_net` (aislada) |
+| **Volumen** | `minio-data:/data` |
+| **Consola** | Puerto `9001` (solo accesible internamente) |
+
+Sistema de almacenamiento centralizado. Usado para guardar snapshots de contenedores, exportaciones de volúmenes y **backups automáticos de MongoDB**. El backend interactúa con él a través del `storage-fw` usando el protocolo S3, garantizando un aislamiento total de los datos persistentes.
+
+---
+
+
 
 ## ⚙️ Inteligencia del Backend (Cerebro Operativo)
 
@@ -76,12 +223,87 @@ La comunicación se segmenta en módulos de Express especializados:
 | `/api/secrets` | Gestión del Vault de credenciales cifradas. |
 | `/api/networks` | Crea VLANs privadas prefijadas por usuario (`${userId}_nombre`), siempre con `Internal: true`. |
 | `/api/volumes` | Gestión de discos de persistencia. |
+| `POST /api/admin/backup/run` | **[Admin]** Dispara un backup manual inmediato de MongoDB → NAS. |
+| `GET /api/admin/backup/list` | **[Admin]** Lista todos los archivos de backup disponibles en el NAS con fecha y tamaño. |
+
 | `/api/snapshots` & `/api/buckets` | Backup de contenedores como archivos `.tar` exportados a MinIO/NAS. |
 | `/api/ai` | Asistente IA local via Ollama. Los datos nunca salen del servidor. |
 
 ---
 
+### Arquitectura del Backup (Zero-Trust S3)
+
+A diferencia de los sistemas tradicionales, DockerManager no utiliza volúmenes compartidos entre el Backend y el Almacenamiento. Todo el tráfico de persistencia es inspeccionado por el firewall.
+
+```
+[Red DMZ]                    [Red Storage Transit]          [Red Storage Internal]
+────────────────────────     ──────────────────────────     ───────────────────────
+[dockermanager-mongo]
+        │
+        │ 1. Docker Exec API
+        ▼
+[dockermanager-backend] ───► [dockermanager-storage-fw] ───► [dockermanager-minio]
+ (Servicio de Backup)        (Firewall HAProxy:9000)         (S3 API:9000)
+                                                                    │
+                                                                    │ 2. Persistencia
+                                                                    ▼
+                                                            [Volumen: minio-data]
+                                                              (Aislado de la DMZ)
+```
+
+**Flujo de Datos:** El backup utiliza el protocolo S3. El chorro de datos viaja desde la base de datos hasta un bucket de MinIO a través del firewall, sin tocar nunca el disco local del Backend.
+
+### Funcionamiento Paso a Paso
+
+1. **Extracción:** El `backupService.js` ejecuta `mongodump` dentro del contenedor de MongoDB y captura el flujo de salida.
+2. **Tránsito:** Envía el chorro de datos mediante el SDK de MinIO (S3) al punto de entrada `storage-fw:9000`, pasando por el **Storage Firewall**.
+3. **Validación:** El Firewall redirige el tráfico S3 al contenedor interno de MinIO.
+4. **Persistencia:** MinIO guarda el archivo en el bucket `backups-mongodb`.
+5. **Rotación:** El Backend utiliza el listado de objetos de MinIO para borrar archivos antiguos según la política de retención (`BACKUP_RETENTION`).
+
+### Convención de Nombres
+
+```
+mongo-backup-2026-03-29T10-00-00-000Z.archive.gz
+```
+
+Formato: `mongo-backup-{ISO8601}.archive.gz` — ordenables cronológicamente por nombre.
+
+### Configuración (Variables de Entorno)
+
+| Variable | Valor por defecto | Descripción |
+|---|---|---|
+| `MINIO_ENDPOINT` | `storage-fw` | Punto de entrada S3 (a través del firewall) |
+| `MINIO_PORT` | `9000` | Puerto del API S3 |
+| `NAS_USERNAME` | `admin` | Access Key de MinIO |
+| `NAS_PASSWORD` | `password123` | Secret Key de MinIO |
+| `BACKUP_INTERVAL_MS` | `86400000` (24h) | Intervalo entre backups automáticos |
+| `BACKUP_RETENTION` | `7` | Número de copias a conservar |
+
+### Cómo Restaurar un Backup
+
+La restauración se realiza descargando el archivo desde la consola de MinIO (puerto 9001) e inyectándolo:
+
+```bash
+# 1. El administrador descarga el archivo desde el bucket 'backups-mongodb'
+# 2. Restaurar usando mongorestore desde el host:
+cat mongo-backup-XXX.archive.gz | docker exec -i dockermanager-mongo mongorestore --archive --gzip --drop
+```
+
+> [!IMPORTANT]
+> El aislamiento de red garantiza que, incluso si el Backend es comprometido, el atacante no tiene acceso físico a los volúmenes de almacenamiento, solo a un endpoint S3 filtrado por el Firewall.
+
+### Endpoints de Administración
+
+| Endpoint | Método | Descripción |
+|---|---|---|
+| `/api/admin/backup/run` | `POST` | Fuerza un backup inmediato (útil antes de actualizaciones) |
+| `/api/admin/backup/list` | `GET` | Lista todos los backups disponibles con tamaño y fecha |
+
+---
+
 ## 💻 La Terminal Interactiva (xterm.js)
+
 
 El sistema ofrece una consola profesional que funciona mediante un flujo de **tres saltos seguros**:
 

@@ -1,9 +1,12 @@
 import express from 'express';
 import Docker from 'dockerode';
+import fs from 'fs';
+import path from 'path';
 import User from '../models/User.js';
 import Container from '../models/Container.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
+import { runBackup } from '../services/backupService.js';
 
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
@@ -111,6 +114,52 @@ router.get('/audit', async (req, res) => {
         res.json(logs);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching audit logs', error: error.message });
+    }
+});
+
+import * as Minio from 'minio';
+
+// ... (existing code) ...
+
+// ── Backup endpoints (admin only) ──────────────────────────────────────────
+
+// Trigger an immediate manual backup
+router.post('/backup/run', async (req, res) => {
+    const result = await runBackup();
+    if (result.success) {
+        res.json({ message: 'Backup completed successfully', filename: result.filename, sizeMb: result.sizeMb });
+    } else {
+        res.status(500).json({ message: 'Backup failed', error: result.error });
+    }
+});
+
+// List all available backup files on the NAS (fetching from MinIO Bucket)
+router.get('/backup/list', async (req, res) => {
+    const minioClient = new Minio.Client({
+        endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
+        port:      9000,
+        useSSL:    false,
+        accessKey: process.env.NAS_USERNAME || 'admin',
+        secretKey: process.env.NAS_PASSWORD || 'password123'
+    });
+
+    const BUCKET_NAME = 'backups-mongodb';
+
+    try {
+        const objects = [];
+        const stream = minioClient.listObjects(BUCKET_NAME, '', true);
+        
+        for await (const obj of stream) {
+            objects.push({
+                filename: obj.name,
+                sizeMb: (obj.size / (1024 * 1024)).toFixed(2),
+                createdAt: obj.lastModified
+            });
+        }
+
+        res.json(objects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+    } catch (err) {
+        res.status(500).json({ message: 'Could not fetch remote backup list from MinIO', error: err.message });
     }
 });
 

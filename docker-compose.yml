@@ -116,6 +116,12 @@ services:
       - DOCKER_HOST=tcp://socket-proxy:2375
       - MINIO_ENDPOINT=storage-fw
       - MINIO_PORT=9000
+      # Zero-Trust Backup config (Network-based S3)
+      - NAS_USERNAME=admin
+      - NAS_PASSWORD=password123
+      - BACKUP_INTERVAL_MS=86400000          # 24h
+      - BACKUP_RETENTION=7
+      - MONGO_CONTAINER_NAME=dockermanager-mongo
     networks:
       - dmz_net
       - storage_transit_net
@@ -176,17 +182,6 @@ services:
     networks:
       - storage_net
 
-  # 10. Storage: NAS
-  nas:
-    image: dperson/samba
-    container_name: dockermanager-nas
-    command: -u "admin;password" -s "backups;/backup;yes;no;no;all;none"
-    volumes:
-      - built-in-nas-data:/backup
-    networks:
-      - storage_net
-
 volumes:
   mongo-data:
   minio-data:
-  built-in-nas-data:

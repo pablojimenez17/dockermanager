@@ -24,6 +24,7 @@ import { initProxyService } from './proxyService.js';
 import { initMinio } from './services/minioService.js';
 import { initOllama } from './services/ollamaService.js';
 import { startReaper } from './services/reaperService.js';
+import { startBackupScheduler } from './services/backupService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 import https from 'https';
@@ -127,6 +128,13 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
 
         // Start the Reaper Service for enforcing plan limits
         startReaper();
+
+        // Start the automated MongoDB → NAS backup scheduler
+        try {
+            startBackupScheduler();
+        } catch (backupErr) {
+            console.error('Failed to start Backup Scheduler:', backupErr);
+        }
 
         // Seed default admin user if no admins
         try {
