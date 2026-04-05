@@ -16,7 +16,7 @@ import secretRoutes from './routes/secretRoutes.js';
 import registryRoutes from './routes/registryRoutes.js';
 import webhookRoutes from './routes/webhookRoutes.js';
 import templateRoutes from './routes/templateRoutes.js';
-import bucketRoutes from './routes/bucketRoutes.js';
+// import bucketRoutes from './routes/bucketRoutes.js';
 import snapshotRoutes from './routes/snapshotRoutes.js';
 import orgRoutes from './routes/orgRoutes.js';
 import { setupSockets } from './websockets.js';
@@ -100,7 +100,7 @@ app.use('/api/secrets', secretRoutes);
 app.use('/api/registries', registryRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/templates', templateRoutes);
-app.use('/api/buckets', bucketRoutes);
+// app.use('/api/buckets', bucketRoutes);
 app.use('/api/snapshots', snapshotRoutes);
 app.use('/api/organizations', orgRoutes);
 

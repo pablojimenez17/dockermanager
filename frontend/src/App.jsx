@@ -136,7 +136,6 @@ const App = () => {
                 <Route path="registries" element={<PlanRoute requiredLevel="enterprise"><Registries /></PlanRoute>} />
                 <Route path="volumes" element={<Volumes />} />
                 <Route path="networks" element={<Networks />} />
-                <Route path="buckets" element={<Buckets />} />
                 <Route path="snapshots" element={<PlanRoute requiredLevel="professional"><Snapshots /></PlanRoute>} />
                 <Route path="admin" element={<AdminDashboard />} />
                 <Route path="organization" element={<OrganizationDashboard />} />

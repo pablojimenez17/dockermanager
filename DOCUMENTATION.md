@@ -55,6 +55,14 @@ docker compose config
 > [!TIP]
 > Puedes crear ficheros adicionales para otros entornos: `docker-compose.staging.yml`, `docker-compose.test.yml`, etc., y cargarlos manualmente con `-f`.
 
+### ¿Por qué los contenedores de clientes no salen agrupados en Docker Desktop?
+
+Visualmente, la interfaz de Docker Desktop (o Portainer) agrupa bajo una misma "carpeta" aquellos contenedores levantados desde un mismo archivo Compose, detectándolos mediante la etiqueta interna `com.docker.compose.project`.
+
+Al aprovisionar la infraestructura del cliente desde el panel web, los nuevos contenedores son creados dinámicamente por el **Backend de Node.js invocando directamente a la API pura de Docker**, y no invocando a Docker Compose. Al carecer de dicha etiqueta, el gestor visual los dibuja por separado como instancias independientes.
+
+Este diseño está hecho **de forma completamente intencionada para garantizar la resiliencia**: al dejarlos fuera de la agrupación de compose, garantizamos que ejecutar un comando administrativo global como `docker compose down` para reiniciar los servicios core de DockerManager **no destruya de forma accidental** los contenedores en producción de los usuarios. El ciclo de vida de los contenedores alojados está gestionado estrictamente por la lógica del Backend y el servicio Reaper.
+
 ---
 
 ## 🏗️ Arquitectura de Red: El Modelo VPC (Virtual Private Cloud)
@@ -175,7 +183,7 @@ Puente de Capa 4 que separa físicamente el Backend del almacenamiento. El backe
 | **Volumen** | `minio-data:/data` |
 | **Consola** | Puerto `9001` (solo accesible internamente) |
 
-Sistema de almacenamiento centralizado. Usado para guardar snapshots de contenedores, exportaciones de volúmenes y **backups automáticos de MongoDB**. El backend interactúa con él a través del `storage-fw` usando el protocolo S3, garantizando un aislamiento total de los datos persistentes.
+Sistema de almacenamiento centralizado e interno. Utilizado para almacenar de manera segura snapshots de contenedores de usuarios y de forma automatizada los **backups unificados del sistema (Base de Datos, Backend y Frontend)**. El backend interactúa con él a través del `storage-fw` usando el protocolo S3, garantizando un aislamiento total de los datos persistentes y bloqueando el acceso público directo.
 
 ---
 
@@ -226,7 +234,7 @@ La comunicación se segmenta en módulos de Express especializados:
 | `POST /api/admin/backup/run` | **[Admin]** Dispara un backup manual inmediato de MongoDB → NAS. |
 | `GET /api/admin/backup/list` | **[Admin]** Lista todos los archivos de backup disponibles en el NAS con fecha y tamaño. |
 
-| `/api/snapshots` & `/api/buckets` | Backup de contenedores como archivos `.tar` exportados a MinIO/NAS. |
+| `/api/snapshots` | Backup de contenedores como archivos `.tar` exportados a MinIO. |
 | `/api/ai` | Asistente IA local via Ollama. Los datos nunca salen del servidor. |
 
 ---
@@ -245,7 +253,7 @@ A diferencia de los sistemas tradicionales, DockerManager no utiliza volúmenes 
 [dockermanager-backend] ───► [dockermanager-storage-fw] ───► [dockermanager-minio]
  (Servicio de Backup)        (Firewall HAProxy:9000)         (S3 API:9000)
                                                                     │
-                                                                    │ 2. Persistencia
+                                                                    │ 2. Persistencia (3 Buckets)
                                                                     ▼
                                                             [Volumen: minio-data]
                                                               (Aislado de la DMZ)
@@ -255,19 +263,24 @@ A diferencia de los sistemas tradicionales, DockerManager no utiliza volúmenes 
 
 ### Funcionamiento Paso a Paso
 
-1. **Extracción:** El `backupService.js` ejecuta `mongodump` dentro del contenedor de MongoDB y captura el flujo de salida.
-2. **Tránsito:** Envía el chorro de datos mediante el SDK de MinIO (S3) al punto de entrada `storage-fw:9000`, pasando por el **Storage Firewall**.
+1. **Extracción (Triple):** El `backupService.js` realiza tres operaciones simultáneas:
+    - **DB:** Ejecuta `mongodump` en el contenedor de MongoDB.
+    - **Server:** Realiza un `export` del sistema de archivos del contenedor del Backend.
+    - **Web:** Realiza un `export` del sistema de archivos del contenedor del Frontend.
+2. **Tránsito:** Envía los datos mediante el SDK de MinIO (S3) al punto de entrada `storage-fw:9000`, pasando por el **Storage Firewall**.
 3. **Validación:** El Firewall redirige el tráfico S3 al contenedor interno de MinIO.
-4. **Persistencia:** MinIO guarda el archivo en el bucket `backups-mongodb`.
-5. **Rotación:** El Backend utiliza el listado de objetos de MinIO para borrar archivos antiguos según la política de retención (`BACKUP_RETENTION`).
+4. **Persistencia Aislada:** MinIO guarda los archivos en tres buckets independientes: `backups-mongodb`, `backups-server` y `backups-web`.
+5. **Rotación:** El Backend limpia los archivos antiguos en los tres buckets según la política de retención (`BACKUP_RETENTION`).
 
 ### Convención de Nombres
 
 ```
-mongo-backup-2026-03-29T10-00-00-000Z.archive.gz
+mongo-db-2026-03-29T10-00-00-000Z.archive.gz
+server-snapshot-2026-03-29T10-00-00-000Z.tar
+web-snapshot-2026-03-29T10-00-00-000Z.tar
 ```
 
-Formato: `mongo-backup-{ISO8601}.archive.gz` — ordenables cronológicamente por nombre.
+Formato: `{componente}-{tipo}-{ISO8601}.{ext}` — ordenables cronológicamente.
 
 ### Configuración (Variables de Entorno)
 

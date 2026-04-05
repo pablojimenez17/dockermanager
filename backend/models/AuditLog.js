@@ -18,7 +18,10 @@ const auditLogSchema = new mongoose.Schema({
             'CREATED_SECRET', 
             'DELETED_SECRET',
             'BACKUP_COMPLETED',
-            'BACKUP_FAILED'
+            'BACKUP_FAILED',
+            'BACKUP_DB_COMPLETED',
+            'BACKUP_SERVER_COMPLETED',
+            'BACKUP_WEB_COMPLETED'
         ]
     },
     resourceName: {

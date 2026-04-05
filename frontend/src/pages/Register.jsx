@@ -24,9 +24,15 @@ const Register = () => {
         }
 
         try {
-            await axios.post('http://localhost:5000/api/auth/register', { name, email, password });
-            setSuccess('Registration successful. Redirecting to login...');
-            setTimeout(() => navigate('/login'), 2000);
+            const res = await axios.post('http://localhost:5000/api/auth/register', { name, email, password });
+            
+            // Auto login
+            localStorage.setItem('name', res.data.name);
+            localStorage.setItem('email', res.data.email);
+            localStorage.setItem('role', res.data.role);
+
+            setSuccess('Registration successful. Accessing dashboard...');
+            setTimeout(() => window.location.href = '/app', 1000);
         } catch (err) {
             setError(err.response?.data?.message || 'Registration failed');
         }

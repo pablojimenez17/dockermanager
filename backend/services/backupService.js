@@ -14,7 +14,14 @@ const docker = new Docker(
 const BACKUP_INTERVAL_MS  = parseInt(process.env.BACKUP_INTERVAL_MS  || String(24 * 60 * 60 * 1000));
 const BACKUP_RETENTION    = parseInt(process.env.BACKUP_RETENTION     || '7');
 const MONGO_CONTAINER     = process.env.MONGO_CONTAINER_NAME          || 'dockermanager-mongo';
-const BUCKET_NAME         = 'backups-mongodb';
+const SERVER_CONTAINER    = 'dockermanager-backend';
+const WEB_CONTAINER       = 'dockermanager-frontend';
+
+const BUCKETS = {
+    DB: 'backups-mongodb',
+    SERVER: 'backups-server',
+    WEB: 'backups-web'
+};
 
 // MinIO Config (Directly from environment, routed via storage-fw)
 const minioClient = new Minio.Client({
@@ -52,12 +59,20 @@ const runMongoDump = async () => {
 };
 
 /**
- * Handle rotation by listing objects and deleting the oldest
+ * Capture a container's filesystem snapshot as a stream
  */
-const rotateBackups = async () => {
+const runContainerExport = async (containerId) => {
+    const container = docker.getContainer(containerId);
+    return await container.export(); // Returns a readable stream (tar)
+};
+
+/**
+ * Handle rotation by listing objects and deleting the oldest in a specific bucket
+ */
+const rotateBucket = async (bucketName) => {
     try {
         const objects = [];
-        const stream = minioClient.listObjects(BUCKET_NAME, '', true);
+        const stream = minioClient.listObjects(bucketName, '', true);
         
         for await (const obj of stream) {
             objects.push(obj);
@@ -67,11 +82,11 @@ const rotateBackups = async () => {
         const toDelete = sorted.slice(0, Math.max(0, sorted.length - BACKUP_RETENTION));
 
         if (toDelete.length > 0) {
-            await minioClient.removeObjects(BUCKET_NAME, toDelete.map(o => o.name));
-            console.log(`[Backup] Rotated: deleted ${toDelete.length} old archives.`);
+            await minioClient.removeObjects(bucketName, toDelete.map(o => o.name));
+            console.log(`[Backup] Rotated [${bucketName}]: deleted ${toDelete.length} old archives.`);
         }
     } catch (err) {
-        console.warn('[Backup] Rotation failed:', err.message);
+        console.warn(`[Backup] Rotation failed for ${bucketName}:`, err.message);
     }
 };
 
@@ -81,50 +96,69 @@ const rotateBackups = async () => {
 
 export const runBackup = async () => {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-    const filename  = `mongo-backup-${timestamp}.archive.gz`;
+    
+    console.log(`[Backup] Starting System-Wide S3 Backup... (Timestamp: ${timestamp})`);
 
-    console.log(`[Backup] Starting Network-based S3 Backup... (${filename})`);
+    const results = [];
 
+    // --- 1. MONGODB BACKUP ---
     try {
-        // 1. Ensure bucket exists
-        const exists = await minioClient.bucketExists(BUCKET_NAME);
-        if (!exists) {
-            await minioClient.makeBucket(BUCKET_NAME);
-            console.log(`[Backup] Created bucket: ${BUCKET_NAME}`);
-        }
-
-        // 2. Capture Dump
+        const bucket = BUCKETS.DB;
+        const filename = `mongo-db-${timestamp}.archive.gz`;
+        if (!(await minioClient.bucketExists(bucket))) await minioClient.makeBucket(bucket);
+        
         const archiveBuffer = await runMongoDump();
-        const sizeMb = (archiveBuffer.length / (1024 * 1024)).toFixed(2);
-
-        // 3. Upload to MinIO (routed via storage-fw)
-        await minioClient.putObject(BUCKET_NAME, filename, archiveBuffer);
-        console.log(`[Backup] Success! Sent ${sizeMb} MB to MinIO via Storage Firewall.`);
-
-        // 4. Rotate
-        await rotateBackups();
-
-        // 5. Audit
-        await AuditLog.create({
-            action: 'BACKUP_COMPLETED',
-            resourceName: filename,
-            details: `S3-compatible backup via Storage Firewall. Size: ${sizeMb} MB. Retention: ${BACKUP_RETENTION}.`
-        });
-
-        return { success: true, filename, sizeMb };
-    } catch (err) {
-        console.error('[Backup] S3 Backup FAILED:', err.message);
-        await AuditLog.create({
-            action: 'BACKUP_FAILED',
-            resourceName: filename,
-            details: `S3 backup attempt failed. Error: ${err.message}`
-        }).catch(() => {});
-        return { success: false, error: err.message };
+        await minioClient.putObject(bucket, filename, archiveBuffer);
+        await rotateBucket(bucket);
+        
+        await AuditLog.create({ action: 'BACKUP_DB_COMPLETED', resourceName: filename, details: 'Database dump successful.' });
+        results.push({ type: 'DB', success: true, filename });
+    } catch (e) {
+        console.error('[Backup] DB FAILED:', e.message);
+        results.push({ type: 'DB', success: false, error: e.message });
     }
+
+    // --- 2. SERVER (BACKEND) BACKUP ---
+    try {
+        const bucket = BUCKETS.SERVER;
+        const filename = `server-snapshot-${timestamp}.tar`;
+        if (!(await minioClient.bucketExists(bucket))) await minioClient.makeBucket(bucket);
+        
+        const exportStream = await runContainerExport(SERVER_CONTAINER);
+        // stream directly to minio
+        await minioClient.putObject(bucket, filename, exportStream);
+        await rotateBucket(bucket);
+
+        await AuditLog.create({ action: 'BACKUP_SERVER_COMPLETED', resourceName: filename, details: 'Backend container filesystem export successful.' });
+        results.push({ type: 'SERVER', success: true, filename });
+    } catch (e) {
+        console.error('[Backup] SERVER FAILED:', e.message);
+        results.push({ type: 'SERVER', success: false, error: e.message });
+    }
+
+    // --- 3. WEB (FRONTEND) BACKUP ---
+    try {
+        const bucket = BUCKETS.WEB;
+        const filename = `web-snapshot-${timestamp}.tar`;
+        if (!(await minioClient.bucketExists(bucket))) await minioClient.makeBucket(bucket);
+        
+        const exportStream = await runContainerExport(WEB_CONTAINER);
+        await minioClient.putObject(bucket, filename, exportStream);
+        await rotateBucket(bucket);
+
+        await AuditLog.create({ action: 'BACKUP_WEB_COMPLETED', resourceName: filename, details: 'Frontend container filesystem export successful.' });
+        results.push({ type: 'WEB', success: true, filename });
+    } catch (e) {
+        console.error('[Backup] WEB FAILED:', e.message);
+        results.push({ type: 'WEB', success: false, error: e.message });
+    }
+
+    return results;
 };
 
 export const startBackupScheduler = () => {
-    console.log(`[Backup] S3 Scheduler active. Endpoint: ${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}`);
+    console.log(`[Backup] System-Wide S3 Scheduler active. Endpoint: ${process.env.MINIO_ENDPOINT}:${process.env.MINIO_PORT}`);
+    // Initial run after 30s, followed by interval
     setTimeout(() => runBackup(), 30_000);
     setInterval(() => runBackup(), BACKUP_INTERVAL_MS);
 };
