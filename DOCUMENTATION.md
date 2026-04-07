@@ -65,21 +65,93 @@ Este diseño está hecho **de forma completamente intencionada para garantizar l
 
 ---
 
+### 🖥️ Desarrollo Local vs Producción (Tu computadora ya es un entorno real)
+
+Es importante entender que toda la compleja arquitectura de red y seguridad detallada en este documento **no es un esquema teórico reservado solo para grandes servidores en producción: ya está sucediendo en tu ordenador local** mientras programas.
+
+Para que te hagas a la idea, esto es lo que está pasando en **tu propio Docker Desktop (Local)** contra cómo será en **Producción**:
+
+🟢 **Lo que es EXACTAMENTE IGUAL en local:**
+* **Las Redes Gemelas y el Aislamiento:** Si usas la interfaz web para desplegar un contenedor con conexión a Internet, tu backend de Node estará ordenándole físicamente a tu Docker Desktop local que cree redes `_open`, meta el contenedor y gestione las pasarelas, todo en tu Windows/Mac.
+* **El Robot Limpiador (Reaper):** Ya está patrullando en tu máquina local cada pocos minutos y borrando tus redes huérfanas en silencio.
+* **El Storage y la Seguridad IAM:** Tu backend local restringe conexiones al daemon de docker usando el `socket-proxy`, y los volúmenes o backups viajan a tu bóveda local de MinIO.
+
+🔴 **Las únicas 3 cosas que cambian en Producción:**
+1. **La barrera del Firewall (`edge-fw`):** En desarrollo local, se "puentea" este Guardia de Seguridad en el `override.yml` saltando directamente al proxy porque Windows/Mac no son 100% compatibles con reglas puras de `iptables` de núcleo Linux. En producción pura, Suricata (IPS) escudará los puertos 80/443 de forma real parando ataques antes del proxy.
+2. **Los Certificados SSL (HTTPS):** En local accedes por `http://localhost`. En producción, el Traefik de forma automatizada pedirá y renovará candados SSL (Let's Encrypt) para cada aplicación que publiques.
+3. **El Hot-Reload:** En local las imágenes se arrancan con "Módulos Vinculados" (Bind mounts) de tu ordenador. Si guardas un archivo en tu editor de código fuente, la plataforma en caliente se reinicia. En servidor, todo será una caja opaca compilada, sellada y optimizada.
+
+---
+
 ## 🏗️ Arquitectura de Red: El Modelo VPC (Virtual Private Cloud)
 
 A diferencia de las soluciones estándar, DockerManager no utiliza una red compartida. Implementa un sistema de **VPC dinámico** donde cada usuario opera en una burbuja de red totalmente privada e invisible para el resto de los inquilinos.
 
-### 🛡️ Segmentación por Capas (Las 7 Subredes)
+### 🛡️ Segmentación por Capas (Diagarama de las 7 Subredes)
 
-La infraestructura se orquestra mediante un despliegue de **7 redes aisladas** para garantizar que el fallo o compromiso de un componente no afecte al resto:
+En lugar de poner a todos los usuarios en la misma red (como hacen sistemas simples), la infraestructura funciona como el plano de un edificio blindado. Se orchesta mediante un despliegue de **7 redes separadas por muros virtuales** para garantizar que, si surge un problema o un ataque en una capa, no salte a la siguiente:
 
-| Red | Rol |
+```mermaid
+graph TD
+    classDef firewall fill:#e74c3c,stroke:#c0392b,stroke-width:2px,color:white;
+    classDef dmz fill:#f39c12,stroke:#d35400,stroke-width:2px,color:white;
+    classDef proxy fill:#3498db,stroke:#2980b9,stroke-width:2px,color:white;
+    classDef private fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:white;
+    classDef storage fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:white;
+    classDef internet fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:white;
+
+    Internet(((🌐 Internet))):::internet
+
+    subgraph public_net [Capa 1: Red Pública]
+        EdgeFW[🛡️ Firewall Perimetral Suricata]:::firewall
+    end
+
+    subgraph proxies [Capa 2: Tránsito y Proxies]
+        AdminProxy[🎩 Proxy Admin DMZ]:::proxy
+        UserProxy[🚦 Proxy de Usuarios]:::proxy
+    end
+
+    subgraph dmz_net [Capa 3: DMZ Sistema Aislado]
+        Backend[🧠 Backend Node.js]:::dmz
+        Frontend[🖥️ Frontend React]:::dmz
+        Mongo[(🗄️ MongoDB)]:::dmz
+        SocketProxy[🦺 Socket-Proxy]:::dmz
+    end
+
+    subgraph user_vpc [Capa 4: VPCs Privadas de Clientes]
+        User1[📦 Contenedor Usuario A]:::private
+        User2[📦 Contenedor Usuario B]:::private
+    end
+
+    subgraph storage_net [Capa 5: Red de Bóveda Almacenamiento]
+        StorageFW[🚧 Storage Firewall HAProxy]:::firewall
+        MinIO[(🏦 Base MinIO S3)]:::storage
+    end
+
+    Internet -- Petición Insegura --> EdgeFW
+    EdgeFW -- Tráfico de admin (limpio) --> AdminProxy
+    EdgeFW -- Tráfico de apps web (limpias) --> UserProxy
+
+    AdminProxy -- Rutas /api y / --> Backend
+    AdminProxy -- Ruta Frontend --> Frontend
+    UserProxy -. Trafico web a contenedor A .-> User1
+    UserProxy -. Trafico web a contenedor B .-> User2
+
+    Backend -- L/E Datos --> Mongo
+    Backend -- Control seguro (solo lectura) --> SocketProxy
+
+    Backend -- Envía Backups y Discos --> StorageFW
+    StorageFW -- Filtra y cruza hacia Bóveda --> MinIO
+```
+
+| Capa / Red | Descripción para humanos |
 |---|---|
-| `public_net` | Punto de entrada único desde el exterior hacia el Firewall perimetral. |
-| `transit_proxy_inverso` & `transit_proxy_forward` | Redes de tránsito que conectan el tráfico limpio (tras ser inspeccionado) con los proxies correspondientes. |
-| `dmz_net` | **Zona Desmilitarizada.** Núcleo del sistema: aloja la API, el Frontend, MongoDB y el Proxy de administración. Inaccesible desde las redes de los clientes. |
-| `${userId}_default_vlan` (VPC del Usuario) | Redes auto-generadas con `{ Internal: true }` por defecto. Cortan el cable a internet y aíslan cada usuario del resto. |
-| `storage_transit_net` & `storage_net` | Enclave ultra-seguro para MinIO y el NAS, protegido por un firewall interno que solo permite conexiones desde el Backend. |
+| `public_net` | La calle. Único lugar donde se recibe directamente tráfico de internet antes de pasar por nuestro Firewall Guardia. |
+| `transit_proxy_inverso` & `transit_proxy_forward` | Los pasillos limpios. Por aquí solo circula tráfico que el Firewall ya ha comprobado que no tiene virus o ataques. |
+| `dmz_net` | **Zona Desmilitarizada.** La sala de mandos. Aquí vive la base de datos y la inteligencia del proyecto. Inaccesible para los clientes. |
+| `${userId}_default_vlan` (VPC del Usuario) | **Tu burbuja privada.** Redes auto-generadas a las que le hemos cortado el cable a Internet. Aíslan a un usuario por completo. |
+| `storage_transit_net` & `storage_net` | **Caja fuerte.** Una bóveda ultra-segura para los discos y backups, protegida por su propio mini-firewall para que nadie pueda conectarse por error. |
+
 
 ### 🧩 Referencia de los "Enanos de Seguridad" (Contenedores de Infraestructura)
 
