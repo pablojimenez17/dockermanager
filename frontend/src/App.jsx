@@ -38,10 +38,17 @@ axios.interceptors.response.use(
     // If the error comes from /auth/me or login, do not nuke the session globally
     const url = error.config?.url || '';
 
-    // We are deliberately keeping the token in localStorage and NO LONGER logging the user out.
-    // If a 401 happens, the specific UI component will show a notification.
     if (error.response && error.response.status === 401) {
-      console.warn(`[Axios] Received 401 Unauthorized from ${url}. Ignoring global logout to prevent session drops.`);
+      if (!url.includes('/auth/me') && !url.includes('/login') && !url.includes('/logout')) {
+        localStorage.removeItem('role');
+        localStorage.removeItem('name');
+        localStorage.removeItem('activeOrgId');
+        
+        if (window.location.pathname !== '/login') {
+          console.warn(`[Axios] Received 401 Unauthorized from ${url}. Logging out to clear invalid session.`);
+          window.location.href = '/login';
+        }
+      }
     }
 
     return Promise.reject(error);

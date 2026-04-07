@@ -37,9 +37,9 @@ services:
       - transit_proxy_inverso
       - transit_proxy_forward
     # For now, port mapping is directly on traefik to ensure UI works out of the box without complex manual iptables scripting inside the suricata container. But to respect the diagram strictly, one might map 80/443 here and use iptables PREROUTING to traefik.
-    ports:
-      - "80:80"
-      - "443:443"
+    # ports:
+    #   - "80:80"
+    #   - "443:443"
     volumes:
       - ./config/edge-fw.sh:/docker-entrypoint.sh:ro
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
@@ -62,9 +62,9 @@ services:
       - dmz_net
     # If edge-fw isn't reliably forwarding (which requires an iptables bash script), 
     # uncomment these ports to access the web UI directly:
-    # ports:
-    #   - "80:80"
-    #   - "443:443"
+    ports:
+      - "80:80"
+      - "443:443"
     depends_on:
       - socket-proxy
 

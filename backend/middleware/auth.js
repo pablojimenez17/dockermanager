@@ -7,7 +7,7 @@ const authMiddleware = async (req, res, next) => {
         // Fallback to Bearer token for Websockets if needed, but prioritize cookie
         const token = req.cookies?.token || req.header('Authorization')?.replace('Bearer ', '');
 
-        if (!token) {
+        if (!token || token === 'undefined' || token === 'null') {
             return res.status(401).json({ message: 'Authentication required' });
         }
 
@@ -38,6 +38,11 @@ const authMiddleware = async (req, res, next) => {
         next();
     } catch (error) {
         console.error("Auth Middleware Error:", error);
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax'
+        });
         res.status(401).json({ message: 'Invalid token' });
     }
 };
