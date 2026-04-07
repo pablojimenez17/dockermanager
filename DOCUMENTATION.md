@@ -81,37 +81,39 @@ La infraestructura se orquestra mediante un despliegue de **7 redes aisladas** p
 | `${userId}_default_vlan` (VPC del Usuario) | Redes auto-generadas con `{ Internal: true }` por defecto. Cortan el cable a internet y aíslan cada usuario del resto. |
 | `storage_transit_net` & `storage_net` | Enclave ultra-seguro para MinIO y el NAS, protegido por un firewall interno que solo permite conexiones desde el Backend. |
 
-### 🧩 Referencia de Contenedores de Infraestructura
+### 🧩 Referencia de los "Enanos de Seguridad" (Contenedores de Infraestructura)
 
-El sistema se compone de **9 contenedores** fijos definidos en `docker-compose.yml`. Cada uno tiene un rol único e irremplazable:
-
----
-
-#### 1. `dockermanager-edge-fw` — Firewall Perimetral (Suricata IDS/IPS)
-| | |
-|---|---|
-| **Imagen** | `jasonish/suricata:latest` |
-| **Redes** | `public_net` → `transit_proxy_inverso` → `transit_proxy_forward` |
-| **Puertos expuestos** | `80`, `443` (punto de entrada único al sistema) |
-
-Actúa como el primer y único punto de contacto con Internet. Realiza **Inspección Profunda de Paquetes (DPI)** usando firmas Suricata para detectar y bloquear ataques (SQLi, XSS, escaneos de red, exploits conocidos) antes de que lleguen a ningún servicio interno. Redirige el tráfico limpio a los proxies mediante reglas `iptables` (DNAT/MASQUERADE) inyectadas por `edge-fw.sh`.
+Para que tus aplicaciones corran de manera profesional y aislada, a tu alrededor trabajan en secreto **9 contenedores de infraestructura** fijos. Piensa en ellos como la plantilla de trabajadores de un hotel de lujo:
 
 ---
 
-#### 2. `dockermanager-proxy` — Proxy Inverso DMZ (Traefik Admin)
-| | |
-|---|---|
-| **Imagen** | `traefik:v2.10` |
-| **Redes** | `transit_proxy_inverso` + `dmz_net` |
-| **Constraint label** | `traefik.constraint-label=dmz-proxy` |
+#### 1. 🛡️ `dockermanager-edge-fw` — El Guardia de la Puerta (Firewall/Suricata)
+Es el único contenedor que da la cara a internet. Todos los ataques de hackers o virus rebotan aquí primero. Inmediatamente analiza el tráfico sospechoso y deja pasar a los clientes legítimos hacia los servicios internos. Imagínalo como el gorila de la discoteca.
 
-Gestiona exclusivamente el acceso a los servicios de administración: la API del Backend (`/api`) y el Frontend. **Ignora completamente** los contenedores de los usuarios. Lee la configuración de Docker vía el Socket Proxy (nunca directamente del socket).
+#### 2. 🎩 `dockermanager-proxy` — El Conserje para VIPs (Proxy de Administración)
+Solo se encarga de recibir a los administradores y usuarios de la plataforma que quieren gestionar sus cosas. Te da acceso a la Interfaz Web y a la API. Ignora por completo las aplicaciones publicadas por ti u otros usuarios.
 
----
+#### 3. 🚦 `dockermanager-lan-proxy` — El Conserje de los Inquilinos (Proxy de Usuario)
+Cuando tú publicas una aplicación con un dominio (ej: `miapp.com`), este contenedor es el que recibe el tráfico limpio que le ha mandado el Guardia, y mágicamente averigua en qué "habitación" (tu red privada VPC) está tu contenedor para enviarle la visita. Ningún tráfico entra a tu aplicación sin pasar antes por él.
 
-#### 3. `dockermanager-lan-proxy` — Proxy de Usuario (Traefik LAN)
-| | |
-|---|---|
+#### 4. 🦺 `dockermanager-socket-proxy` — El Escudo de la Sala de Máquinas
+El Cerebro del sistema no tiene permitido tocar los cables de las máquinas reales directamente, porque sería peligroso si un robot se vuelve loco. Así que le pide las cosas al Socket Proxy, quien permite ciertas órdenes ("Apaga este contenedor", "Crea una red") y bloquea operaciones destructivas del sistema madre ("Borra todos los discos").
+
+#### 5. 🧠 `dockermanager-backend` — El Cerebro de la Plataforma (Node.js)
+El "jefe" del hotel. Crea facturas, maneja los registros, ejecuta los despliegues de tus apps en paralelo, vigila la IA local, manda la creación de redes aisladas e, internamente, programa cosas robóticas automáticas (como apagar tu contenedor si te has pasado del tiempo gratuito).
+
+#### 6. 🖥️ `dockermanager-frontend` — El Mostrador (React)
+La interfaz web bonita que tú vas a usar desde tu ordenador. 
+
+#### 7. 🗄️ `dockermanager-mongo` — El Archivero General (Base de Datos)
+El libro de registros del hotel en formato MongoDB. Guarda los nombres de usuario, contraseñas cifradas, cuotas disponibles y la lista de todos los contenedores creados. Nunca interactúa con el mundo exterior.
+
+#### 8. 🚧 `dockermanager-storage-fw` — El Puente Elevadizo (Firewall de Almacenamiento)
+Para que nadie pueda robar los discos duros ni por accidente desde dentro del sistema, el Cerebro del hotel (Backend) tiene que enviar los documentos o backups a través de este control aduanero interno llamado HAProxy, que solo acepta solicitudes del Backend. Y este lo cruzará hacia la caja fuerte.
+
+#### 9. 🏦 `dockermanager-minio` — La Caja Fuerte (MinIO S3)
+Los discos duros reales. Un servidor de almacenamiento privado e interno tipo S3. A esta caja fuerte van ordenados tus discos de persistencia, snapshots de tus contenedores y las copias de seguridad cada 24 horas. Imposible el acceso público directo.
+|
 | **Imagen** | `traefik:v2.10` |
 | **Redes** | `transit_proxy_forward` + `lan_net` + VPCs de usuarios (dinámico) |
 | **Constraint label** | `traefik.constraint-label=lan-proxy` |
@@ -315,22 +317,31 @@ cat mongo-backup-XXX.archive.gz | docker exec -i dockermanager-mongo mongorestor
 
 ---
 
-## 💻 La Terminal Interactiva (xterm.js)
+## 💻 La Terminal Interactiva (xterm.js) — Explicación sencilla
 
+Cuando haces clic en el botón de la terminal en la plataforma, no te estás conectando de manera directa e insegura a la máquina de linux. Estamos usando **xterm.js**, que es como una "ventana mágica de cine" en el propio navegador web. Todo lo que ves es una "película en directo" del contenedor, enviada letra por letra a tu pantalla de manera segura.
 
-El sistema ofrece una consola profesional que funciona mediante un flujo de **tres saltos seguros**:
+Para que esto sea ultra-seguro y ningún atacante pueda interceptar tus sistemas, la comunicación da varios **saltos** invisibles y ultrarrápidos:
 
+```mermaid
+sequenceDiagram
+    participant TuNavegador as 🧑 Tú (Navegador)
+    participant Cerebro as 🧠 Cerebro (Backend)
+    participant Escudo as 🛡️ Escudo (Proxy)
+    participant TuContenedor as 📦 Tu Contenedor
+
+    TuNavegador->>Cerebro: Escribes un comando como "ls" en tu teclado
+    Cerebro->>Escudo: El Cerebro verifica si eres el dueño y se lo pasa al Escudo
+    Escudo->>TuContenedor: El Escudo lo inyecta seguro en la consola interna
+    TuContenedor-->>Escudo: El contenedor responde con el resultado del comando
+    Escudo-->>Cerebro: Se lo pasa al Cerebro de vuelta
+    Cerebro-->>TuNavegador: Y el Cerebro dibuja la respuesta en tu pantalla
 ```
-[Navegador (React)] → [WebSocket] → [Backend] → [Socket-Proxy] → [stdin/stdout del contenedor]
-```
 
-1. El usuario escribe en la terminal del navegador.
-2. Los datos viajan por WebSockets hasta el Backend.
-3. El Backend los retransmite al Socket-Proxy, que los inyecta directamente en el proceso del contenedor.
-
-> Esto permite administrar cualquier contenedor sin exponer puertos SSH o Telnet vulnerables al exterior.
+> **¿Qué ganamos con esto?** Que tú tienes control interactivo total de tus contenedores de forma instantánea usando tan solo un navegador web, **sin arriesgarte y sin necesidad de abrir vulnerables puertos SSH o firewalls hacia el exterior.**
 
 ---
+
 
 ## ✅ Garantías de Seguridad del Sistema
 
@@ -342,53 +353,47 @@ El sistema ofrece una consola profesional que funciona mediante un flujo de **tr
 | **Confinamiento del Daemon** | El Socket Proxy impide que el backend (o un contenedor comprometido) escale privilegios al host. |
 | **Cifrado en Tránsito y Reposo** | Secretos cifrados con AES-256. Conexiones HTTPS gestionadas por Traefik + Let's Encrypt. |
 
-### Sistema de "Redes Gemelas" — La Solución al Flag `Internal` Inmutable
+### 👯‍♂️ Sistema de "Redes Gemelas" — Explicación para humanos
 
-Docker impone una restricción de diseño: el flag `Internal` de una red es **inmutable** una vez creada. No existe ninguna API para convertir una red cerrada en abierta o viceversa sin borrarla y recrearla (lo que rompería las conexiones activas de los contenedores).
+Docker tiene una limitación técnica por defecto: **una red interna aislada no se puede abrir hacia internet mágicamente con un clic**. Si quisieras abrirla manualmente, tendrías que destruirla y crearla de nuevo desde cero, lo que "apagaría" la conexión de todos tus otros contenedores conectados a ella de manera temporal.
 
-El backend resuelve este problema con el **patrón de redes gemelas**: cada red privada tiene una _hermana_ abierta con el sufijo `_open` que se crea bajo demanda y se destruye cuando queda vacía.
+Para resolver esto y lograr esa inmediatez en el panel (*un clic y estás publicado*), DockerManager emplea un concepto interno llamado **patrón de redes gemelas**. 
 
-**Flujo de decisión al desplegar un contenedor:**
+Imagínate que cada red virtual de Docker es una **habitación sin ventanas** 100% segura para tus inquilinos (es tu red privada `Internal`). Y si de repente decides que un contenedor concreto necesita poder interactuar con fuera (darle Internet)... ¿Qué hace el sistema sin que te enteres? En lugar de derruir la habitación completa con todos dentro, el sistema **te construye inmediatamente una habitación gemela idéntica al lado, pero con ventanas (la extensión `_open`)**, y arranca a ese contenedor ahí conectado. Si le quitas internet en la interfaz web, borra la habitación abierta y te lo vuelve a clonar en la segura. 
 
+**Esquema de Flujo visual del sistema:**
+
+```mermaid
+flowchart TD
+    A[¿Activas el check de Conexión Externa en tu
+Contenedor Web / Stack?]
+    
+    A -->|NO O PULSAS QUITAR INTERNET| B[Modo Seguro / Bloqueado]
+    A -->|SÍ, QUIERO INTERNET Y UN DOMINIO| C[Modo Expuesto al Exterior]
+    
+    B --> B1{¿Dónde lo estás desplegando?}
+    B1 -->|VPC por defecto| D[Se manda a la Red: usuario_default_vlan
+🔒 100% Privada y Aislada
+Imposible hackearte remotamente]
+    B1 -->|Red custom personalizada| E[Se manda a la Red: usuario_mi-red
+🔒 100% Privada y Aislada]
+    
+    C --> C1{¿Dónde lo estás desplegando?}
+    C1 -->|VPC por defecto| F[Se manda a la Red: usuario_default_vlan (version abierta)
+🌐 Conectada a internet con reglas proxy
+Se actualizan las defensas Suricata en caliente para él]
+    C1 -->|Red custom personalizada| G[El sistema auto-crea la Red: usuario_mi-red_open
+🌐 Red Gemela Orientada a Internet
+Tus demás procesos y proyectos o DBs que compartían la red
+original quedan aislados a salvo]
 ```
-¿El usuario activa "Internet"?
-       │
-      NO ──────────────────────────────────────────────────────────────────────
-       │                                                                        │
-       ▼                                                                        ▼
-  networkMode = 'bridge'          networkMode = 'mi-red' (custom)
-       │                                        │
-       ▼                                        ▼
-${userId}_default_vlan           ${userId}_mi-red
-  Internal: true ✅                Internal: true ✅
 
-      SÍ ──────────────────────────────────────────────────────────────────────
-       │                                                                        │
-       ▼                                                                        ▼
-  networkMode = 'bridge'          networkMode = 'mi-red' (custom)
-       │                                        │
-       ▼                                        ▼
-${userId}_default_vlan           ${userId}_mi-red_open
-  Internal: false ⚠️               Internal: false ⚠️
-  (se recrea si era interna)       (se auto-crea si no existe)
-```
+**¿Qué pasa con todas esas habitaciones vacías después?**
+No tienes que preocuparte del desorden informático. Si dejas de utilizar aplicaciones expuestas a internet, esa red `_open` abandonada que creamos es detectada por el proceso limpiador que ronda tu cuenta **(El Segador/Reaper)** y la **elimina automáticamente por completo** pasados cinco minutos para ahorrar ancho de banda.
 
-**¿Por qué `_open` y no modificar la red original?**
-Modificar `Internal` requeriría:
-1. Detener todos los contenedores de la red (downtime).
-2. Borrar la red.
-3. Recrearla con el nuevo flag.
-4. Reconectar todos los contenedores.
 
-Con el sistema gemelo, el contenedor **se conecta directamente a la red correcta desde el arranque**, sin afectar al resto de contenedores del usuario que puedan seguir en la red interna original.
-
-**Ciclo de vida de las redes `_open`:**
-- Se crean automáticamente al primer deploy con Internet activado.
-- Son rastreadas con las labels `dockermanager.vpc=true` y `dockermanager.owner=${userId}`.
-- El Reaper las borra en cuanto quedan sin contenedores de usuario (Fase 3).
-
-| Situación | Red utilizada | Acceso a Internet |
-|---|---|---|
+---
+|---|---|
 | VPC por defecto, Internet **OFF** | `${userId}_default_vlan` | ❌ Bloqueado |
 | VPC por defecto, Internet **ON** | `${userId}_default_vlan` recreada | ✅ Filtrado |
 | Red custom, Internet **OFF** | `${userId}_mi-red` | ❌ Bloqueado |
