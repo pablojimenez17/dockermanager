@@ -65,7 +65,7 @@ Este diseño está hecho **de forma completamente intencionada para garantizar l
 
 ---
 
-### 🖥️ Desarrollo Local vs Producción (Tu computadora ya es un entorno real)
+### 🖥️ Desarrollo Local vs Producción 
 
 Es importante entender que toda la compleja arquitectura de red y seguridad detallada en este documento **no es un esquema teórico reservado solo para grandes servidores en producción: ya está sucediendo en tu ordenador local** mientras programas.
 
