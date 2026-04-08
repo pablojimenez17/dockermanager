@@ -260,12 +260,7 @@ const ViewContainers = () => {
                     <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Manage and monitor your deployed instances.</p>
                 </div>
                 <div className="flex w-full sm:w-auto space-x-3">
-                    <button
-                        onClick={() => addToast('Test System', 'If you see this, Toast CSS works', 'success')}
-                        className="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white px-5 py-2.5 rounded-xl shadow-lg hover:shadow-brand-500/25 transition-all duration-300 font-bold hover:-translate-y-0.5"
-                    >
-                        Test Notification
-                    </button>
+
                     <button
                         onClick={fetchContainers}
                         disabled={refreshing}

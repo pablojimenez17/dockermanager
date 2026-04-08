@@ -75,7 +75,7 @@ const Secrets = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center space-x-3">
-                        <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-500 border border-blue-500/20">
+                        <div className="p-2.5 bg-brand-500/10 rounded-xl text-brand-500 border border-brand-500/20">
                             <Lock size={28} />
                         </div>
                         <span>Secret Manager</span>
@@ -86,7 +86,7 @@ const Secrets = () => {
                 </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2"
+                    className="shrink-0 bg-brand-600 hover:bg-brand-700 text-white px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg shadow-brand-500/25 flex items-center justify-center space-x-2"
                 >
                     <Plus size={20} />
                     <span>New Secret</span>
@@ -114,7 +114,7 @@ const Secrets = () => {
                                         value={newSecret.name}
                                         onChange={(e) => setNewSecret({ ...newSecret, name: e.target.value.toUpperCase().replace(/[^A-Z0-9_]/g, '') })}
                                         placeholder="e.g. MYSQL_ROOT_PASSWORD"
-                                        className="pl-10 w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-all font-mono"
+                                        className="pl-10 w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:text-white transition-all font-mono"
                                     />
                                 </div>
                             </div>
@@ -127,7 +127,7 @@ const Secrets = () => {
                                         value={newSecret.value}
                                         onChange={(e) => setNewSecret({ ...newSecret, value: e.target.value })}
                                         placeholder="Paste your sensitive token here"
-                                        className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-all font-mono"
+                                        className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:text-white transition-all font-mono"
                                     />
                                     <button
                                         type="button"
@@ -147,7 +147,7 @@ const Secrets = () => {
                                 value={newSecret.description}
                                 onChange={(e) => setNewSecret({ ...newSecret, description: e.target.value })}
                                 placeholder="What is this used for?"
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:text-white transition-all"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 dark:text-white transition-all"
                             />
                         </div>
 
@@ -162,7 +162,7 @@ const Secrets = () => {
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center space-x-2"
+                                className="bg-brand-600 hover:bg-brand-700 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-medium transition-all shadow-md flex items-center space-x-2"
                             >
                                 {submitting ? <span className="animate-pulse">Encrypting...</span> : (
                                     <>
