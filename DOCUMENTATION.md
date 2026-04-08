@@ -4,6 +4,29 @@ DockerManager es una solución integral de "Contenedores como Servicio" (CaaS) d
 
 ---
 
+## 🚀 Guía Rápida de Inicio (Quickstart para el Equipo)
+
+Para levantar toda esta infraestructura desde cero en tu ordenador y empezar a probar la plataforma o desarrollar encima de ella, solo necesitas tener [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y encendido.
+
+Abre tu terminal en la raíz del proyecto (donde se encuentra este archivo) y ejecuta el siguiente comando mágico que orquestará los 10 servicios al mismo tiempo:
+
+```bash
+# Construye las imágenes y levanta todo en segundo plano
+docker-compose up -d --build
+```
+
+Una vez que termine (la primera vez puede tardar un par de minutos descargando dependencias y compilando Node/React), tendrás acceso a todos los servicios locales a través de los siguientes enlaces:
+
+| Servicio | Enlace Local | Credenciales por Defecto |
+|---|---|---|
+| **Plataforma Web (Frontend)** | [http://localhost](http://localhost) | Regístrate con un usuario nuevo directamente |
+| **Monitor IPS del Firewall (EveBox)** | [http://localhost:5636](http://localhost:5636) | Sin contraseñas (Acceso libre en local) |
+| **Bóveda de Discos y Backups (MinIO)** | [http://localhost:9001](http://localhost:9001) | Usuario: `admin` <br> Pass: `password123` |
+
+> [!TIP]
+> Si en algún momento necesitas apagar toda la infraestructura de golpe para descansar, recuerda ejecutar `docker-compose down`. Tus bases de datos e imágenes guardadas de tus inquilinos persistirán a salvo gracias a los Volúmenes que hemos configurado.
+
+---
 ## 🔧 Entornos: `docker-compose.yml` vs `docker-compose.override.yml`
 
 El proyecto usa **dos ficheros Compose** que Docker fusiona automáticamente al ejecutar `docker compose up`:
