@@ -491,3 +491,39 @@ DockerManager sigue el mismo modelo de responsabilidad que los grandes proveedor
 
 > [!NOTE]
 > DockerManager protege el **perímetro y la infraestructura**. La seguridad de lo que se ejecuta dentro de cada contenedor — versiones de software, configuraciones, contraseñas de aplicación — es responsabilidad exclusiva del usuario que lo despliega, tal y como ocurre en servicios como Heroku, Render o Railway.
+
+---
+
+## 🔄 Lifecycle Management & Billing Retention
+
+DockerManager incorpora estrategias avanzadas de Billing y Retención propias de plataformas SaaS (Software as a Service):
+
+### 1. Sistema de "Auto-Renew" y Degradación Elegante (Graceful Downgrade)
+El esquema de usuario nativo cuenta con un control de pago mensual (campo `autoRenew`).
+1. **Renovación Autónoma**: El "Segador" (Reaper Service) comprueba recurrentemente si el plan ha expirado. Si el `autoRenew` está activo (`true`), en vez de apagar los servicios, prolonga automáticamente la vida de la suscripción un mes más para no interrumpir entornos de producción.
+2. **Degradación Elegante (Downgrade)**: Si un usuario cancela su plan (`autoRenew = false`), el Reaper tampoco apaga sus máquinas de golpe si tiene aplicaciones publicadas vitales. Cuando su periodo facturado termina, la plataforma rebaja la cuenta automáticamente al plan `free` base, lo cual limitará los recursos RAM/CPU que ese usuario puede gastar, forzándole a adaptar su infraestructura a los límites gratuitos sin desconectarlo fatalmente de un tirón.
+
+### 2. Flujo de Fricción en Cancelaciones (Retargeting)
+El panel de **Subscription Management** incluye un túnel de cancelación compuesto por 4 pasos puramente psicológicos y técnicos diseñados para desalentar al máximo el abandono o los clicks accidentales:
+- **Paso 1 (Disuasión visual)**: Lista dramática y visual de todo lo que van a perder si abandonan la suscripción premium.
+- **Paso 2 (Encuesta estricta)**: Obliga al usuario a interactuar seleccionando un motivo de abandono ("Muy caro", "Faltan features", etc.).
+- **Paso 3 (Retención de Última Oportunidad)**: Mensaje empático apelando al Roadmap de plataforma con el botón de cancelar oculto visualmente versus un botón gigante de "I'll Stay".
+- **Paso 4 (Sentencia de Culpabilidad y Castigo)**: Se fuerza al usuario a mecanografiar a mano exactamente "I AGREE TO CANCEL". Los eventos de navegador de *copy-paste (Pegar)* están totalmente boicoteados de forma nativa vía JavaScript saltando un "Toast" de notificación castigándolo. Como último paso de frustración controlada, exige aguantar un **countdown de 5 segundos** impidiendo confirmar la operación hasta que finalice por completo.
+
+---
+
+## 🎨 Arquitectura UI Tonal Dinámica (CSS Variables y CSS-in-JS Variables)
+
+DockerManager implementa un sistema unificado y cohesivo de Identidad Visual a lo largo de toda su SPA de React apoyándose de variables nativas de CSS integradas en `tailwind.config.js`.
+
+El diseño emplea una paleta modular nombrada `brand` que inyecta los tonos desde `--brand-50` hasta `--brand-900`. 
+Por defecto, toda la plataforma hace uso de una ardiente y vibrante paleta en tonos rojos que responde instantáneamente sin depender de configuraciones estáticas engorrosas en frameworks de Tailwind. 
+Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unificado (`index.css`), suprimiendo completamente los anticuados azules base para uniformizar un "modo espacial agresivo y Premium", con todos los componentes principales (botones, badges y tarjetas de precios) adaptados para leer del alias genérico genérico `bg-brand-500` en vez de usar valores de colores crudos del navegador.
+
+---
+
+## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
+
+Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y escupe al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
+- **Volumen de Logs Directos**: Suricata reporta en silencia los logs de alertas a un volumen puente llamado `suricata-logs` (generando un pesado `eve.json`).
+- **Data-Store SQLite de Alto Rendimiento**: El motor de Evebox, sin depender monstruosas bases de datos como Elasticsearch, tira del modo binario y consume en caliente ese `.json` renderizando un visor con filtros de búsqueda y geolocalización ultra avanzado sobre el puerto `5636` en local. No es ruteado por el Traefik Proxy por diseño estricto para evitar embudos de cuellos de botella para el administrador de red.

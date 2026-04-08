@@ -42,7 +42,20 @@ services:
     #   - "443:443"
     volumes:
       - ./config/edge-fw.sh:/docker-entrypoint.sh:ro
+      - suricata-logs:/var/log/suricata
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
+
+  # 1.5 Edge Firewall UI (EveBox)
+  evebox:
+    image: jasonish/evebox:latest
+    container_name: dockermanager-evebox
+    command: evebox server --datastore sqlite --sqlite /tmp/evebox.sqlite -i /var/log/suricata/eve.json --no-tls --no-auth
+    ports:
+      - "5636:5636"
+    volumes:
+      - suricata-logs:/var/log/suricata:ro
+    networks:
+      - public_net
 
   # 2. Reverse Proxy (Traefik) - Proxy Inverso
   proxy-inverso:
@@ -185,3 +198,4 @@ services:
 volumes:
   mongo-data:
   minio-data:
+  suricata-logs:
