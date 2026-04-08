@@ -524,6 +524,8 @@ Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unif
 
 ## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
 
+http://localhost:5636
+
 Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y escupe al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
 - **Volumen de Logs Directos**: Suricata reporta en silencia los logs de alertas a un volumen puente llamado `suricata-logs` (generando un pesado `eve.json`).
 - **Data-Store SQLite de Alto Rendimiento**: El motor de Evebox, sin depender monstruosas bases de datos como Elasticsearch, tira del modo binario y consume en caliente ese `.json` renderizando un visor con filtros de búsqueda y geolocalización ultra avanzado sobre el puerto `5636` en local. No es ruteado por el Traefik Proxy por diseño estricto para evitar embudos de cuellos de botella para el administrador de red.
