@@ -1,11 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useOrg } from '../context/OrgContext';
-import { Building2, UserCircle, Check, ChevronDown, Plus } from 'lucide-react';
+import { Building2, UserCircle, Check, ChevronDown, Plus, Lock, AlertCircle, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const OrgSwitcher = () => {
     const { organizations, activeOrg, switchOrganization, loadingOrgs, userPlan } = useOrg();
     const [isOpen, setIsOpen] = useState(false);
+    const [lockedOrgData, setLockedOrgData] = useState(null);
     const dropdownRef = useRef(null);
     const navigate = useNavigate();
 
@@ -84,16 +85,27 @@ const OrgSwitcher = () => {
                         {organizations.map(org => (
                             <button
                                 key={org._id}
-                                onClick={() => { switchOrganization(org._id); setIsOpen(false); }}
-                                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${activeOrg?._id === org._id ? 'bg-brand-50/50 dark:bg-brand-500/10' : ''}`}
+                                onClick={() => {
+                                    if (org.isLocked) {
+                                        setLockedOrgData(org);
+                                        setIsOpen(false);
+                                    } else {
+                                        switchOrganization(org._id);
+                                        setIsOpen(false);
+                                    }
+                                }}
+                                className={`w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${activeOrg?._id === org._id ? 'bg-brand-50/50 dark:bg-brand-500/10' : ''} ${org.isLocked ? 'opacity-70 grayscale-[0.5]' : ''}`}
                             >
                                 <div className="flex items-center space-x-3 truncate">
-                                    <div className={`w-6 h-6 rounded flex flex-shrink-0 items-center justify-center text-xs font-bold ${activeOrg?._id === org._id ? 'bg-brand-500 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                                        {org.name.substring(0, 1).toUpperCase()}
+                                    <div className={`w-6 h-6 rounded flex flex-shrink-0 items-center justify-center text-xs font-bold ${activeOrg?._id === org._id ? (org.isLocked ? 'bg-amber-500 text-white' : 'bg-brand-500 text-white') : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                                        {org.isLocked ? <Lock size={12} /> : org.name.substring(0, 1).toUpperCase()}
                                     </div>
-                                    <span className={`truncate ${activeOrg?._id === org._id ? 'font-semibold text-brand-700 dark:text-brand-300' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
-                                        {org.name}
-                                    </span>
+                                    <div className="flex flex-col items-start truncate">
+                                        <span className={`truncate ${activeOrg?._id === org._id ? 'font-semibold text-brand-700 dark:text-brand-300' : 'font-medium text-slate-700 dark:text-slate-300'}`}>
+                                            {org.name}
+                                        </span>
+                                        {org.isLocked && <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider leading-none mt-0.5">Locked</span>}
+                                    </div>
                                 </div>
                                 {activeOrg?._id === org._id && <Check size={16} className="text-brand-600 dark:text-brand-400" />}
                             </button>
@@ -111,6 +123,40 @@ const OrgSwitcher = () => {
                             </button>
                         </div>
                     )}
+                </div>
+            )}
+
+            {lockedOrgData && (
+                <div className="fixed inset-0 z-[100] bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4" onClick={(e) => { e.stopPropagation(); setLockedOrgData(null); }}>
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl w-full max-w-sm shadow-2xl animate-fade-in relative overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-8 text-center flex flex-col items-center">
+                            <div className="w-20 h-20 bg-amber-500/10 rounded-full flex items-center justify-center mb-5 shadow-sm text-amber-500 ring-4 ring-amber-500/5">
+                                <Lock size={36} />
+                            </div>
+                            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Upgrade Plan</h3>
+                            <p className="text-slate-500 dark:text-slate-400 mb-8 text-[15px] leading-relaxed">
+                                You do not have the appropriate plan to manage <strong className="text-slate-700 dark:text-slate-200">{lockedOrgData.name}</strong>. Upgrade your subscription to unlock this organization or create a new one.
+                            </p>
+                            
+                            <div className="flex gap-3 w-full">
+                                <button 
+                                    onClick={() => setLockedOrgData(null)}
+                                    className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-all active:scale-95"
+                                >
+                                    Close
+                                </button>
+                                <button 
+                                    onClick={() => {
+                                        setLockedOrgData(null);
+                                        navigate('/app/plans');
+                                    }}
+                                    className="flex-1 px-4 py-3 rounded-xl bg-brand-600 text-white font-semibold hover:bg-brand-700 transition-all shadow-md shadow-brand-500/20 active:scale-95"
+                                >
+                                    View Plans
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

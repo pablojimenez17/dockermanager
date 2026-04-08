@@ -200,6 +200,15 @@ const Plans = () => {
                     <p className="text-sm opacity-90">In this development environment, payments are not processed. Clicking "Upgrade" will instantly apply the mock limits to your registered user and immediately unlock resources.</p>
                 </div>
             </div>
+
+            <div className="max-w-3xl mx-auto mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 text-center">
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
+                    * Subscription Terms & Conditions: By upgrading to a paid plan, you agree to a recurring monthly subscription. 
+                    Your account will automatically renew each month on the anniversary of your upgrade date. You can cancel auto-renewal 
+                    at any time from your User Settings panel. Upon cancellation, you will retain access to your paid resources until the end of 
+                    your current billing period, after which your account will automatically downgrade to the Hobby plan and your containers may be stopped.
+                </p>
+            </div>
         </div>
     );
 };

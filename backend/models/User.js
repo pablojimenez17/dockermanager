@@ -31,6 +31,10 @@ const userSchema = new mongoose.Schema({
     planExpiresAt: {
         type: Date
     },
+    autoRenew: {
+        type: Boolean,
+        default: true
+    },
     limits: {
         maxContainers: { type: Number, default: 2 },
         maxRamMb: { type: Number, default: 1024 },

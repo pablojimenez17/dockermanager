@@ -64,6 +64,7 @@ router.post('/upgrade', async (req, res) => {
         }
 
         user.planType = planType;
+        user.autoRenew = true; // Ensure autoRenew is on when upgrading
         // Mock auto-renewal one month from today
         const expiration = new Date();
         expiration.setMonth(expiration.getMonth() + 1);
@@ -82,6 +83,33 @@ router.post('/upgrade', async (req, res) => {
 
     } catch (error) {
         res.status(500).json({ message: 'Error upgrading plan', error: error.message });
+    }
+});
+
+// Cancel plan (disable auto-renew)
+router.post('/cancel', async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        if (user.planType === 'free') {
+            return res.status(400).json({ message: 'You are already on the Free plan.' });
+        }
+
+        // Only disable auto-renew. The Reaper Service will take care of downgrading when planExpiresAt passes.
+        user.autoRenew = false;
+        await user.save();
+
+        res.json({
+            message: 'Your plan has been cancelled and will not renew. You can keep using your resources until the end of the billing period.',
+            autoRenew: false,
+            planExpiresAt: user.planExpiresAt
+        });
+
+    } catch (error) {
+        res.status(500).json({ message: 'Error cancelling plan', error: error.message });
     }
 });
 

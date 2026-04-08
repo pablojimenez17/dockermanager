@@ -65,7 +65,33 @@ export const startReaper = () => {
 
             for (const user of usersToCheck) {
                 // Determine if user has fully expired a paid plan
-                const isPaidPlanExpired = user.planType !== 'free' && user.planExpiresAt && new Date(user.planExpiresAt) < now;
+                let isPaidPlanExpired = user.planType !== 'free' && user.planExpiresAt && new Date(user.planExpiresAt) < now;
+
+                // Process auto-renewal or downgrade
+                if (isPaidPlanExpired) {
+                    if (user.autoRenew) {
+                        console.log(`[Reaper] Auto-renewing plan for user: ${user.email}`);
+                        const newExpiration = new Date();
+                        newExpiration.setMonth(newExpiration.getMonth() + 1);
+                        user.planExpiresAt = newExpiration;
+                        await user.save();
+                        isPaidPlanExpired = false; // Successfully renewed, no longer expired
+                    } else {
+                        console.log(`[Reaper] Plan expired and auto-renew cancelled for user: ${user.email}. Downgrading to Free.`);
+                        user.planType = 'free';
+                        user.limits = {
+                            maxContainers: 2,
+                            maxRamMb: 1024,
+                            maxCpuCores: 1,
+                            maxDomains: 0,
+                            maxVolumes: 1,
+                            maxVolumeSizeMb: 1024,
+                            maxBuckets: 1
+                        };
+                        await user.save();
+                        // isPaidPlanExpired remains true for this cycle to trigger container shutdown below
+                    }
+                }
 
                 // Find all their running containers from DB
                 const userContainers = await Container.find({ userId: user._id, status: 'running' });

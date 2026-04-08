@@ -401,7 +401,7 @@ const OrganizationDashboard = () => {
                                 <label className="block text-sm font-medium mb-1">Assign Role</label>
                                 <select required value={inviteData.roleId} onChange={e => setInviteData({ ...inviteData, roleId: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 outline-none focus:ring-2 ring-brand-500">
                                     <option value="" disabled>Select a role</option>
-                                    {roles.map(r => (
+                                    {roles.filter(r => r.name !== 'Owner').map(r => (
                                         <option key={r._id} value={r._id}>{r.name}</option>
                                     ))}
                                 </select>

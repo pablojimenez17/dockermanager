@@ -4,6 +4,34 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  :root {
+    --brand-50: 240 249 255;
+    --brand-100: 224 242 254;
+    --brand-200: 186 230 253;
+    --brand-300: 125 211 252;
+    --brand-400: 56 189 248;
+    --brand-500: 14 165 233;
+    --brand-600: 2 132 199;
+    --brand-700: 3 105 161;
+    --brand-800: 7 89 133;
+    --brand-900: 12 74 110;
+  }
+
+  .dark {
+    --brand-50: 254 242 242; /* #fef2f2 */
+    --brand-100: 254 226 226; /* #fee2e2 */
+    --brand-200: 254 202 202; /* #fecaca */
+    --brand-300: 252 165 165; /* #fca5a5 */
+    --brand-400: 248 113 113; /* #f87171 */
+    --brand-500: 239 68 68; /* #ef4444 */
+    --brand-600: 220 38 38; /* #dc2626 */
+    --brand-700: 185 28 28; /* #b91c1c */
+    --brand-800: 153 27 27; /* #991b1b */
+    --brand-900: 127 29 29; /* #7f1d1d */
+  }
+}
+
 body {
   margin: 0;
   font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',

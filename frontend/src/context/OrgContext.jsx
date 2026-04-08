@@ -19,12 +19,17 @@ export const OrgProvider = ({ children }) => {
         setLoadingOrgs(true);
         try {
             const res = await axios.get('/api/organizations/my-orgs');
-            setOrganizations(res.data);
+            const dataOrgs = res.data.orgs || res.data; // Accommodate both formats
+            setOrganizations(dataOrgs);
+            
+            if (res.data.userId) {
+                localStorage.setItem('userId', res.data.userId);
+            }
 
             // Re-validate activeOrg if it exists
             const savedOrgId = localStorage.getItem('activeOrgId');
             if (savedOrgId) {
-                const foundOrg = res.data.find(org => org._id === savedOrgId);
+                const foundOrg = dataOrgs.find(org => org._id === savedOrgId);
                 if (foundOrg) {
                     setActiveOrg(foundOrg);
                     fetchMembership(foundOrg._id);
@@ -94,15 +99,23 @@ export const OrgProvider = ({ children }) => {
     const userId = localStorage.getItem('userId');
     const canManageOrgs = ['enterprise', 'agency', 'msp', 'partner'].includes(userPlan);
 
-    // Filter out owned organizations if plan doesn't support it anymore
-    const validOrganizations = organizations.filter(org => {
-        if (org.ownerId === userId) return canManageOrgs;
-        return true;
+    // Map organizations to add isLocked flag for owned orgs when plan doesn't support it
+    const processedOrganizations = organizations.map(org => {
+        const orgOwnerId = org.ownerId?._id || org.ownerId;
+        if (String(orgOwnerId) === String(userId) && !canManageOrgs) {
+            return { ...org, isLocked: true };
+        }
+        return { ...org, isLocked: false };
     });
 
-    // Clear activeOrg if it becomes invalid (e.g. user downgraded)
+    const activeOrgProcessed = activeOrg 
+        ? processedOrganizations.find(o => o._id === activeOrg._id) 
+        : null;
+
+    // Clear activeOrg if it gets completely deleted OR if it becomes locked
     useEffect(() => {
-        if (activeOrg && !validOrganizations.find(o => o._id === activeOrg._id)) {
+        const found = processedOrganizations.find(o => o._id === activeOrg?._id);
+        if (activeOrg && (!found || found.isLocked)) {
             clearActiveOrg();
         }
     }, [userPlan, organizations]);
@@ -110,8 +123,8 @@ export const OrgProvider = ({ children }) => {
     return (
         <OrgContext.Provider
             value={{
-                organizations: validOrganizations,
-                activeOrg,
+                organizations: processedOrganizations,
+                activeOrg: activeOrgProcessed,
                 membership,
                 loadingOrgs,
                 userPlan,

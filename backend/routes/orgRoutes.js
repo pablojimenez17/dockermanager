@@ -84,7 +84,7 @@ router.get('/my-orgs', authMiddleware, async (req, res) => {
             .populate('organizationId', 'name ownerId plan createdAt');
 
         const orgs = memberships.map(m => m.organizationId).filter(org => org != null);
-        res.json(orgs);
+        res.json({ userId: req.user.userId, orgs });
     } catch (error) {
         res.status(500).json({ message: 'Server error fetching organizations', error: error.message });
     }
