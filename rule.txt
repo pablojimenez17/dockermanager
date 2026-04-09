@@ -1,0 +1,1 @@
+alert http any any -> any any (msg:"TEST EXPLOSION ALARM"; content:"/BOOM"; sid:9999999; rev:1;)

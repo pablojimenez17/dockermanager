@@ -43,6 +43,7 @@ services:
     volumes:
       - ./config/edge-fw.sh:/docker-entrypoint.sh:ro
       - suricata-logs:/var/log/suricata
+      - suricata-rules:/var/lib/suricata
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
 
   # 1.5 Edge Firewall UI (EveBox)
@@ -199,3 +200,4 @@ volumes:
   mongo-data:
   minio-data:
   suricata-logs:
+  suricata-rules:

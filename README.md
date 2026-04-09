@@ -547,8 +547,60 @@ Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unif
 
 ## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
 
-http://localhost:5636
+**Acceso:** http://localhost:5636
 
-Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y escupe al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
-- **Volumen de Logs Directos**: Suricata reporta en silencia los logs de alertas a un volumen puente llamado `suricata-logs` (generando un pesado `eve.json`).
-- **Data-Store SQLite de Alto Rendimiento**: El motor de Evebox, sin depender monstruosas bases de datos como Elasticsearch, tira del modo binario y consume en caliente ese `.json` renderizando un visor con filtros de búsqueda y geolocalización ultra avanzado sobre el puerto `5636` en local. No es ruteado por el Traefik Proxy por diseño estricto para evitar embudos de cuellos de botella para el administrador de red.
+Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y muestra al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
+
+- **Volumen de Logs Compartido**: Suricata reporta en silencio los logs de alertas a un volumen Docker llamado `suricata-logs` (generando el archivo `eve.json`).
+- **Data-Store SQLite de Alto Rendimiento**: EveBox consume en caliente ese `.json` renderizando un visor con filtros de búsqueda ultra avanzado en el puerto `5636`.
+
+### 🚀 Arranque con Reglas Automáticas
+
+El script de arranque del firewall (`config/edge-fw.sh`) ejecuta automáticamente `suricata-update` al iniciarse, descargando el **ET Open Ruleset (~49.500 reglas)** antes de arrancar el motor. Las reglas se persisten en el volumen `suricata-rules` para no tener que descargarlas en cada reinicio.
+
+> [!NOTE]
+> El primer arranque tarda 2-3 minutos extra mientras descarga las reglas de internet. Los reinicios posteriores son instantáneos al usar el caché del volumen.
+
+### ⚠️ Limitación en Docker Desktop (Windows/Mac)
+
+> [!WARNING]
+> **Por qué EveBox puede aparecer vacío en desarrollo local:**
+> En Docker Desktop sobre Windows o Mac, los contenedores de una misma red se comunican a través de un switch virtual interno del hypervisor (Hyper-V/VirtIO). Este switch **no replica el tráfico entre las interfaces de los contenedores**, por lo que Suricata, aunque esté escuchando en `eth0`, `eth1` y `eth2`, no llega a ver los paquetes que intercambian otros contenedores.
+>
+> **Esto es una limitación de arquitectura de Docker Desktop, no un bug de nuestra configuración.** En producción sobre Linux nativo, Suricata captura el tráfico de forma completa porque los bridges de Linux sí replican los paquetes.
+
+### 🧪 Cómo Generar Alertas de Prueba
+
+Para verificar que el pipeline Suricata → EveBox funciona correctamente, hay dos formas:
+
+**Opción A — Tráfico real desde dentro del firewall** (funciona en todos los entornos):
+```bash
+# Desde dentro del contenedor del firewall, que sí genera tráfico visible
+docker exec dockermanager-edge-fw curl -s http://testmyids.com
+```
+Esta URL está diseñada explícitamente para disparar la regla **GPL ATTACK_RESPONSE id check returned root** (SID 2100498). La respuesta `uid=0(root)` es la firma que detecta Suricata.
+
+**Opción B — Inyección directa de evento de prueba** (para demos sin red):
+```bash
+docker exec dockermanager-edge-fw python3 -c "
+import json, time, datetime
+log_file = '/var/log/suricata/eve.json'
+now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f') + '+0000'
+alert = {
+    'timestamp': now, 'flow_id': int(time.time()), 'in_iface': 'eth0',
+    'event_type': 'alert', 'src_ip': '185.15.54.12', 'src_port': 54321,
+    'dest_ip': '10.0.0.5', 'dest_port': 80, 'proto': 'TCP',
+    'alert': {'action': 'allowed', 'gid': 1, 'signature_id': 2100498, 'rev': 7,
+              'signature': 'GPL ATTACK_RESPONSE id check returned root',
+              'category': 'Potentially Bad Traffic', 'severity': 1},
+    'app_proto': 'http'
+}
+open(log_file, 'a').write(json.dumps(alert) + '\n')
+print('Alert injected at', now)
+"
+docker restart dockermanager-evebox
+```
+Tras reiniciar EveBox y pulsar **Refresh**, el evento aparecerá en el Inbox.
+
+**En producción sobre Linux**, el tráfico real disparará alertas automáticamente sin ningún paso adicional.
+
