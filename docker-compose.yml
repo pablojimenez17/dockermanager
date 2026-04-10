@@ -1,5 +1,3 @@
-
-
 networks:
   public_net:
     driver: bridge
@@ -196,8 +194,69 @@ services:
     networks:
       - storage_net
 
+  # 10. Observability: Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dockermanager-prometheus
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=15d'
+    networks:
+      - dmz_net
+
+  # 11. Observability: Grafana
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dockermanager-grafana
+    networks:
+      - dmz_net
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+
+  # 12. Observability: Node Exporter (Host Metrics)
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: dockermanager-node-exporter
+    pid: host
+    volumes:
+      - /:/rootfs:ro
+    command:
+      - '--path.rootfs=/rootfs'
+    networks:
+      - dmz_net
+
+  # 13. Observability: cAdvisor (Container Metrics)
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.0
+    container_name: dockermanager-cadvisor
+    privileged: true
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    networks:
+      - dmz_net
+
 volumes:
   mongo-data:
   minio-data:
   suricata-logs:
   suricata-rules:
+  prometheus-data:
+  grafana-data:

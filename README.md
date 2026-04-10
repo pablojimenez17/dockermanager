@@ -284,6 +284,51 @@ Sistema de almacenamiento centralizado e interno. Utilizado para almacenar de ma
 
 ---
 
+#### 10. 📥 `dockermanager-prometheus` — El Recolector de Telemetría (Prometheus)
+| | |
+|---|---|
+| **Imagen** | `prom/prometheus:latest` |
+| **Redes** | `dmz_net` |
+| **Volumen** | `prometheus-data:/prometheus` |
+
+Se encarga de conectarse cada 15 segundos a los demás contenedores y al servidor para raspar ("scrape") sus métricas (RAM, CPU, Disco). Actúa como la base de datos temporal hiper-optimizada que guarda todo este histórico de rendimiento en la DMZ de forma privada.
+
+---
+
+#### 11. 📈 `dockermanager-grafana` — El Panel de Control (Grafana)
+| | |
+|---|---|
+| **Imagen** | `grafana/grafana:latest` |
+| **Redes** | `dmz_net` |
+| **Volumen** | `grafana-data:/var/lib/grafana` |
+| **Puerto Expuesto**| `3000` |
+
+La herramienta visual definitiva. Se conecta a Prometheus y dibuja espectaculares cuadros de mando interactivos que permiten al administrador revisar cuellos de botella y configurar alertas de infraestructura.
+
+---
+
+#### 12. 🖥️ `dockermanager-node-exporter` — El Termómetro del Servidor (Node Exporter)
+| | |
+|---|---|
+| **Imagen** | `prom/node-exporter:latest` |
+| **Redes** | `dmz_net` |
+| **Modo PID** | `host` |
+
+Es un agente ciego que se ancla al sistema de archivos real del servidor de Producción para leer las constantes vitales del hardware subyacente (Carga de CPU nativa, Inodos y espacio libre en disco, red física) y exponerlas en bruto para que Prometheus las recoja.
+
+---
+
+#### 13. 📦 `dockermanager-cadvisor` — El Espía de Contenedores (Google cAdvisor)
+| | |
+|---|---|
+| **Imagen** | `gcr.io/cadvisor/cadvisor:v0.47.0` |
+| **Redes** | `dmz_net` |
+| **Privilegios** | `privileged: true` |
+
+A diferencia de Node Exporter que mira el hierro, cAdvisor intercepta el kernel de Linux (`/dev/kmsg` y `cgroups`) para espiar a todos y cada uno de los contenedores de los clientes y registrar su consumo individual de Red, RAM y CPU sin entrometerse en sus datos.
+
+---
+
 
 
 ## ⚙️ Inteligencia del Backend (Cerebro Operativo)
@@ -604,3 +649,246 @@ Tras reiniciar EveBox y pulsar **Refresh**, el evento aparecerá en el Inbox.
 
 **En producción sobre Linux**, el tráfico real disparará alertas automáticamente sin ningún paso adicional.
 
+---
+
+## 📊 Observabilidad y Monitorización (Grafana + Prometheus)
+
+Para asegurar la estabilidad en producción, DockerManager incluye un stack completo de métricas integrado directamente en el `docker-compose.yml`. A diferencia de EveBox que vigila intrusiones (Seguridad/IPS), este stack vigila la **salud del rendimiento** del servidor y los contenedores aportando telemetría en tiempo real.
+
+**Accesos y Puertos:**
+- **Grafana (Dashboard Visual)**: `http://localhost:3000` (Usuario: `admin` / Contraseña: `admin`)
+- **Prometheus (Motor de Series Temporales)**: *Oculto en la red DMZ (No expuesto directamente al público por seguridad).*
+
+### Los 4 Pilares de la Monitorización
+
+1. 📥 **Prometheus (El Recolector):** Es el corazón del sistema. Cada 15 segundos se dedica a preguntar automáticamente al resto de los componentes cómo se encuentran, y guarda todo el histórico de métricas de forma súper eficiente en una base de datos propia (`prometheus-data`).
+
+2. 📈 **Grafana (El Visualizador):** Prometheus por sí solo solo guarda números puros. Grafana se conecta a Prometheus y te permite crear paneles de control (Dashboards) preciosos y fáciles de entender con gráficos sobre consumo de RAM, alertas por correo si se cae un servidor, etc.
+
+3. 🖥️ **Node Exporter (Métricas del Host/Hardware):** Un pequeño "chivato" o agente instalado mediante un contenedor. Informa a Prometheus exclusivamente sobre el estado de la **máquina real (El servidor Ubuntu/Debian host)**:
+   - ¿Queda espacio libre en el disco duro físico?
+    Escudo->>TuContenedor: El Escudo lo inyecta seguro en la consola interna
+    TuContenedor-->>Escudo: El contenedor responde con el resultado del comando
+    Escudo-->>Cerebro: Se lo pasa al Cerebro de vuelta
+    Cerebro-->>TuNavegador: Y el Cerebro dibuja la respuesta en tu pantalla
+```
+
+> **¿Qué ganamos con esto?** Que tú tienes control interactivo total de tus contenedores de forma instantánea usando tan solo un navegador web, **sin arriesgarte y sin necesidad de abrir vulnerables puertos SSH o firewalls hacia el exterior.**
+
+---
+
+
+## ✅ Garantías de Seguridad del Sistema
+
+| Garantía | Descripción |
+|---|---|
+| **Aislamiento de Capa 2** | Ningún usuario puede ver el tráfico de otro. Docker actúa como un muro físico entre VPCs. |
+| **Prevención de Escaneo** | El firewall Suricata bloquea intentos de descubrimiento de red interna (NMAP, etc.). |
+| **Inmutabilidad de Red** | Las VPCs son `--internal` por defecto. El acceso a internet es un privilegio concedido y filtrado, no un derecho automático. |
+| **Confinamiento del Daemon** | El Socket Proxy impide que el backend (o un contenedor comprometido) escale privilegios al host. |
+| **Cifrado en Tránsito y Reposo** | Secretos cifrados con AES-256. Conexiones HTTPS gestionadas por Traefik + Let's Encrypt. |
+
+### 👯‍♂️ Sistema de "Redes Gemelas" — Explicación para humanos
+
+Docker tiene una limitación técnica por defecto: **una red interna aislada no se puede abrir hacia internet mágicamente con un clic**. Si quisieras abrirla manualmente, tendrías que destruirla y crearla de nuevo desde cero, lo que "apagaría" la conexión de todos tus otros contenedores conectados a ella de manera temporal.
+
+Para resolver esto y lograr esa inmediatez en el panel (*un clic y estás publicado*), DockerManager emplea un concepto interno llamado **patrón de redes gemelas**. 
+
+Imagínate que cada red virtual de Docker es una **habitación sin ventanas** 100% segura para tus inquilinos (es tu red privada `Internal`). Y si de repente decides que un contenedor concreto necesita poder interactuar con fuera (darle Internet)... ¿Qué hace el sistema sin que te enteres? En lugar de derruir la habitación completa con todos dentro, el sistema **te construye inmediatamente una habitación gemela idéntica al lado, pero con ventanas (la extensión `_open`)**, y arranca a ese contenedor ahí conectado. Si le quitas internet en la interfaz web, borra la habitación abierta y te lo vuelve a clonar en la segura. 
+
+**Esquema de Flujo visual del sistema:**
+
+```mermaid
+flowchart TD
+    A[¿Activas el check de Conexión Externa en tu
+Contenedor Web / Stack?]
+    
+    A -->|NO O PULSAS QUITAR INTERNET| B[Modo Seguro / Bloqueado]
+    A -->|SÍ, QUIERO INTERNET Y UN DOMINIO| C[Modo Expuesto al Exterior]
+    
+    B --> B1{¿Dónde lo estás desplegando?}
+    B1 -->|VPC por defecto| D[Se manda a la Red: usuario_default_vlan
+🔒 100% Privada y Aislada
+Imposible hackearte remotamente]
+    B1 -->|Red custom personalizada| E[Se manda a la Red: usuario_mi-red
+🔒 100% Privada y Aislada]
+    
+    C --> C1{¿Dónde lo estás desplegando?}
+    C1 -->|VPC por defecto| F[Se manda a la Red: usuario_default_vlan (version abierta)
+🌐 Conectada a internet con reglas proxy
+Se actualizan las defensas Suricata en caliente para él]
+    C1 -->|Red custom personalizada| G[El sistema auto-crea la Red: usuario_mi-red_open
+🌐 Red Gemela Orientada a Internet
+Tus demás procesos y proyectos o DBs que compartían la red
+original quedan aislados a salvo]
+```
+
+**¿Qué pasa con todas esas habitaciones vacías después?**
+No tienes que preocuparte del desorden informático. Si dejas de utilizar aplicaciones expuestas a internet, esa red `_open` abandonada que creamos es detectada por el proceso limpiador que ronda tu cuenta **(El Segador/Reaper)** y la **elimina automáticamente por completo** pasados cinco minutos para ahorrar ancho de banda.
+
+
+---
+|---|---|
+| VPC por defecto, Internet **OFF** | `${userId}_default_vlan` | ❌ Bloqueado |
+| VPC por defecto, Internet **ON** | `${userId}_default_vlan` recreada | ✅ Filtrado |
+| Red custom, Internet **OFF** | `${userId}_mi-red` | ❌ Bloqueado |
+| Red custom, Internet **ON** | `${userId}_mi-red_open` (auto-creada) | ✅ Filtrado |
+| Sin red (`none`) | — | ❌ Completamente aislado |
+| Stack multi-contenedor | `${userId}_stack_xxx_net` | ❌ Bloqueado (por diseño) |
+
+---
+
+## ⚖️ Modelo de Responsabilidad Compartida
+
+DockerManager sigue el mismo modelo de responsabilidad que los grandes proveedores cloud (AWS, Azure, GCP): **la plataforma garantiza la seguridad _de_ la infraestructura; el usuario es responsable de la seguridad _dentro_ de sus aplicaciones.**
+
+| Capa | Responsable | Ejemplos |
+|---|---|---|
+| **Red perimetral e IDS/IPS** | DockerManager ✅ | Firewall Suricata, bloqueo de escaneos, aislamiento VPC |
+| **Aislamiento entre usuarios** | DockerManager ✅ | Redes `Internal`, prefijado de redes, Socket Proxy |
+| **Actualizaciones del host** | DockerManager ✅ | Kernel, Docker Engine, Traefik, MongoDB |
+| **Imagen del contenedor** | **Usuario** ⚠️ | Usar imágenes base actualizadas, evitar versiones con CVEs conocidos |
+| **Seguridad de la aplicación** | **Usuario** ⚠️ | WordPress, plugins, contraseñas, autenticación de la app |
+| **Datos dentro del contenedor** | **Usuario** ⚠️ | Backups, cifrado de datos en reposo dentro del volumen |
+| **Acceso a Internet activado** | **Usuario** ⚠️ | El usuario acepta la responsabilidad del tráfico saliente al habilitarlo |
+
+> [!NOTE]
+> DockerManager protege el **perímetro y la infraestructura**. La seguridad de lo que se ejecuta dentro de cada contenedor — versiones de software, configuraciones, contraseñas de aplicación — es responsabilidad exclusiva del usuario que lo despliega, tal y como ocurre en servicios como Heroku, Render o Railway.
+
+---
+
+## 🔄 Lifecycle Management & Billing Retention
+
+DockerManager incorpora estrategias avanzadas de Billing y Retención propias de plataformas SaaS (Software as a Service):
+
+### 1. Sistema de "Auto-Renew" y Degradación Elegante (Graceful Downgrade)
+El esquema de usuario nativo cuenta con un control de pago mensual (campo `autoRenew`).
+1. **Renovación Autónoma**: El "Segador" (Reaper Service) comprueba recurrentemente si el plan ha expirado. Si el `autoRenew` está activo (`true`), en vez de apagar los servicios, prolonga automáticamente la vida de la suscripción un mes más para no interrumpir entornos de producción.
+2. **Degradación Elegante (Downgrade)**: Si un usuario cancela su plan (`autoRenew = false`), el Reaper tampoco apaga sus máquinas de golpe si tiene aplicaciones publicadas vitales. Cuando su periodo facturado termina, la plataforma rebaja la cuenta automáticamente al plan `free` base, lo cual limitará los recursos RAM/CPU que ese usuario puede gastar, forzándole a adaptar su infraestructura a los límites gratuitos sin desconectarlo fatalmente de un tirón.
+
+### 2. Flujo de Fricción en Cancelaciones (Retargeting)
+El panel de **Subscription Management** incluye un túnel de cancelación compuesto por 4 pasos puramente psicológicos y técnicos diseñados para desalentar al máximo el abandono o los clicks accidentales:
+- **Paso 1 (Disuasión visual)**: Lista dramática y visual de todo lo que van a perder si abandonan la suscripción premium.
+- **Paso 2 (Encuesta estricta)**: Obliga al usuario a interactuar seleccionando un motivo de abandono ("Muy caro", "Faltan features", etc.).
+- **Paso 3 (Retención de Última Oportunidad)**: Mensaje empático apelando al Roadmap de plataforma con el botón de cancelar oculto visualmente versus un botón gigante de "I'll Stay".
+- **Paso 4 (Sentencia de Culpabilidad y Castigo)**: Se fuerza al usuario a mecanografiar a mano exactamente "I AGREE TO CANCEL". Los eventos de navegador de *copy-paste (Pegar)* están totalmente boicoteados de forma nativa vía JavaScript saltando un "Toast" de notificación castigándolo. Como último paso de frustración controlada, exige aguantar un **countdown de 5 segundos** impidiendo confirmar la operación hasta que finalice por completo.
+
+---
+
+## 🎨 Arquitectura UI Tonal Dinámica (CSS Variables y CSS-in-JS Variables)
+
+DockerManager implementa un sistema unificado y cohesivo de Identidad Visual a lo largo de toda su SPA de React apoyándose de variables nativas de CSS integradas en `tailwind.config.js`.
+
+El diseño emplea una paleta modular nombrada `brand` que inyecta los tonos desde `--brand-50` hasta `--brand-900`. 
+Por defecto, toda la plataforma hace uso de una ardiente y vibrante paleta en tonos rojos que responde instantáneamente sin depender de configuraciones estáticas engorrosas en frameworks de Tailwind. 
+Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unificado (`index.css`), suprimiendo completamente los anticuados azules base para uniformizar un "modo espacial agresivo y Premium", con todos los componentes principales (botones, badges y tarjetas de precios) adaptados para leer del alias genérico genérico `bg-brand-500` en vez de usar valores de colores crudos del navegador.
+
+---
+
+## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
+
+**Acceso:** http://localhost:5636
+
+Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y muestra al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
+
+- **Volumen de Logs Compartido**: Suricata reporta en silencio los logs de alertas a un volumen Docker llamado `suricata-logs` (generando el archivo `eve.json`).
+- **Data-Store SQLite de Alto Rendimiento**: EveBox consume en caliente ese `.json` renderizando un visor con filtros de búsqueda ultra avanzado en el puerto `5636`.
+
+### 🚀 Arranque con Reglas Automáticas
+
+El script de arranque del firewall (`config/edge-fw.sh`) ejecuta automáticamente `suricata-update` al iniciarse, descargando el **ET Open Ruleset (~49.500 reglas)** antes de arrancar el motor. Las reglas se persisten en el volumen `suricata-rules` para no tener que descargarlas en cada reinicio.
+
+> [!NOTE]
+> El primer arranque tarda 2-3 minutos extra mientras descarga las reglas de internet. Los reinicios posteriores son instantáneos al usar el caché del volumen.
+
+### ⚠️ Limitación en Docker Desktop (Windows/Mac)
+
+> [!WARNING]
+> **Por qué EveBox puede aparecer vacío en desarrollo local:**
+> En Docker Desktop sobre Windows o Mac, los contenedores de una misma red se comunican a través de un switch virtual interno del hypervisor (Hyper-V/VirtIO). Este switch **no replica el tráfico entre las interfaces de los contenedores**, por lo que Suricata, aunque esté escuchando en `eth0`, `eth1` y `eth2`, no llega a ver los paquetes que intercambian otros contenedores.
+>
+> **Esto es una limitación de arquitectura de Docker Desktop, no un bug de nuestra configuración.** En producción sobre Linux nativo, Suricata captura el tráfico de forma completa porque los bridges de Linux sí replican los paquetes.
+
+### 🧪 Cómo Generar Alertas de Prueba
+
+Para verificar que el pipeline Suricata → EveBox funciona correctamente, hay dos formas:
+
+**Opción A — Tráfico real desde dentro del firewall** (funciona en todos los entornos):
+```bash
+# Desde dentro del contenedor del firewall, que sí genera tráfico visible
+docker exec dockermanager-edge-fw curl -s http://testmyids.com
+```
+Esta URL está diseñada explícitamente para disparar la regla **GPL ATTACK_RESPONSE id check returned root** (SID 2100498). La respuesta `uid=0(root)` es la firma que detecta Suricata.
+
+**Opción B — Inyección directa de evento de prueba** (para demos sin red):
+```bash
+docker exec dockermanager-edge-fw python3 -c "
+import json, time, datetime
+log_file = '/var/log/suricata/eve.json'
+now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f') + '+0000'
+alert = {
+    'timestamp': now, 'flow_id': int(time.time()), 'in_iface': 'eth0',
+    'event_type': 'alert', 'src_ip': '185.15.54.12', 'src_port': 54321,
+    'dest_ip': '10.0.0.5', 'dest_port': 80, 'proto': 'TCP',
+    'alert': {'action': 'allowed', 'gid': 1, 'signature_id': 2100498, 'rev': 7,
+              'signature': 'GPL ATTACK_RESPONSE id check returned root',
+              'category': 'Potentially Bad Traffic', 'severity': 1},
+    'app_proto': 'http'
+}
+open(log_file, 'a').write(json.dumps(alert) + '\n')
+print('Alert injected at', now)
+"
+docker restart dockermanager-evebox
+```
+Tras reiniciar EveBox y pulsar **Refresh**, el evento aparecerá en el Inbox.
+
+**En producción sobre Linux**, el tráfico real disparará alertas automáticamente sin ningún paso adicional.
+
+---
+
+## 📊 Observabilidad y Monitorización (Grafana + Prometheus)
+
+Para asegurar la estabilidad en producción, DockerManager incluye un stack completo de métricas integrado directamente en el `docker-compose.yml`. A diferencia de EveBox que vigila intrusiones (Seguridad/IPS), este stack vigila la **salud del rendimiento** del servidor y los contenedores aportando telemetría en tiempo real.
+
+**Accesos y Puertos:**
+- **Grafana (Dashboard Visual)**: `http://localhost:3000` (Usuario: `admin` / Contraseña: `admin`)
+- **Prometheus (Motor de Series Temporales)**: *Oculto en la red DMZ (No expuesto directamente al público por seguridad).*
+
+### Los 4 Pilares de la Monitorización
+
+1. 📥 **Prometheus (El Recolector):** Es el corazón del sistema. Cada 15 segundos se dedica a preguntar automáticamente al resto de los componentes cómo se encuentran, y guarda todo el histórico de métricas de forma súper eficiente en una base de datos propia (`prometheus-data`).
+
+2. 📈 **Grafana (El Visualizador):** Prometheus por sí solo solo guarda números puros. Grafana se conecta a Prometheus y te permite crear paneles de control (Dashboards) preciosos y fáciles de entender con gráficos sobre consumo de RAM, alertas por correo si se cae un servidor, etc.
+
+3. 🖥️ **Node Exporter (Métricas del Host/Hardware):** Un pequeño "chivato" o agente instalado mediante un contenedor. Informa a Prometheus exclusivamente sobre el estado de la **máquina real (El servidor Ubuntu/Debian host)**:
+   - ¿Queda espacio libre en el disco duro físico?
+   - ¿La CPU está al 100% de uso?
+   - ¿Se está consumiendo la memoria RAM del servidor?
+
+4. 📦 **cAdvisor (Métricas de Contenedores de Google):** Mientras Node Exporter mira el servidor, cAdvisor (Container Advisor) mira **hacia dentro de Docker**. Le chiva a Prometheus exactamente cuánta RAM y CPU está consumiendo individualmente *cada* contenedor en tiempo real, lo que te permite descubrir qué aplicación de qué inquilino se está comiendo los recursos ("Noisy neighbor").
+
+### 🛠️ Cómo configurar Grafana paso a paso (Tutorial GUI)
+
+Grafana viene en blanco por defecto. Sigue estos 3 simples pasos desde el navegador (`http://localhost:3000`) para activar toda la telemetría:
+
+**Paso 1: Conectar a Grafana con Prometheus (La fuente de los datos)**
+1. En Grafana, ve al menú izquierdo, dale al ícono de tuerca ⚙️ (**Connections -> Data sources**).
+2. Haz clic en el botón azul **"Add data source"** y selecciona **Prometheus**.
+3. En la casilla **URL**, introduce exactamente: `http://prometheus:9090` (este es su nombre en la red interna).
+4. Baja hasta el final y dale a **"Save & test"**. Saldrá un check verde.
+
+**Paso 2: Importar el Dashboard del Servidor (Node Exporter)**
+En lugar de crear paneles desde cero, aprovecharemos el trabajo de la comunidad.
+1. En Grafana, pulsa el botón **`+`** arriba a la derecha y dale a **Import dashboard**.
+2. Escribe el ID oficial **`1860`** (Panel maestro de Node Exporter) y pulsa "Load".
+3. Abajo del todo te pedirá elegir la base de datos que creamos en el Paso 1 (Suele salir como `prometheus default`). Selecciónala y pulsa **Import**. 
+*¡Disfruta de paneles profesionales automáticos de la salud de tu servidor!*
+
+**Paso 3: Crear paneles de Contenedores (cAdvisor) limpios**
+Debido a las actualizaciones frecuentes de Docker, importar paneles comunitarios de cAdvisor suele dar errores. Te enseñamos cómo crear el tuyo propio perfecto en 1 minuto:
+1. Dale a la tuerca **`+` -> New Dashboard -> + Add visualization**.
+2. Selecciona **prometheus** como fuente de datos.
+3. En la caja inferior de código ("Metrics browser") escribe: `container_memory_usage_bytes{name!=""}`
+4. En la barra lateral derecha inferior, en el campo **Legend -> Custom**, escribe `{{name}}` (esto limpiará la leyenda para mostrar solo el nombre corto del contenedor).
+5. En la barra lateral derecha superior, busca **Standard options -> Unit**, escribe `bytes` y selecciona `Data -> bytes(IEC)`. 
+6. ¡Dale a *Run queries* y luego *Save*! Las líneas serán totalmente legibles en MB/GB y no verás basura del sistema en la leyenda.
