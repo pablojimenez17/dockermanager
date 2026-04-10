@@ -12,7 +12,7 @@ async function run() {
     await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/dockermanager');
     console.log('Connected to DB');
 
-    const domain = 'api.pablo.dev';
+    const domain = 'api.orbit.dev';
     const domainPort = '80';
     const name = 'testnginx';
     const image = 'nginx:alpine';

@@ -60,7 +60,7 @@ const TerminalDemo = () => {
         { text: '✓ Cloning repository...', color: 'text-emerald-600 dark:text-emerald-400', delay: 600 },
         { text: '✓ Building Docker image (1.2s cache hit)', color: 'text-emerald-600 dark:text-emerald-400', delay: 1100 },
         { text: '✓ Container started on port 3000', color: 'text-emerald-600 dark:text-emerald-400', delay: 1600 },
-        { text: '✓ Domain api.pablo.dev → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 2100 },
+        { text: '✓ Domain api.orbit.dev → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 2100 },
         { text: '✓ TLS certificate issued', color: 'text-brand-600 dark:text-brand-400', delay: 2500 },
         { text: '🚀 Deployed in 3.8s', color: 'text-amber-600 dark:text-amber-400 font-bold', delay: 3000 },
     ];
@@ -383,14 +383,12 @@ const Welcome = () => {
                                 'RAM quota',
                                 'CPU Cores',
                                 'Persistent Storage',
-                                'S3-Compatible Buckets',
                                 'Custom Domains',
                                 'Support level',
                                 'Advanced Network Modes',
                                 'Custom Node Mapping',
                                 'Multi-Tenant Org Management',
                                 'Custom Roles & RBAC',
-                                'White-glove Support',
                             ].map((feature, rowIdx) => {
                                 const values = {
                                     'Containers limit': ['Up to 2', 'Up to 10', 'Up to 50', 'Unlimited'],
@@ -403,7 +401,6 @@ const Welcome = () => {
                                     'Custom Node Mapping': [false, false, true, true],
                                     'Multi-Tenant Org Management': [false, false, false, true],
                                     'Custom Roles & RBAC': [false, false, false, true],
-                                    'White-glove Support': [false, false, false, true],
                                 };
                                 const rowValues = values[feature] || [false, false, false, false];
                                 const isEven = rowIdx % 2 === 0;
