@@ -27,10 +27,12 @@ export const NotificationProvider = ({ children }) => {
     };
 
     useEffect(() => {
-        // Only fetch if logged in
-        if (localStorage.getItem('token')) {
-            fetchInvites();
+        // Only fetch and connect socket if logged in
+        if (!localStorage.getItem('role') && !localStorage.getItem('token')) {
+            return;
         }
+
+        fetchInvites();
 
         // Setup Socket
         const newSocket = io('http://localhost:5000', {

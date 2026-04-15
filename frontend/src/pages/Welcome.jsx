@@ -1,68 +1,63 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import {
     ArrowRight, Zap, ShieldCheck, Activity, Terminal,
     GitBranch, Globe, Lock, ChevronRight, Cpu,
-    HardDrive, BarChart2, Layers, Sun, Moon, Aperture
+    HardDrive, BarChart2, Layers, Sun, Moon, Aperture,
+    Code, Server, Database, Mail, CheckCircle2, Send, Star, Quote
 } from 'lucide-react';
 import { useTheme } from '../components/ThemeContext';
 
-/* ─── Animated Grid Background ───────────────────────────── */
-const AnimatedGrid = () => (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        {/* Fixed explicit colors to avoid currentColor inheritance issues */}
-        <div
-            className="absolute inset-0"
-            style={{
-                backgroundImage: `
-                    linear-gradient(to right, rgba(100,116,139,0.08) 1px, transparent 1px),
-                    linear-gradient(to bottom, rgba(100,116,139,0.08) 1px, transparent 1px)
-                `,
-                backgroundSize: '80px 80px',
-            }}
-        />
-        <div className="absolute top-[-20%] left-[-10%] w-[60vw] h-[60vw] rounded-full bg-brand-500/10 blur-[130px] animate-pulse-slow" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[50vw] h-[50vw] rounded-full bg-indigo-500/10 blur-[130px] animate-pulse-slow" style={{ animationDelay: '2s' }} />
-        <div className="absolute top-[40%] left-[40%] w-[30vw] h-[30vw] rounded-full bg-violet-500/8 blur-[100px] animate-pulse-slow" style={{ animationDelay: '4s' }} />
-    </div>
-);
-
-/* ─── Stats Badge ─────────────────────────────────────────── */
-const StatBadge = ({ value, label, icon: Icon, color }) => (
-    <div className="flex flex-col items-center p-5 rounded-2xl bg-white/80 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 backdrop-blur-md hover:border-brand-500/50 dark:hover:border-brand-500/40 transition-all hover:-translate-y-1 group shadow-sm">
-        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${color} group-hover:scale-110 transition-transform`}>
-            <Icon size={20} />
+/* ─── Optimized Background ───────────────────────────── */
+const AnimatedBackground = () => {
+    // Removed expensive framer-motion loops and huge blurs to improve scroll performance
+    return (
+        <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10 bg-slate-50 dark:bg-slate-950">
+            <div
+                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
+                style={{
+                    backgroundImage: `linear-gradient(to right, #808080 1px, transparent 1px), linear-gradient(to bottom, #808080 1px, transparent 1px)`,
+                    backgroundSize: '80px 80px',
+                }}
+            />
+            <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-brand-500/10 blur-[80px]" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-indigo-500/10 blur-[80px]" />
         </div>
-        <span className="text-3xl font-black text-slate-900 dark:text-white mb-1">{value}</span>
-        <span className="text-xs text-slate-500 dark:text-slate-400 text-center">{label}</span>
-    </div>
-);
+    );
+};
 
-/* ─── Feature Card ────────────────────────────────────────── */
-const FeatureCard = ({ icon: Icon, title, desc, accent, delay }) => (
-    <div
-        className="relative group p-6 rounded-2xl border border-slate-200 dark:border-slate-700/70 bg-white/80 dark:bg-slate-800/60 backdrop-blur-sm hover:border-brand-500/40 hover:bg-white dark:hover:bg-slate-800/80 transition-all duration-300 hover:-translate-y-1 shadow-sm"
-        style={{ animationDelay: delay }}
-    >
-        <div className={`w-11 h-11 rounded-xl flex items-center justify-center mb-4 border transition-transform group-hover:scale-110 ${accent}`}>
-            <Icon size={20} />
-        </div>
-        <h3 className="font-bold text-slate-900 dark:text-white mb-2">{title}</h3>
-        <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
-        <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-brand-500/5 to-transparent pointer-events-none" />
-    </div>
-);
+/* ─── Shared Animation Variants ───────────────────────────── */
+const fadeInUp = {
+    hidden: { opacity: 0, y: 30 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: "easeOut" } }
+};
+
+const staggerContainer = {
+    hidden: { opacity: 0 },
+    visible: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1
+        }
+    }
+};
+
+const scaleIn = {
+    hidden: { opacity: 0, scale: 0.95 },
+    visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: "easeOut" } }
+};
 
 /* ─── Terminal Demo ───────────────────────────────────────── */
 const TerminalDemo = () => {
     const lines = [
-        { text: '$ orbit deploy my-api --git github.com/pablo/api', color: 'text-slate-700 dark:text-slate-300' },
-        { text: '✓ Cloning repository...', color: 'text-emerald-600 dark:text-emerald-400', delay: 600 },
-        { text: '✓ Building Docker image (1.2s cache hit)', color: 'text-emerald-600 dark:text-emerald-400', delay: 1100 },
-        { text: '✓ Container started on port 3000', color: 'text-emerald-600 dark:text-emerald-400', delay: 1600 },
-        { text: '✓ Domain api.orbit.dev → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 2100 },
-        { text: '✓ TLS certificate issued', color: 'text-brand-600 dark:text-brand-400', delay: 2500 },
-        { text: '🚀 Deployed in 3.8s', color: 'text-amber-600 dark:text-amber-400 font-bold', delay: 3000 },
+        { text: '$ orbit deploy my-api --git github.com/orbit/api', color: 'text-slate-700 dark:text-slate-300' },
+        { text: '✓ Cloning repository...', color: 'text-emerald-600 dark:text-emerald-400', delay: 400 },
+        { text: '✓ Building Docker image (1.2s cache hit)', color: 'text-emerald-600 dark:text-emerald-400', delay: 800 },
+        { text: '✓ Container started on port 3000', color: 'text-emerald-600 dark:text-emerald-400', delay: 1200 },
+        { text: '✓ Domain api.orbit.dev → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 1600 },
+        { text: '✓ TLS certificate issued', color: 'text-brand-600 dark:text-brand-400', delay: 2000 },
+        { text: '🚀 Deployed in 3.8s', color: 'text-amber-600 dark:text-amber-400 font-bold', delay: 2400 },
     ];
 
     const [visible, setVisible] = useState(0);
@@ -74,64 +69,44 @@ const TerminalDemo = () => {
     }, []);
 
     return (
-        <div className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-2xl shadow-slate-200/60 dark:shadow-black/50">
-            <div className="flex items-center gap-2 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+        <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+            className="relative lg:col-span-3 rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-brand-500/5 dark:shadow-black/20 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md group"
+        >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 dark:from-slate-800/40 dark:to-slate-900/10 pointer-events-none" />
+            <div className="relative flex items-center gap-2 px-4 py-3 bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700/50">
                 <span className="w-3 h-3 rounded-full bg-red-400" />
                 <span className="w-3 h-3 rounded-full bg-amber-400" />
                 <span className="w-3 h-3 rounded-full bg-emerald-400" />
-                <span className="ml-2 text-xs text-slate-400 font-mono">orbit-cli</span>
+                <span className="ml-2 text-xs text-slate-500 dark:text-slate-400 font-mono flex-1 text-center mr-8">orbit-cli</span>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-900 p-5 font-mono text-sm min-h-[200px]">
+            <div className="relative p-6 font-mono text-sm min-h-[260px]">
                 {lines.slice(0, visible).map((l, i) => (
-                    <div key={i} className={`mb-1.5 ${l.color}`}>
+                    <motion.div
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        key={i}
+                        className={`mb-2.5 ${l.color}`}
+                    >
                         {l.text}
-                    </div>
+                    </motion.div>
                 ))}
                 {visible < lines.length && (
-                    <span className="inline-block w-2 h-4 bg-brand-500 animate-pulse" />
+                    <span className="inline-block w-2 h-4 bg-brand-500 animate-pulse mt-1" />
                 )}
             </div>
-        </div>
+        </motion.div>
     );
 };
 
-/* ─── Main Welcome Component ──────────────────────────────── */
+/* ─── Main Component ──────────────────────────────────────── */
 const Welcome = () => {
     const { theme, toggleTheme } = useTheme();
 
-    const features = [
-        {
-            icon: GitBranch, title: 'Git Deploy Pipelines',
-            desc: 'Push to GitHub, Orbit builds and deploys your app automatically in seconds.',
-            accent: 'bg-violet-100 dark:bg-violet-500/10 border-violet-200 dark:border-violet-500/20 text-violet-600 dark:text-violet-400'
-        },
-        {
-            icon: Globe, title: 'Auto-Routing & TLS',
-            desc: 'Assign custom domains instantly. Traefik reverse-proxies and issues certs automatically.',
-            accent: 'bg-emerald-100 dark:bg-emerald-500/10 border-emerald-200 dark:border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
-        },
-        {
-            icon: Layers, title: 'Smart Stack Builder',
-            desc: 'Deploy multi-tier apps like WordPress + MySQL in one click with linked env vars.',
-            accent: 'bg-brand-100 dark:bg-brand-500/10 border-brand-200 dark:border-brand-500/20 text-brand-600 dark:text-brand-400'
-        },
-        {
-            icon: Terminal, title: 'Live Terminals & Logs',
-            desc: 'Browser-based shell access and real-time log streaming. No SSH needed.',
-            accent: 'bg-amber-100 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/20 text-amber-600 dark:text-amber-400'
-        },
-        {
-            icon: HardDrive, title: 'Persistent Volumes',
-            desc: 'Attach Docker volumes to containers so your data survives restarts.',
-            accent: 'bg-pink-100 dark:bg-pink-500/10 border-pink-200 dark:border-pink-500/20 text-pink-600 dark:text-pink-400'
-        },
-        {
-            icon: Lock, title: 'Secrets & Registries',
-            desc: 'Store encrypted environment secrets and connect private Docker registries.',
-            accent: 'bg-indigo-100 dark:bg-indigo-500/10 border-indigo-200 dark:border-indigo-500/20 text-indigo-600 dark:text-indigo-400'
-        },
-    ];
-
+    // Pricing Plans Array
     const plans = [
         {
             name: 'Hobby', price: '$0', desc: 'Perfect for learning Docker and running small personal projects.',
@@ -189,162 +164,325 @@ const Welcome = () => {
     ];
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-brand-500/30 overflow-x-hidden transition-colors duration-200">
-            <AnimatedGrid />
+        <div className="bg-transparent text-slate-900 dark:text-slate-100 selection:bg-brand-500/30 overflow-x-hidden min-h-screen">
+            <AnimatedBackground />
 
-            {/* ── Navbar ── */}
-            <nav className="relative z-50 border-b border-slate-200 dark:border-slate-800 bg-white/70 dark:bg-slate-950/80 backdrop-blur-xl sticky top-0 transition-colors duration-200">
+            {/* ── Sticky Navbar ── */}
+            <motion.nav
+                initial={{ y: -100 }}
+                animate={{ y: 0 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="fixed top-0 left-0 right-0 z-50 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/70 dark:bg-slate-950/70 backdrop-blur-xl shadow-sm"
+            >
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 bg-brand-500/15 rounded-lg flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
+                    <Link to="/" className="flex items-center gap-3 group">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
                             <Aperture size={18} className="animate-[spin_15s_linear_infinite]" />
                         </div>
-                        <span className="text-base font-bold tracking-wide text-slate-900 dark:text-white">Orbit</span>
-                    </div>
+                        <span className="text-lg font-black tracking-wide text-slate-900 dark:text-white">Orbit</span>
+                    </Link>
 
-                    <div className="hidden md:flex items-center gap-7 text-sm text-slate-500 dark:text-slate-400">
-                        <a href="#features" className="hover:text-slate-900 dark:hover:text-white transition-colors">Features</a>
-                        <a href="#pricing" className="hover:text-slate-900 dark:hover:text-white transition-colors">Pricing</a>
-                        <a href="#stats" className="hover:text-slate-900 dark:hover:text-white transition-colors">Stats</a>
-                    </div>
+                    {/* Navbar Middle Links Removed */}
+                    <div className="flex-1" />
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-4">
                         <button
                             onClick={toggleTheme}
-                            className="p-2 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-all border border-slate-200 dark:border-slate-700"
+                            className="p-2 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
                             title="Toggle Theme"
                         >
                             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                         </button>
-                        <Link to="/login" className="text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors px-3 py-1.5">
+                        <Link to="/login" className="hidden sm:block text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-500 transition-colors">
                             Log in
                         </Link>
                         <Link
                             to="/register"
-                            className="text-sm bg-brand-500 hover:bg-brand-400 text-white px-4 py-2 rounded-lg font-medium transition-all shadow-lg shadow-brand-500/20 flex items-center gap-1.5"
+                            className="text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-brand-500 dark:hover:bg-brand-400 px-5 py-2 rounded-full font-bold transition-all shadow-md"
                         >
-                            Get Started <ArrowRight size={14} />
+                            Get Started
                         </Link>
                     </div>
                 </div>
-            </nav>
+            </motion.nav>
 
-            {/* ── Hero ── */}
-            <section className="relative max-w-7xl mx-auto px-6 pt-24 pb-20 text-center">
-                <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 text-brand-600 dark:text-brand-300 text-xs font-semibold mb-8">
-                    <span className="relative flex h-1.5 w-1.5">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-500" />
-                    </span>
-                    v1.0 — Now Live
-                </div>
-
-                <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-6 leading-[1.1]">
-                    <span className="text-slate-900 dark:text-white">Ship containers.</span><br />
-                    <span className="bg-gradient-to-r from-brand-500 via-violet-500 to-indigo-500 dark:from-brand-400 dark:via-violet-400 dark:to-indigo-400 bg-clip-text text-transparent">
-                        Not complexity.
-                    </span>
-                </h1>
-
-                <p className="text-lg text-slate-600 dark:text-slate-400 max-w-xl mx-auto mb-10 leading-relaxed">
-                    Orbit is a self-hosted PaaS that wraps Docker Engine in a premium developer experience.
-                    Deploy, monitor, and scale — all from one place.
-                </p>
-
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <Link
-                        to="/register"
-                        className="px-7 py-3.5 bg-brand-500 hover:bg-brand-400 text-white font-semibold rounded-xl transition-all shadow-[0_0_40px_rgba(14,165,233,0.3)] hover:shadow-[0_0_50px_rgba(14,165,233,0.45)] flex items-center gap-2 text-sm"
+            {/* ── Hero Section ── */}
+            <section className="relative pt-32 pb-20 md:pt-40 md:pb-32 px-6 flex items-center justify-center">
+                <div className="max-w-7xl mx-auto text-center w-full z-10">
+                    <motion.div
+                        initial="hidden" animate="visible" variants={staggerContainer}
+                        className="max-w-4xl mx-auto"
                     >
-                        Start Deploying Now <ArrowRight size={16} />
-                    </Link>
-                    <a
-                        href="#features"
-                        className="px-7 py-3.5 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 font-semibold rounded-xl transition-all border border-slate-200 dark:border-slate-700 text-sm shadow-sm"
-                    >
-                        Explore Features
-                    </a>
-                </div>
+                        {/* Live for students badge removed */}
 
-                {/* Terminal visual */}
-                <div className="relative mt-20 max-w-3xl mx-auto">
-                    <div className="absolute -inset-1 rounded-3xl bg-gradient-to-r from-brand-500/20 via-violet-500/20 to-indigo-500/20 blur-xl opacity-50 dark:opacity-100" />
-                    <div className="relative">
+                        <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.1]">
+                            Manage Infrastructure <br className="hidden md:block" />
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 via-indigo-500 to-violet-500">
+                                Without Friction.
+                            </span>
+                        </motion.h1>
+
+                        <motion.p variants={fadeInUp} className="text-lg md:text-xl text-slate-600 dark:text-slate-400 mb-10 max-w-2xl mx-auto leading-relaxed">
+                            A powerful, intuitive orchestration platform inspired by modern standards.
+                            Deploy, scale, and monitor containers with a beautifully crafted experience.
+                        </motion.p>
+
+                        <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <Link
+                                to="/register"
+                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-full transition-all shadow-lg shadow-brand-500/30 hover:scale-105 flex items-center justify-center gap-2"
+                            >
+                                Start Building <ArrowRight size={18} />
+                            </Link>
+                        </motion.div>
+                    </motion.div>
+                </div>
+                {/* Hero gradient fade removed for better scroll performance */}
+            </section>
+
+            {/* ── About Section ── */}
+            <section className="relative py-20 px-6 border-t border-slate-200/50 dark:border-slate-800/50 bg-white/40 dark:bg-slate-900/40 backdrop-blur-sm">
+                <div className="max-w-7xl mx-auto">
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                        className="grid grid-cols-1 lg:grid-cols-5 gap-12 items-center"
+                    >
+                        <motion.div variants={fadeInUp} className="lg:col-span-2">
+                            <h2 className="text-3xl md:text-5xl font-black mb-6 text-slate-900 dark:text-white">
+                                Built for <span className="text-brand-500">Developers</span>, Designed for <span className="text-indigo-500">Humans</span>.
+                            </h2>
+                            <p className="text-lg text-slate-600 dark:text-slate-400 mb-6 leading-relaxed">
+                                Orbit removes the complexities of Docker and server management.
+                                We provide a seamless, premium interface to control your architecture
+                                so you can focus on writing code, not configuring servers.
+                            </p>
+
+                            <ul className="space-y-4 mb-8">
+                                {[
+                                    "Zero configuration deployments",
+                                    "Real-time metrics and logs",
+                                    "SSL & Custom Domains built-in",
+                                    "Role-based access control"
+                                ].map((item, i) => (
+                                    <li key={i} className="flex items-center gap-3 text-slate-700 dark:text-slate-300 font-medium">
+                                        <div className="w-6 h-6 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                            <CheckCircle2 size={14} />
+                                        </div>
+                                        {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        </motion.div>
+
                         <TerminalDemo />
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* ── Features Section ── */}
+            <section className="relative py-20 px-6 bg-slate-100/50 dark:bg-slate-900/10">
+                <div className="max-w-7xl mx-auto">
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={fadeInUp}
+                        className="text-center mb-16"
+                    >
+                        <span className="text-brand-500 font-bold uppercase tracking-widest text-sm mb-4 block">Platform Capabilities</span>
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white max-w-2xl mx-auto">
+                            Everything you need to ship production-ready apps.
+                        </h2>
+                    </motion.div>
+
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                        className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                    >
+                        {[
+                            { icon: GitBranch, title: 'Git Integration', desc: 'Push code, and we will build, containerize, and deploy it automatically.', color: 'from-violet-500 to-indigo-500' },
+                            { icon: Globe, title: 'Instant Routing', desc: 'Automatic subdomains, SSL certificates, and intelligent load balancing via Traefik.', color: 'from-brand-400 to-brand-600' },
+                            { icon: Database, title: 'Persistent Volumes', desc: 'Attach stateful storage to any container ensuring your data survives restarts.', color: 'from-emerald-400 to-emerald-600' },
+                            { icon: ShieldCheck, title: 'Secure Secrets', desc: 'Inject encrypted environment variables safely into your application runtime.', color: 'from-amber-400 to-orange-500' },
+                            { icon: Activity, title: 'Live Telemetry', desc: 'Visualize CPU, memory usage, and stream logs directly in your browser.', color: 'from-pink-500 to-rose-500' },
+                            { icon: Layers, title: 'Template Market', desc: 'Deploy databases, message queues, and full stacks in a single click.', color: 'from-blue-500 to-cyan-500' }
+                        ].map((feature, i) => (
+                            <motion.div
+                                key={i}
+                                variants={scaleIn}
+                                className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 shadow-sm hover:shadow-xl transition-all duration-300"
+                            >
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br ${feature.color} text-white shadow-lg shadow-black/10 group-hover:scale-110 transition-transform duration-300`}>
+                                    <feature.icon size={26} strokeWidth={2.5} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{feature.title}</h3>
+                                <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
+                                    {feature.desc}
+                                </p>
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                </div>
+            </section>
+
+            {/* ── Projects / Showcase Section ── */}
+            <section className="relative py-20 px-6">
+                <div className="max-w-7xl mx-auto">
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                        className="mb-16"
+                    >
+                        <motion.div variants={fadeInUp} className="max-w-2xl">
+                            <span className="text-indigo-500 font-bold uppercase tracking-widest text-sm mb-4 block">Built For Scale</span>
+                            <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4">
+                                One platform, infinite possibilities.
+                            </h2>
+                            <p className="text-lg text-slate-600 dark:text-slate-400">
+                                Whether you're running a personal blog or a microservices architecture, Orbit adapts to your topology.
+                            </p>
+                        </motion.div>
+                        {/* View Documentation removed */}
+                    </motion.div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                        {[
+                            {
+                                title: 'Modern Web Apps',
+                                tech: 'React, Node.js, Redis',
+                                bg: 'bg-gradient-to-br from-brand-500/10 to-indigo-500/10',
+                                stats: [
+                                    { label: 'Avg Build Time', value: '4.2s' },
+                                    { label: 'Deployments', value: '1,200+' }
+                                ]
+                            },
+                            {
+                                title: 'Data Pipelines',
+                                tech: 'Python, Postgres, Airflow',
+                                bg: 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10',
+                                stats: [
+                                    { label: 'Uptime', value: '99.9%' },
+                                    { label: 'Logs Processed', value: '50M+' }
+                                ]
+                            }
+                        ].map((item, i) => (
+                            <motion.div
+                                initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                                variants={fadeInUp}
+                                key={i}
+                                className={`relative h-auto md:h-64 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 ${item.bg} overflow-hidden group`}
+                            >
+                                <div className="relative z-10 h-full flex flex-col justify-between gap-6">
+                                    <div className="inline-flex px-4 py-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-slate-900 dark:text-white text-sm font-bold shadow-sm w-fit">
+                                        {item.tech}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-2xl md:text-3xl font-black text-slate-900 dark:text-white mb-4 group-hover:text-brand-500 transition-colors">{item.title}</h3>
+                                        <div className="flex gap-6">
+                                            {item.stats.map((stat, idx) => (
+                                                <div key={idx}>
+                                                    <div className="text-xl font-bold text-slate-900 dark:text-white">{stat.value}</div>
+                                                    <div className="text-sm font-medium text-slate-500 dark:text-slate-400">{stat.label}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/10 dark:bg-slate-800/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
+                            </motion.div>
+                        ))}
                     </div>
                 </div>
             </section>
 
-            {/* ── Stats ── */}
-            <section id="stats" className="relative max-w-7xl mx-auto px-6 py-16">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <StatBadge value="30+" label="Container Templates" icon={Layers} color="bg-brand-100 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400 border border-brand-200 dark:border-brand-500/20" />
-                    <StatBadge value="99.9%" label="Uptime SLA" icon={Activity} color="bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-500/20" />
-                    <StatBadge value="<4s" label="Average Deploy Time" icon={Zap} color="bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20" />
-                    <StatBadge value="∞" label="Scale Potential" icon={Cpu} color="bg-violet-100 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400 border border-violet-200 dark:border-violet-500/20" />
+            {/* ── Testimonials / Social Proof ── */}
+            <section className="relative py-24 px-6 overflow-hidden">
+                <motion.div 
+                    initial={{ y: 50, opacity: 0 }}
+                    whileInView={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 1 }}
+                    className="absolute top-1/2 left-0 w-64 h-64 bg-brand-500/20 blur-[100px] rounded-full pointer-events-none mix-blend-screen" 
+                />
+                <motion.div 
+                    initial={{ y: -50, opacity: 0 }}
+                    whileInView={{ y: 0, opacity: 1 }}
+                    transition={{ duration: 1, delay: 0.2 }}
+                    className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen" 
+                />
+                
+                <div className="max-w-7xl mx-auto relative z-10">
+                    <motion.div
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={fadeInUp}
+                        className="text-center mb-16"
+                    >
+                        <span className="text-emerald-500 font-bold uppercase tracking-widest text-sm mb-4 block">Loved by Engineering Teams</span>
+                        <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white max-w-3xl mx-auto">
+                            Don't just take our word for it.
+                        </h2>
+                    </motion.div>
+
+                    <motion.div 
+                        initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
+                        variants={staggerContainer}
+                        className="grid grid-cols-1 md:grid-cols-3 gap-8"
+                    >
+                        {[
+                            {
+                                quote: "Orbit transformed how we deploy. No more writing endless YAML files; everything just works out of the box. Absolutely game-changing.",
+                                author: "Sarah Jenkins",
+                                role: "Lead DevOps, TechFlow",
+                                avatar: "https://ui-avatars.com/api/?name=Sarah+Jenkins&background=0D8ABC&color=fff"
+                            },
+                            {
+                                quote: "The real-time metrics and beautiful interface make monitoring our microservices a breeze. It's like having a dedicated SRE on the team.",
+                                author: "Michael Chen",
+                                role: "CTO, StartupX",
+                                avatar: "https://ui-avatars.com/api/?name=Michael+Chen&background=10B981&color=fff"
+                            },
+                            {
+                                quote: "We migrated 50+ containers to Orbit in hours. The built-in Traefik routing and SSL management saved us weeks of engineering time.",
+                                author: "Elena Rodriguez",
+                                role: "Backend Lead, CloudSync",
+                                avatar: "https://ui-avatars.com/api/?name=Elena+Rodriguez&background=8B5CF6&color=fff"
+                            }
+                        ].map((testimonial, i) => (
+                            <motion.div 
+                                key={i}
+                                variants={scaleIn}
+                                className="relative p-8 rounded-3xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-xl hover:-translate-y-2 transition-transform duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] group overflow-hidden"
+                            >
+                                <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                                <Quote className="absolute -top-4 -right-2 text-slate-100 dark:text-slate-800/50 w-32 h-32 -z-10 rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-110" />
+                                <div className="flex gap-1 mb-6 text-amber-400">
+                                    {[...Array(5)].map((_, i) => <Star key={i} size={18} fill="currentColor" />)}
+                                </div>
+                                <p className="text-slate-700 dark:text-slate-300 text-lg mb-8 leading-relaxed font-medium relative z-10">
+                                    "{testimonial.quote}"
+                                </p>
+                                <div className="flex items-center gap-4 relative z-10">
+                                    <img src={testimonial.avatar} alt={testimonial.author} className="w-12 h-12 rounded-full ring-4 ring-white dark:ring-slate-800 shadow-md" />
+                                    <div>
+                                        <h4 className="font-bold text-slate-900 dark:text-white">{testimonial.author}</h4>
+                                        <span className="text-sm font-semibold text-brand-500 dark:text-brand-400">{testimonial.role}</span>
+                                    </div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </motion.div>
                 </div>
             </section>
 
-            {/* ── Features ── */}
-            <section id="features" className="relative max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-center mb-14">
-                    <div className="inline-flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400 font-semibold uppercase tracking-widest mb-4">
-                        <span className="w-8 h-px bg-brand-400/50" /> Features <span className="w-8 h-px bg-brand-400/50" />
-                    </div>
-                    <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4">Everything to ship faster</h2>
-                    <p className="text-slate-500 dark:text-slate-400 max-w-xl mx-auto">
-                        A complete PaaS experience, built directly on top of your Docker Engine.
-                    </p>
-                </div>
-                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-                    {features.map((f, i) => (
-                        <FeatureCard key={i} {...f} delay={`${i * 80}ms`} />
-                    ))}
-                </div>
-            </section>
-
-            {/* ── How it works ── */}
-            <section className="relative max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-center mb-14">
-                    <div className="inline-flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400 font-semibold uppercase tracking-widest mb-4">
-                        <span className="w-8 h-px bg-brand-400/50" /> How It Works <span className="w-8 h-px bg-brand-400/50" />
-                    </div>
-                    <h2 className="text-4xl font-black text-slate-900 dark:text-white mb-4">Deploy in three steps</h2>
-                </div>
-                <div className="grid md:grid-cols-3 gap-6">
-                    {[
-                        { step: '01', title: 'Create your account', desc: 'Sign up and choose your plan. Be up and running in under a minute.', icon: ShieldCheck },
-                        { step: '02', title: 'Connect your code', desc: 'Link a GitHub repo or pick a template from our marketplace.', icon: GitBranch },
-                        { step: '03', title: 'Deploy & monitor', desc: 'Hit deploy. Watch your app go live. Monitor resources in real time.', icon: BarChart2 },
-                    ].map((s, i) => (
-                        <div key={i} className="relative p-7 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-800/60 group hover:border-brand-500/40 transition-all shadow-sm">
-                            <div className="text-7xl font-black text-slate-100 dark:text-slate-700 absolute top-4 right-6 select-none font-mono">{s.step}</div>
-                            <div className="w-11 h-11 rounded-xl bg-brand-100 dark:bg-brand-500/15 border border-brand-200 dark:border-brand-500/30 flex items-center justify-center text-brand-600 dark:text-brand-400 mb-5 group-hover:scale-110 transition-transform">
-                                <s.icon size={20} />
-                            </div>
-                            <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">{s.title}</h3>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{s.desc}</p>
-                            {i < 2 && (
-                                <ChevronRight className="hidden md:block absolute -right-3 top-1/2 -translate-y-1/2 text-brand-500/40" size={24} />
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* ── Pricing ── */}
-            <section id="pricing" className="relative max-w-7xl mx-auto px-6 py-24 border-t border-slate-200 dark:border-slate-800">
-                <div className="text-center mb-14">
-                    <div className="inline-flex items-center gap-2 text-xs text-brand-600 dark:text-brand-400 font-semibold uppercase tracking-widest mb-4">
-                        <span className="w-8 h-px bg-brand-400/50" /> Pricing <span className="w-8 h-px bg-brand-400/50" />
-                    </div>
+            {/* ── Pricing Table Section (Restored) ── */}
+            <section className="relative max-w-7xl mx-auto px-6 py-20 border-t border-slate-200/50 dark:border-slate-800/50">
+                <div className="text-center mb-16">
+                    <span className="text-brand-500 font-bold uppercase tracking-widest text-sm mb-4 block">Pricing</span>
                     <h2 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-4">Simple, transparent pricing</h2>
                     <p className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto">Start for free, scale when you're ready.</p>
                 </div>
 
-                {/* Comparison grid */}
-                <div className="overflow-x-auto rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
-                    <table className="w-full min-w-[700px] border-collapse">
+                <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                    <table className="w-full min-w-[800px] border-collapse bg-white dark:bg-slate-900/40">
                         {/* Header row */}
                         <thead>
                             <tr>
@@ -352,25 +490,19 @@ const Welcome = () => {
                                     Feature
                                 </th>
                                 {plans.map((p, i) => (
-                                    <th key={i} className={`px-6 py-5 text-center border-b border-slate-200 dark:border-slate-700 ${p.highlighted
+                                    <th key={i} className={`px-6 py-6 text-center border-b border-slate-200 dark:border-slate-700 ${p.highlighted
                                         ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white'
                                         : 'bg-slate-50 dark:bg-slate-800/80'
                                         }`}>
                                         {p.tag && (
-                                            <div className={`inline-flex text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 mb-2 ${p.highlighted ? 'bg-white/20 text-white' : 'bg-brand-100 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400'
-                                                }`}>
+                                            <div className={`inline-flex text-[10px] font-bold uppercase tracking-wide rounded-full px-2 py-0.5 mb-2 ${p.highlighted ? 'bg-white/20 text-white' : 'bg-brand-100 dark:bg-brand-500/15 text-brand-600 dark:text-brand-400'}`}>
                                                 {p.tag}
                                             </div>
                                         )}
-                                        <div className={`font-black text-lg ${p.highlighted ? 'text-white' : 'text-slate-900 dark:text-white'
-                                            }`}>{p.name}</div>
-                                        <div className={`text-2xl font-black mt-1 ${p.highlighted ? 'text-white' : 'text-slate-900 dark:text-white'
-                                            }`}>
-                                            {p.price}<span className={`text-sm font-normal ${p.highlighted ? 'text-brand-200' : 'text-slate-400 dark:text-slate-500'
-                                                }`}>/mo</span>
+                                        <div className={`font-black text-lg ${p.highlighted ? 'text-white' : 'text-slate-900 dark:text-white'}`}>{p.name}</div>
+                                        <div className={`text-2xl font-black mt-1 ${p.highlighted ? 'text-white' : 'text-slate-900 dark:text-white'}`}>
+                                            {p.price}<span className={`text-sm font-normal ${p.highlighted ? 'text-brand-200' : 'text-slate-400 dark:text-slate-500'}`}>/mo</span>
                                         </div>
-                                        <p className={`text-xs mt-1 leading-tight ${p.highlighted ? 'text-brand-100' : 'text-slate-500 dark:text-slate-400'
-                                            }`}>{p.desc}</p>
                                     </th>
                                 ))}
                             </tr>
@@ -386,43 +518,33 @@ const Welcome = () => {
                                 'Custom Domains',
                                 'Support level',
                                 'Advanced Network Modes',
-                                'Custom Node Mapping',
-                                'Multi-Tenant Org Management',
                                 'Custom Roles & RBAC',
                             ].map((feature, rowIdx) => {
                                 const values = {
                                     'Containers limit': ['Up to 2', 'Up to 10', 'Up to 50', 'Unlimited'],
                                     'RAM quota': ['1 GB', '8 GB', '32 GB', '128 GB'],
                                     'CPU Cores': ['1 Core', '4 Cores', '16 Cores', '64 Cores'],
-                                    'Persistent Storage': ['1 GB (1 Disk)', '10 GB (5 Disks)', '100 GB (20 Disks)', '1 TB'],
+                                    'Persistent Storage': ['1 GB', '10 GB', '100 GB', '1 TB'],
                                     'Custom Domains': [false, '3 Domains', 'Unlimited', 'Unlimited'],
-                                    'Support level': ['Community', 'Priority', '24/7 Dedicated', 'White-glove SRE'],
+                                    'Support level': ['Community', 'Priority', '24/7 Dedicated', 'White-glove'],
                                     'Advanced Network Modes': [false, true, true, true],
-                                    'Custom Node Mapping': [false, false, true, true],
-                                    'Multi-Tenant Org Management': [false, false, false, true],
                                     'Custom Roles & RBAC': [false, false, false, true],
                                 };
                                 const rowValues = values[feature] || [false, false, false, false];
                                 const isEven = rowIdx % 2 === 0;
                                 return (
-                                    <tr key={rowIdx} className={isEven
-                                        ? 'bg-white dark:bg-slate-900'
-                                        : 'bg-slate-50/60 dark:bg-slate-800/40'
-                                    }>
-                                        <td className="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700/60">
+                                    <tr key={rowIdx} className={isEven ? 'bg-white dark:bg-slate-900/50' : 'bg-slate-50/60 dark:bg-slate-800/20'}>
+                                        <td className="px-6 py-4 text-sm font-medium text-slate-600 dark:text-slate-300 border-b border-slate-100 dark:border-slate-800">
                                             {feature}
                                         </td>
                                         {rowValues.map((val, colIdx) => (
-                                            <td key={colIdx} className={`px-6 py-4 text-center text-sm border-b border-slate-100 dark:border-slate-700/60 ${plans[colIdx].highlighted
-                                                ? 'bg-brand-500/8 dark:bg-brand-500/10'
-                                                : ''
-                                                }`}>
+                                            <td key={colIdx} className={`px-6 py-4 text-center text-sm border-b border-slate-100 dark:border-slate-800 ${plans[colIdx].highlighted ? 'bg-brand-500/5 dark:bg-brand-500/10' : ''}`}>
                                                 {val === false ? (
                                                     <span className="text-slate-300 dark:text-slate-600 text-lg">—</span>
                                                 ) : val === true ? (
-                                                    <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-xs font-bold">✓</span>
+                                                    <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-bold">✓</span>
                                                 ) : (
-                                                    <span className="font-medium text-slate-700 dark:text-slate-200">{val}</span>
+                                                    <span className="font-medium text-slate-700 dark:text-slate-300">{val}</span>
                                                 )}
                                             </td>
                                         ))}
@@ -434,18 +556,12 @@ const Welcome = () => {
                         {/* CTA row */}
                         <tfoot>
                             <tr>
-                                <td className="px-6 py-5 bg-slate-50 dark:bg-slate-800/80 rounded-bl-2xl" />
+                                <td className="px-6 py-5 bg-slate-50 dark:bg-slate-800/80 rounded-bl-3xl" />
                                 {plans.map((p, i) => (
-                                    <td key={i} className={`px-6 py-5 text-center ${p.highlighted
-                                        ? 'bg-brand-600/15 dark:bg-brand-500/15'
-                                        : 'bg-slate-50 dark:bg-slate-800/80'
-                                        } ${i === plans.length - 1 ? 'rounded-br-2xl' : ''}`}>
+                                    <td key={i} className={`px-6 py-5 text-center ${p.highlighted ? 'bg-brand-600/10 dark:bg-brand-500/10' : 'bg-slate-50 dark:bg-slate-800/80'} ${i === plans.length - 1 ? 'rounded-br-3xl' : ''}`}>
                                         <Link
                                             to="/register"
-                                            className={`inline-flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${p.highlighted
-                                                ? 'bg-brand-500 hover:bg-brand-400 text-white shadow-lg shadow-brand-500/20'
-                                                : 'bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'
-                                                }`}
+                                            className={`inline-flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${p.highlighted ? 'bg-brand-500 hover:bg-brand-400 text-white shadow-lg shadow-brand-500/20' : 'bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'}`}
                                         >
                                             {p.cta}
                                         </Link>
@@ -457,40 +573,61 @@ const Welcome = () => {
                 </div>
             </section>
 
-            {/* ── CTA Banner ── */}
-            <section className="relative max-w-7xl mx-auto px-6 py-16">
-                <div className="relative overflow-hidden rounded-3xl border border-brand-200 dark:border-brand-500/20 bg-gradient-to-br from-brand-50 via-indigo-50 to-violet-50 dark:from-brand-600/20 dark:via-indigo-600/15 dark:to-violet-600/20 p-12 text-center shadow-sm">
-                    <div className="absolute inset-0 opacity-10 dark:opacity-20" style={{
-                        backgroundImage: 'radial-gradient(circle at 50% 50%, rgba(14,165,233,0.5) 0%, transparent 70%)'
-                    }} />
-                    <h2 className="relative text-4xl font-black text-slate-900 dark:text-white mb-4">Ready to take off?</h2>
-                    <p className="relative text-slate-600 dark:text-slate-300 max-w-md mx-auto mb-8">
-                        Join Orbit today — deploy your first container in under 60 seconds, no DevOps experience needed.
-                    </p>
-                    <div className="relative flex flex-col sm:flex-row gap-4 justify-center">
-                        <Link
-                            to="/register"
-                            className="px-8 py-4 bg-brand-500 hover:bg-brand-400 text-white font-bold rounded-xl transition-all shadow-[0_0_30px_rgba(14,165,233,0.3)] hover:shadow-[0_0_40px_rgba(14,165,233,0.5)] flex items-center justify-center gap-2"
-                        >
-                            Create Free Account <ArrowRight size={18} />
-                        </Link>
-                        <Link
-                            to="/login"
-                            className="px-8 py-4 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-800 dark:text-white font-bold rounded-xl transition-all border border-slate-200 dark:border-slate-700 shadow-sm"
-                        >
-                            Sign In
-                        </Link>
+            {/* ── Contact / CTA Section ── */}
+            <section className="relative py-20 px-6 overflow-hidden">
+                <motion.div
+                    initial="hidden" whileInView="visible" viewport={{ once: true }}
+                    variants={scaleIn}
+                    className="max-w-5xl mx-auto rounded-[3rem] bg-slate-900 border border-slate-800 p-10 md:p-20 text-center relative shadow-2xl"
+                >
+                    {/* Background effects */}
+                    <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDIiLz4KPC9zdmc+')] opacity-20" />
+
+                    <div className="relative z-10">
+                        <h2 className="text-4xl md:text-6xl font-black text-white mb-6">
+                            Ready to modernize your infrastructure?
+                        </h2>
+                        <p className="text-xl text-slate-400 mb-10 max-w-2xl mx-auto">
+                            Join thousands of developers using Orbit to push code faster and scale effortlessly.
+                        </p>
+
+                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                            <Link
+                                to="/register"
+                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-400 text-white font-bold rounded-full transition-all shadow-[0_0_30px_rgba(14,165,233,0.3)] hover:scale-105 flex items-center justify-center gap-2"
+                            >
+                                Get Started for Free <ArrowRight size={18} />
+                            </Link>
+                            <a
+                                href="mailto:hello@orbit.dev"
+                                className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-full transition-all border border-slate-700 flex items-center justify-center gap-2"
+                            >
+                                <Mail size={18} /> Contact Sales
+                            </a>
+                        </div>
                     </div>
-                </div>
+                </motion.div>
             </section>
 
             {/* ── Footer ── */}
-            <footer className="border-t border-slate-200 dark:border-slate-800 py-10 text-center text-slate-400 dark:text-slate-500 text-sm">
-                <div className="flex items-center justify-center gap-2 mb-2">
-                    <Aperture size={14} className="text-brand-500" />
-                    <span className="font-bold text-slate-500 dark:text-slate-400">Orbit</span>
+            <footer className="border-t border-slate-200/50 dark:border-slate-800/50 py-10 px-6">
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-6">
+                    <div className="flex items-center gap-3">
+                        <Aperture size={20} className="text-brand-500" />
+                        <span className="font-black text-lg text-slate-900 dark:text-white">Orbit</span>
+                    </div>
+                    <div className="text-slate-500 dark:text-slate-400 text-sm font-medium text-center md:text-left">
+                        © {new Date().getFullYear()} Orbit — Pablo Jiménez Prieto.
+                    </div>
+                    <div className="flex items-center gap-4">
+                        <a href="https://github.com" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                            <Code size={20} />
+                        </a>
+                        <a href="mailto:contact@orbit" className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">
+                            <Send size={20} />
+                        </a>
+                    </div>
                 </div>
-                <p>© 2026 Orbit — Pablo Jiménez Prieto · Institut Pedralbes</p>
             </footer>
         </div>
     );

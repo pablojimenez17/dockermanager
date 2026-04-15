@@ -61,7 +61,11 @@ export const OrgProvider = ({ children }) => {
     useEffect(() => {
         // Assume AuthContext handles login state. We just fetch whenever mounted for now.
         // In a real scenario, you'd tie this to user login/logout events.
-        fetchOrganizations();
+        if (localStorage.getItem('role')) {
+            fetchOrganizations();
+        } else {
+            setLoadingOrgs(false);
+        }
     }, []);
 
     const switchOrganization = (orgId) => {
