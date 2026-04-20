@@ -16,7 +16,7 @@ const Secrets = () => {
 
     const fetchSecrets = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/secrets');
+            const res = await axios.get('/api/secrets');
             setSecrets(res.data);
         } catch (error) {
             console.error('Failed to fetch secrets:', error);
@@ -42,7 +42,7 @@ const Secrets = () => {
 
         setSubmitting(true);
         try {
-            await axios.post('http://localhost:5000/api/secrets', newSecret);
+            await axios.post('/api/secrets', newSecret);
             addToast('Success', 'Secret encrypted and stored in vault', 'success');
             setNewSecret({ name: '', value: '', description: '' });
             setShowForm(false);
@@ -60,7 +60,7 @@ const Secrets = () => {
         }
 
         try {
-            await axios.delete(`http://localhost:5000/api/secrets/${id}`);
+            await axios.delete(`/api/secrets/${id}`);
             addToast('Deleted', `Secret ${name} removed from vault`, 'success');
             fetchSecrets();
         } catch (error) {

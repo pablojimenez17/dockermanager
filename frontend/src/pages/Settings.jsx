@@ -32,7 +32,7 @@ const Settings = () => {
         // Fetch fresh subscription data
         const fetchUserData = async () => {
             try {
-                const res = await axios.get('http://localhost:5000/api/auth/me');
+                const res = await axios.get('/api/auth/me');
                 setPlanData({
                     planType: res.data.planType,
                     planExpiresAt: res.data.planExpiresAt,
@@ -68,7 +68,7 @@ const Settings = () => {
     const executeCancelPlan = async () => {
         setCancelling(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/plans/cancel');
+            const res = await axios.post('/api/plans/cancel');
             setPlanData(prev => ({ ...prev, autoRenew: false, planExpiresAt: res.data.planExpiresAt }));
             addToast('Plan Cancelled', res.data.message, 'success');
             setIsCancelModalOpen(false);

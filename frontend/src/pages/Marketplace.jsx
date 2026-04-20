@@ -47,14 +47,14 @@ const Marketplace = () => {
                 const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
                 const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
-                    axios.get('http://localhost:5000/api/templates', authOptions),
-                    axios.get('http://localhost:5000/api/secrets', authOptions).catch(() => ({ data: [] })),
-                    axios.get('http://localhost:5000/api/auth/me', authOptions),
-                    axios.get('http://localhost:5000/api/containers', authOptions),
+                    axios.get('/api/templates', authOptions),
+                    axios.get('/api/secrets', authOptions).catch(() => ({ data: [] })),
+                    axios.get('/api/auth/me', authOptions),
+                    axios.get('/api/containers', authOptions),
                     // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
-                    axios.get('http://localhost:5000/api/snapshots', authOptions).catch(() => ({ data: [] })),
-                    axios.get('http://localhost:5000/api/networks', authOptions).catch(() => ({ data: [] })),
-                    axios.get('http://localhost:5000/api/volumes', authOptions).catch(() => ({ data: [] }))
+                    axios.get('/api/snapshots', authOptions).catch(() => ({ data: [] })),
+                    axios.get('/api/networks', authOptions).catch(() => ({ data: [] })),
+                    axios.get('/api/volumes', authOptions).catch(() => ({ data: [] }))
                 ]);
 
                 // Map snapshots into the expected "Template" format
@@ -251,7 +251,7 @@ const Marketplace = () => {
             });
 
             // Post as a full stack using the working, reliable endpoint
-            await axios.post('http://localhost:5000/api/containers', { stack });
+            await axios.post('/api/containers', { stack });
 
             addToast(`${selectedTemplate.name} deployed successfully!`, 'success');
             closeModal();

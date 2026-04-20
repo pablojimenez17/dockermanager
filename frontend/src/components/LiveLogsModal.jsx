@@ -15,7 +15,7 @@ const LiveLogsModal = ({ containerId, containerName, onClose }) => {
         // Initialize socket connection using HTTP-Only cookies (credentials: true)
         // Or if using Bearer tokens: io('...', { auth: { token: localStorage.getItem(...) } })
 
-        socketRef.current = io('http://localhost:5000', {
+        socketRef.current = io('', {
             withCredentials: true // Important for HTTP-Only cookie auth if supported by backend io logic
             // Note: Our backend websocket.js currently expects handshake.auth.token for React
             // let's grab it if it still exists in a cookie/localstorage, or if your auth architecture
@@ -31,7 +31,7 @@ const LiveLogsModal = ({ containerId, containerName, onClose }) => {
 
     useEffect(() => {
         // Connect and subscribe to logs
-        socketRef.current = io('http://localhost:5000', {
+        socketRef.current = io('', {
             withCredentials: true // Send the httpOnly auth cookie to the socket server
         });
 

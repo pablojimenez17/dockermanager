@@ -20,7 +20,7 @@ const Snapshots = () => {
         try {
             setLoading(true);
             const token = localStorage.getItem('token');
-            const userRes = await axios.get('http://localhost:5000/api/auth/me', {
+            const userRes = await axios.get('/api/auth/me', {
                 headers: { Authorization: `Bearer ${token}` }
             });
 
@@ -29,7 +29,7 @@ const Snapshots = () => {
             localStorage.setItem('planType', currentPlan); // sync just in case
 
             if (currentPlan !== 'free') {
-                const snapRes = await axios.get('http://localhost:5000/api/snapshots', {
+                const snapRes = await axios.get('/api/snapshots', {
                     headers: { Authorization: `Bearer ${token}` }
                 });
                 setSnapshots(snapRes.data || []);
@@ -47,7 +47,7 @@ const Snapshots = () => {
 
         try {
             const token = localStorage.getItem('token');
-            await axios.delete(`http://localhost:5000/api/snapshots/${id}`, {
+            await axios.delete(`/api/snapshots/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             addToast('Snapshot deleted successfully.', 'success');

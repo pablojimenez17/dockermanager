@@ -16,7 +16,7 @@ const Dashboard = () => {
     useEffect(() => {
         const fetchSummary = async () => {
             try {
-                const res = await axios.get('http://localhost:5000/api/containers');
+                const res = await axios.get('/api/containers');
                 const containers = res.data;
                 const running = containers.filter(c => c.state === 'running');
 
@@ -33,7 +33,7 @@ const Dashboard = () => {
 
                 if (running.length > 0) {
                     const metricsPromises = running.map(c =>
-                        axios.get(`http://localhost:5000/api/stats/${c._id}`).catch(() => null)
+                        axios.get(`/api/stats/${c._id}`).catch(() => null)
                     );
                     const metricsResults = await Promise.all(metricsPromises);
                     metricsResults.forEach(m => {
@@ -58,7 +58,7 @@ const Dashboard = () => {
         const interval = setInterval(fetchSummary, 30000);
 
         // Setup Real-time Docker events socket
-        const socket = io('http://localhost:5000');
+        const socket = io('');
         socket.on('container:status_change', () => {
             fetchSummary(); // Just refetch numbers when any container changes state globally
         });

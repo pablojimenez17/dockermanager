@@ -14,7 +14,7 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
 
     useEffect(() => {
         // Initialize socket connection
-        socketRef.current = io('http://localhost:5000', { withCredentials: true });
+        socketRef.current = io('', { withCredentials: true });
 
         // Initialize xterm.js
         const term = new Terminal({

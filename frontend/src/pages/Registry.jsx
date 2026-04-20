@@ -18,7 +18,7 @@ const Registries = () => {
 
     const fetchRegistries = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/registries');
+            const res = await axios.get('/api/registries');
             setRegistries(res.data);
             setIsEnterprise(true);
         } catch (error) {
@@ -48,7 +48,7 @@ const Registries = () => {
 
         setSubmitting(true);
         try {
-            await axios.post('http://localhost:5000/api/registries', newRegistry);
+            await axios.post('/api/registries', newRegistry);
             addToast('Success', 'Registry credentials stored securely', 'success');
             setNewRegistry({ name: '', url: '', username: '', password: '' });
             setShowForm(false);
@@ -66,7 +66,7 @@ const Registries = () => {
         }
 
         try {
-            await axios.delete(`http://localhost:5000/api/registries/${id}`);
+            await axios.delete(`/api/registries/${id}`);
             addToast('Deleted', `Registry ${name} removed`, 'success');
             fetchRegistries();
         } catch (error) {

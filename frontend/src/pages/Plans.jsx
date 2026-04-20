@@ -13,7 +13,7 @@ const Plans = () => {
 
     const fetchCurrentPlan = async () => {
         try {
-            const res = await axios.get('http://localhost:5000/api/auth/me');
+            const res = await axios.get('/api/auth/me');
             setCurrentPlan(res.data.planType || 'free');
             // Update local storage just in case
             localStorage.setItem('planType', res.data.planType);
@@ -33,7 +33,7 @@ const Plans = () => {
 
         setProcessing(true);
         try {
-            const res = await axios.post('http://localhost:5000/api/plans/upgrade', { planType });
+            const res = await axios.post('/api/plans/upgrade', { planType });
 
             setCurrentPlan(res.data.planType);
             localStorage.setItem('planType', res.data.planType);

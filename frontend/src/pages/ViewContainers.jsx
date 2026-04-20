@@ -44,11 +44,11 @@ const ViewContainers = () => {
     const fetchContainers = async () => {
         try {
             setRefreshing(true);
-            const res = await axios.get('http://localhost:5000/api/containers');
+            const res = await axios.get('/api/containers');
             setContainers(res.data);
 
             // Also fetch basic user profile for limits
-            const userRes = await axios.get('http://localhost:5000/api/auth/me', {
+            const userRes = await axios.get('/api/auth/me', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setUserLimits(userRes.data?.limits || { maxSnapshots: 0 });
@@ -67,7 +67,7 @@ const ViewContainers = () => {
         const interval = setInterval(fetchContainers, 30000); // Poll every 30s
 
         // Setup Real-time Docker events socket
-        const socket = io('http://localhost:5000', { withCredentials: true });
+        const socket = io('', { withCredentials: true });
 
         socket.on('container:status_change', ({ dockerId, status }) => {
             console.log('[React Socket] Received container event:', dockerId, status);
@@ -112,8 +112,8 @@ const ViewContainers = () => {
             const cName = targetContainer ? targetContainer.name : 'Container';
 
             const endpoint = action === 'delete'
-                ? `http://localhost:5000/api/containers/${id}`
-                : `http://localhost:5000/api/containers/${id}/${action}`; // action 'stop'
+                ? `/api/containers/${id}`
+                : `/api/containers/${id}/${action}`; // action 'stop'
 
             const method = action === 'delete' ? 'delete' : 'post';
 
@@ -138,7 +138,7 @@ const ViewContainers = () => {
         try {
             addToast('Redeploy Started', `Pulling latest ${image} and spawning Green container for ${name}...`, 'info');
 
-            await axios.put(`http://localhost:5000/api/containers/${id}/redeploy`, {});
+            await axios.put(`/api/containers/${id}/redeploy`, {});
 
             addToast('Zero-Downtime Success', `${name} is now running the latest version. Old container removed.`, 'success');
             fetchContainers();
@@ -165,7 +165,7 @@ const ViewContainers = () => {
             addToast('Updating Container', `Applying network settings for ${editingContainer.name}...`, 'info');
             setEditModalOpen(false);
 
-            await axios.put(`http://localhost:5000/api/containers/${editingContainer._id}/edit`, {
+            await axios.put(`/api/containers/${editingContainer._id}/edit`, {
                 domain: editDomain,
                 domainPort: editPort
             });
@@ -195,7 +195,7 @@ const ViewContainers = () => {
             addToast('Creating Snapshot', `Committing image for ${snapshotContainer.name}. This may take a few seconds...`, 'info');
             setSnapshotModalOpen(false);
 
-            await axios.post(`http://localhost:5000/api/containers/${snapshotContainer.dockerId}/snapshot`, {
+            await axios.post(`/api/containers/${snapshotContainer.dockerId}/snapshot`, {
                 snapshotName: snapshotName
             }, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
@@ -219,7 +219,7 @@ const ViewContainers = () => {
 
         if (!isExpanded && container.state === 'running') {
             try {
-                const res = await axios.get(`http://localhost:5000/api/stats/${container._id}`);
+                const res = await axios.get(`/api/stats/${container._id}`);
                 setContainerStats(prev => ({ ...prev, [container._id]: res.data }));
             } catch (err) {
                 console.error("Failed to fetch stats for", container.name);
