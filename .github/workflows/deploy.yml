@@ -13,12 +13,16 @@ jobs:
     steps:
       - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
+          envs: GITHUB_TOKEN
           script: |
+            export PATH=$PATH:/usr/local/bin
             cd /opt/dockermanager
-            git pull
-            # Reiniciar los contenedores que hayan cambiado y forzar la reconstruccion si hubo cambios en los Dockerfiles
-            docker-compose up -d --build
+            git pull https://x-access-token:${GITHUB_TOKEN}@github.com/pablojimenez17/dockermanager.git main
+            # Usar docker compose (con espacio) que viene integrado con Docker V2 moderno
+            docker compose up -d --build
