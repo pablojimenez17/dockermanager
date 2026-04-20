@@ -108,9 +108,9 @@ Para que te hagas a la idea, esto es lo que está pasando en **tu propio Docker 
 
 ## 🌍 Despliegue en Producción (CI/CD y Dominio)
 
-El proyecto está diseñado para pasar de desarrollo local a un servidor público real de forma completamente transparente. Actualmente, DockerManager se encuentra en producción operando bajo las siguientes infraestructuras:
+El proyecto ha sido diseñado para pasar de desarrollo local a un servidor público real de forma completamente transparente. Actualmente, DockerManager - OrbitCloud se encuentra en producción operando bajo las siguientes infraestructuras:
 
-1. **Alojamiento en VPS:** Todo el stack está desplegado en un servidor VPS remoto (Ubuntu/Debian), donde las imágenes de los contenedores se compilan nativamente para el entorno de producción.
+1. **Alojamiento en VPS:** Todo el stack está desplegado en un servidor VPS remoto de DigitalOcean (Ubuntu), donde las imágenes de los contenedores se compilan nativamente para el entorno de producción.
 2. **Dominio Personalizado y SSL:** El dominio principal (`orbitcloud.app`) gestionado en Name.com apunta mediante registros DNS (A) a la IP del VPS. Traefik intercepta de forma inminente este tráfico y genera **Certificados SSL (HTTPS)** totalmente válidos mediante Let's Encrypt (TLS-ALPN-01) otorgando el candado de seguridad obligatorio para dominios `.app`.
 3. **Frontend Relativo (Sin Localhost):** El antiguo código rígido del frontend que forzaba peticiones a `localhost` se ha refactorizado entero. Ahora se nutre de **rutas relativas** (proxy interno en desarrollo local y mapeo directo en el servidor VPS), permitiendo funcionar en cualquier dominio subyacente sin colisionar puertos.
 
