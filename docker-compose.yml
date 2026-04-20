@@ -65,13 +65,19 @@ services:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
       - "--entrypoints.websecure.address=:443"
-      # Securely read from the socket proxy!
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=a22pabjimpri@inspedralbes.cat"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.constraints=Label(`traefik.constraint-label`, `dmz-proxy`)"
     networks:
       - transit_proxy_inverso
       - dmz_net
+    volumes:
+      - letsencrypt-data:/letsencrypt
     # If edge-fw isn't reliably forwarding (which requires an iptables bash script), 
     # uncomment these ports to access the web UI directly:
     ports:
@@ -144,8 +150,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.backend.rule=PathPrefix(`/api`)"
-      - "traefik.http.routers.backend.entrypoints=web"
+      - "traefik.http.routers.backend.rule=Host(`orbitcloud.app`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
 
   # 6. DMZ: Frontend
@@ -158,8 +165,9 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.frontend.rule=PathPrefix(`/`)"
-      - "traefik.http.routers.frontend.entrypoints=web"
+      - "traefik.http.routers.frontend.rule=Host(`orbitcloud.app`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
   # 7. DMZ: MongoDB
@@ -256,6 +264,7 @@ services:
 volumes:
   mongo-data:
   minio-data:
+  letsencrypt-data:
   suricata-logs:
   suricata-rules:
   prometheus-data:
