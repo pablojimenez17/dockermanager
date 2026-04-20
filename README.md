@@ -106,6 +106,26 @@ Para que te hagas a la idea, esto es lo que está pasando en **tu propio Docker 
 
 ---
 
+## 🌍 Despliegue en Producción (CI/CD y Dominio)
+
+El proyecto está diseñado para pasar de desarrollo local a un servidor público real de forma completamente transparente. Actualmente, DockerManager se encuentra en producción operando bajo las siguientes infraestructuras:
+
+1. **Alojamiento en VPS:** Todo el stack está desplegado en un servidor VPS remoto (Ubuntu/Debian), donde las imágenes de los contenedores se compilan nativamente para el entorno de producción.
+2. **Dominio Personalizado y SSL:** El dominio principal (`orbitcloud.app`) gestionado en Name.com apunta mediante registros DNS (A) a la IP del VPS. Traefik intercepta de forma inminente este tráfico y genera **Certificados SSL (HTTPS)** totalmente válidos mediante Let's Encrypt (TLS-ALPN-01) otorgando el candado de seguridad obligatorio para dominios `.app`.
+3. **Frontend Relativo (Sin Localhost):** El antiguo código rígido del frontend que forzaba peticiones a `localhost` se ha refactorizado entero. Ahora se nutre de **rutas relativas** (proxy interno en desarrollo local y mapeo directo en el servidor VPS), permitiendo funcionar en cualquier dominio subyacente sin colisionar puertos.
+
+### 🤖 Canalización CI/CD (Despliegue Continuo con GitHub Actions)
+
+DockerManager implementa un flujo de DevOps automatizado para olvidarse de acceder manualmente al servidor. En la carpeta `.github/workflows/deploy.yml` reside la magia:
+
+- Cada vez que se hace un `git push` a la rama `main`, un runner esclavo temporal de **GitHub Actions** despierta.
+- Inicia una conexión **SSH encriptada** hacia la IP del VPS utilizando los secretos almacenados de forma indescifrable (`VPS_HOST`, `VPS_USERNAME`, `VPS_PASSWORD`).
+- Inyecta un `GITHUB_TOKEN` local automáticamente en el servidor para evitar que el VPS bloquee permisos de autenticación de repositorios al intentar hacer `git pull`.
+- Utiliza la última tecnología del plugin **Docker Compose V2** (`docker compose up -d --build`) para derribar, reconstruir y reiniciar elegantemente los contenedores modificados **sin downtime manual**. 
+
+Con esto, el panel de control se mantiene siempre fresco y actualizado con el simple hecho de programar y hacer PUSH a GitHub desde la comodidad de casa.
+
+---
 ## 🏗️ Arquitectura de Red: El Modelo VPC (Virtual Private Cloud)
 
 A diferencia de las soluciones estándar, DockerManager no utiliza una red compartida. Implementa un sistema de **VPC dinámico** donde cada usuario opera en una burbuja de red totalmente privada e invisible para el resto de los inquilinos.
