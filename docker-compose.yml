@@ -58,7 +58,7 @@ services:
 
   # 2. Reverse Proxy (Traefik) - Proxy Inverso
   proxy-inverso:
-    image: traefik:v2.10
+    image: traefik:v2
     container_name: dockermanager-proxy
     command:
       - "--api.insecure=true"
@@ -88,7 +88,7 @@ services:
 
   # 3. LAN Reverse Proxy (Traefik for user containers)
   lan-proxy:
-    image: traefik:v2.10
+    image: traefik:v2
     container_name: dockermanager-lan-proxy
     command:
       - "--providers.docker=true"
