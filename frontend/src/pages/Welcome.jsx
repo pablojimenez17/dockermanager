@@ -55,7 +55,7 @@ const TerminalDemo = () => {
         { text: '✓ Cloning repository...', color: 'text-emerald-600 dark:text-emerald-400', delay: 400 },
         { text: '✓ Building Docker image (1.2s cache hit)', color: 'text-emerald-600 dark:text-emerald-400', delay: 800 },
         { text: '✓ Container started on port 3000', color: 'text-emerald-600 dark:text-emerald-400', delay: 1200 },
-        { text: '✓ Domain api.orbit.dev → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 1600 },
+        { text: '✓ Domain https://orbitcloud.app/ → routed via Traefik', color: 'text-brand-600 dark:text-brand-400', delay: 1600 },
         { text: '✓ TLS certificate issued', color: 'text-brand-600 dark:text-brand-400', delay: 2000 },
         { text: '🚀 Deployed in 3.8s', color: 'text-amber-600 dark:text-amber-400 font-bold', delay: 2400 },
     ];
@@ -397,19 +397,19 @@ const Welcome = () => {
 
             {/* ── Testimonials / Social Proof ── */}
             <section className="relative py-24 px-6 overflow-hidden">
-                <motion.div 
+                <motion.div
                     initial={{ y: 50, opacity: 0 }}
                     whileInView={{ y: 0, opacity: 1 }}
                     transition={{ duration: 1 }}
-                    className="absolute top-1/2 left-0 w-64 h-64 bg-brand-500/20 blur-[100px] rounded-full pointer-events-none mix-blend-screen" 
+                    className="absolute top-1/2 left-0 w-64 h-64 bg-brand-500/20 blur-[100px] rounded-full pointer-events-none mix-blend-screen"
                 />
-                <motion.div 
+                <motion.div
                     initial={{ y: -50, opacity: 0 }}
                     whileInView={{ y: 0, opacity: 1 }}
                     transition={{ duration: 1, delay: 0.2 }}
-                    className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen" 
+                    className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen"
                 />
-                
+
                 <div className="max-w-7xl mx-auto relative z-10">
                     <motion.div
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
@@ -422,7 +422,7 @@ const Welcome = () => {
                         </h2>
                     </motion.div>
 
-                    <motion.div 
+                    <motion.div
                         initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
                         variants={staggerContainer}
                         className="grid grid-cols-1 md:grid-cols-3 gap-8"
@@ -447,7 +447,7 @@ const Welcome = () => {
                                 avatar: "https://ui-avatars.com/api/?name=Elena+Rodriguez&background=8B5CF6&color=fff"
                             }
                         ].map((testimonial, i) => (
-                            <motion.div 
+                            <motion.div
                                 key={i}
                                 variants={scaleIn}
                                 className="relative p-8 rounded-3xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-xl hover:-translate-y-2 transition-transform duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] group overflow-hidden"

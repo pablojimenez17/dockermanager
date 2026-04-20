@@ -481,7 +481,7 @@ const CreateContainer = () => {
                                                     type="text"
                                                     value={c.domain || ''}
                                                     onChange={(e) => updateContainer(c.id, 'domain', e.target.value)}
-                                                    placeholder="e.g., api.orbit.dev"
+                                                    placeholder="e.g., https://orbitcloud.app/"
                                                     required={c.exposeDomain}
                                                     className="w-full px-3 py-2.5 bg-white dark:bg-slate-900 border border-purple-300 dark:border-purple-700 rounded-xl focus:ring-2 focus:ring-purple-500 text-sm font-mono placeholder-slate-400"
                                                 />
@@ -589,8 +589,8 @@ const CreateContainer = () => {
                                                 {/* Internet Access Toggle */}
                                                 {c.networkMode !== 'none' && (
                                                     <div className={`col-span-1 md:col-span-2 flex items-center justify-between p-3.5 rounded-xl border transition-all ${c.enableInternet
-                                                            ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50'
-                                                            : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-600'
+                                                        ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50'
+                                                        : 'bg-slate-50 dark:bg-slate-900/50 border-slate-300 dark:border-slate-600'
                                                         }`}>
                                                         <div className="flex items-center space-x-3">
                                                             {c.enableInternet
