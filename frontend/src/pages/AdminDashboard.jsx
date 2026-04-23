@@ -65,6 +65,17 @@ const AdminDashboard = () => {
         }
     };
 
+    const handleDeleteBackup = async (bucket, filename) => {
+        if (!window.confirm(`¿Eliminar "${filename}" de ${bucket}?`)) return;
+        try {
+            await axios.delete(`/api/admin/backup/${bucket}/${encodeURIComponent(filename)}`);
+            addToast('Backup Deleted', `"${filename}" eliminado correctamente.`, 'success');
+            fetchBackupList();
+        } catch (err) {
+            addToast('Delete Failed', err.response?.data?.message || 'No se pudo eliminar el backup.', 'error');
+        }
+    };
+
     useEffect(() => {
         fetchData();
         fetchBackupList();
@@ -301,7 +312,8 @@ const AdminDashboard = () => {
                                     <th className="p-3 pl-4 rounded-tl-xl">Filename</th>
                                     <th className="p-3">Bucket</th>
                                     <th className="p-3">Size</th>
-                                    <th className="p-3 rounded-tr-xl">Created</th>
+                                    <th className="p-3">Created</th>
+                                    <th className="p-3 rounded-tr-xl"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -319,9 +331,20 @@ const AdminDashboard = () => {
                                             }`}>{b.bucket?.replace('backups-', '')}</span>
                                         </td>
                                         <td className="p-3 text-slate-500 dark:text-slate-400">{b.sizeMb} MB</td>
-                                        <td className="p-3 text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                                            <Clock size={12} className="opacity-60" />
-                                            {new Date(b.createdAt).toLocaleString()}
+                                        <td className="p-3 text-slate-500 dark:text-slate-400">
+                                            <span className="flex items-center gap-1">
+                                                <Clock size={12} className="opacity-60" />
+                                                {new Date(b.createdAt).toLocaleString()}
+                                            </span>
+                                        </td>
+                                        <td className="p-3">
+                                            <button
+                                                onClick={() => handleDeleteBackup(b.bucket, b.filename)}
+                                                className="p-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors border border-rose-500/20"
+                                                title="Eliminar backup"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

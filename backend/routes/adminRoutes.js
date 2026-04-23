@@ -180,4 +180,34 @@ router.get('/backup/list', async (req, res) => {
     }
 });
 
+// Delete a specific backup file from MinIO
+router.delete('/backup/:bucket/:filename', async (req, res) => {
+    const { bucket, filename } = req.params;
+    const ALLOWED_BUCKETS = ['backups-mongodb', 'backups-server', 'backups-web'];
+
+    if (!ALLOWED_BUCKETS.includes(bucket)) {
+        return res.status(400).json({ message: 'Invalid bucket name.' });
+    }
+
+    const minioClient = new Minio.Client({
+        endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
+        port:      9000,
+        useSSL:    false,
+        accessKey: process.env.MINIO_ROOT_USER || 'admin',
+        secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
+    });
+
+    try {
+        await minioClient.removeObject(bucket, filename);
+        await AuditLog.create({
+            action: 'BACKUP_DELETED',
+            resourceName: filename,
+            details: `Admin deleted backup from bucket: ${bucket}`
+        });
+        res.json({ message: `Backup "${filename}" deleted from ${bucket}.` });
+    } catch (err) {
+        res.status(500).json({ message: 'Failed to delete backup.', error: err.message });
+    }
+});
+
 export default router;
