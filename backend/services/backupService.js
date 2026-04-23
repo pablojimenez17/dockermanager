@@ -28,8 +28,8 @@ const minioClient = new Minio.Client({
     endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
     port:      parseInt(process.env.MINIO_PORT) || 9000,
     useSSL:    false,
-    accessKey: process.env.NAS_USERNAME || 'admin',
-    secretKey: process.env.NAS_PASSWORD || 'password123'
+    accessKey: process.env.MINIO_ROOT_USER || 'admin',
+    secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
 });
 
 // ──────────────────────────────────────────────────────────────────────────────

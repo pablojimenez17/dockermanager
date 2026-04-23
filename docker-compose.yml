@@ -149,9 +149,9 @@ services:
       - DOCKER_HOST=tcp://socket-proxy:2375
       - MINIO_ENDPOINT=storage-fw
       - MINIO_PORT=9000
-      # FIX #7: Credentials sourced from .env — no hardcoded values
-      - NAS_USERNAME=${NAS_USERNAME}
-      - NAS_PASSWORD=${NAS_PASSWORD}
+      # MinIO credentials — same source as the MinIO container itself
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - BACKUP_INTERVAL_MS=86400000          # 24h
       - BACKUP_RETENTION=7
       - MONGO_CONTAINER_NAME=dockermanager-mongo

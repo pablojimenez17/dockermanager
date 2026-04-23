@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock } from 'lucide-react';
+import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock, DatabaseBackup, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -14,6 +14,9 @@ const AdminDashboard = () => {
     const [activeTerminal, setActiveTerminal] = useState(null);
     const { addToast } = useToast();
     const [selectedLogs, setSelectedLogs] = useState(null);
+    const [backupList, setBackupList] = useState([]);
+    const [backupLoading, setBackupLoading] = useState(false);
+    const [backupRunning, setBackupRunning] = useState(false);
 
     // Keep ref to latest containers for socket closure
     const containersRef = useRef([]);
@@ -36,8 +39,35 @@ const AdminDashboard = () => {
         }
     };
 
+    const fetchBackupList = async () => {
+        setBackupLoading(true);
+        try {
+            const res = await axios.get('/api/admin/backup/list');
+            setBackupList(res.data);
+        } catch (err) {
+            addToast('Backup List Error', err.response?.data?.message || 'Could not fetch backups from MinIO.', 'error');
+        } finally {
+            setBackupLoading(false);
+        }
+    };
+
+    const handleRunBackup = async () => {
+        setBackupRunning(true);
+        addToast('Backup Started', 'Running full system backup...', 'info');
+        try {
+            await axios.post('/api/admin/backup/run');
+            addToast('Backup Completed', 'All backups stored in MinIO successfully.', 'success');
+            fetchBackupList();
+        } catch (err) {
+            addToast('Backup Failed', err.response?.data?.error || 'Backup process failed.', 'error');
+        } finally {
+            setBackupRunning(false);
+        }
+    };
+
     useEffect(() => {
         fetchData();
+        fetchBackupList();
         const interval = setInterval(fetchData, 30000);
 
         // Setup Real-time Docker events socket
@@ -221,6 +251,76 @@ const AdminDashboard = () => {
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            {/* Backup Section */}
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl mb-12">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 border-b border-slate-200 dark:border-slate-700 pb-4 gap-4">
+                    <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
+                        <DatabaseBackup className="text-emerald-500" />
+                        <span>MinIO Backups</span>
+                        <span className="text-sm font-normal text-slate-400 ml-1">({backupList.length} files)</span>
+                    </h3>
+                    <div className="flex items-center gap-3">
+                        <button
+                            id="admin-refresh-backups"
+                            onClick={fetchBackupList}
+                            disabled={backupLoading}
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm disabled:opacity-50"
+                        >
+                            <RefreshCw size={14} className={backupLoading ? 'animate-spin' : ''} />
+                            Refresh
+                        </button>
+                        <button
+                            id="admin-run-backup"
+                            onClick={handleRunBackup}
+                            disabled={backupRunning}
+                            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {backupRunning ? (
+                                <><RefreshCw size={14} className="animate-spin" /> Running...</>
+                            ) : (
+                                <><DatabaseBackup size={14} /> Run Backup Now</>
+                            )}
+                        </button>
+                    </div>
+                </div>
+
+                {backupLoading && backupList.length === 0 ? (
+                    <div className="py-10 text-center text-slate-400">Loading backups from MinIO...</div>
+                ) : backupList.length === 0 ? (
+                    <div className="py-10 text-center">
+                        <AlertCircle className="mx-auto mb-3 text-slate-300 dark:text-slate-600" size={32} />
+                        <p className="text-slate-400">No backups found in MinIO yet. Run your first backup.</p>
+                    </div>
+                ) : (
+                    <div className="overflow-x-auto rounded-xl">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-900/50">
+                                <tr className="text-slate-500 dark:text-slate-400">
+                                    <th className="p-3 pl-4 rounded-tl-xl">Filename</th>
+                                    <th className="p-3">Size</th>
+                                    <th className="p-3 rounded-tr-xl">Created</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {backupList.map((b, i) => (
+                                    <tr key={i} className="border-t border-slate-100 dark:border-slate-700/50 hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors">
+                                        <td className="p-3 pl-4 font-mono text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                            <CheckCircle size={12} className="text-emerald-500 shrink-0" />
+                                            {b.filename}
+                                        </td>
+                                        <td className="p-3 text-slate-500 dark:text-slate-400">{b.sizeMb} MB</td>
+                                        <td className="p-3 text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                                            <Clock size={12} className="opacity-60" />
+                                            {new Date(b.createdAt).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
 
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl">

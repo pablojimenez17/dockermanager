@@ -125,11 +125,16 @@ import * as Minio from 'minio';
 
 // Trigger an immediate manual backup
 router.post('/backup/run', async (req, res) => {
-    const result = await runBackup();
-    if (result.success) {
-        res.json({ message: 'Backup completed successfully', filename: result.filename, sizeMb: result.sizeMb });
-    } else {
-        res.status(500).json({ message: 'Backup failed', error: result.error });
+    try {
+        const results = await runBackup();
+        const failed = results.filter(r => !r.success);
+        if (failed.length === 0) {
+            res.json({ message: 'All backups completed successfully.', results });
+        } else {
+            res.status(207).json({ message: 'Some backups failed.', results });
+        }
+    } catch (err) {
+        res.status(500).json({ message: 'Backup process crashed.', error: err.message });
     }
 });
 
@@ -139,8 +144,8 @@ router.get('/backup/list', async (req, res) => {
         endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
         port:      9000,
         useSSL:    false,
-        accessKey: process.env.NAS_USERNAME || 'admin',
-        secretKey: process.env.NAS_PASSWORD || 'password123'
+        accessKey: process.env.MINIO_ROOT_USER || 'admin',
+        secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
     });
 
     const BUCKET_NAME = 'backups-mongodb';
