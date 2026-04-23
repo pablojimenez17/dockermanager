@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Server, ArrowRight, Sun, Moon } from 'lucide-react';
 import axios from 'axios';
 import { useTheme } from '../components/ThemeContext';
+import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
 
 const Register = () => {
     const { theme, toggleTheme } = useTheme();
@@ -18,8 +19,15 @@ const Register = () => {
         e.preventDefault();
         setError('');
 
+        // Validar que la contraseña sea segura
+        const passwordStrength = validatePasswordStrength(password);
+        if (!passwordStrength.isValid) {
+            setError(passwordStrength.message);
+            return;
+        }
+
         if (password !== confirmPassword) {
-            setError('Passwords do not match');
+            setError('Las contraseñas no coinciden');
             return;
         }
 
@@ -31,11 +39,41 @@ const Register = () => {
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);
 
-            setSuccess('Registration successful. Accessing dashboard...');
+            setSuccess('Registro exitoso. Accediendo al panel...');
             setTimeout(() => window.location.href = '/app', 1000);
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
+            setError(err.response?.data?.message || 'Registro fallido');
         }
+    };
+
+    const validatePasswordStrength = (pwd) => {
+        const criteria = {
+            length: pwd.length >= 8,
+            lowercase: /[a-z]/.test(pwd),
+            uppercase: /[A-Z]/.test(pwd),
+            numbers: /[0-9]/.test(pwd),
+            special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd),
+        };
+
+        const passedCount = Object.values(criteria).filter(Boolean).length;
+
+        if (!criteria.length) {
+            return { isValid: false, message: 'La contraseña debe tener al menos 8 caracteres' };
+        }
+        if (!criteria.lowercase) {
+            return { isValid: false, message: 'La contraseña debe contener letras minúsculas' };
+        }
+        if (!criteria.uppercase) {
+            return { isValid: false, message: 'La contraseña debe contener letras mayúsculas' };
+        }
+        if (!criteria.numbers) {
+            return { isValid: false, message: 'La contraseña debe contener números' };
+        }
+        if (!criteria.special) {
+            return { isValid: false, message: 'La contraseña debe contener caracteres especiales (!@#$%^&*)' };
+        }
+
+        return { isValid: true, message: '' };
     };
 
     return (
@@ -56,12 +94,12 @@ const Register = () => {
                     </div>
                 </Link>
                 <h2 className="text-center text-3xl font-extrabold text-slate-900 dark:text-white">
-                    Create your account
+                    Crea tu cuenta
                 </h2>
                 <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-                    Already have an account?{' '}
+                    ¿Ya tienes cuenta?{' '}
                     <Link to="/login" className="font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 transition-colors">
-                        Sign in here
+                        Inicia sesión aquí
                     </Link>
                 </p>
             </div>
@@ -82,7 +120,7 @@ const Register = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Full Name
+                                Nombre Completo
                             </label>
                             <div className="mt-2">
                                 <input
@@ -91,14 +129,14 @@ const Register = () => {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="Jane Doe"
+                                    placeholder="Juan Pérez"
                                 />
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Email Address
+                                Correo Electrónico
                             </label>
                             <div className="mt-2">
                                 <input
@@ -107,14 +145,14 @@ const Register = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="you@example.com"
+                                    placeholder="tu@ejemplo.com"
                                 />
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Password
+                                Contraseña
                             </label>
                             <div className="mt-2">
                                 <input
@@ -126,11 +164,12 @@ const Register = () => {
                                     placeholder="••••••••"
                                 />
                             </div>
+                            {password.length > 0 && <PasswordStrengthMeter password={password} />}
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Confirm Password
+                                Confirmar Contraseña
                             </label>
                             <div className="mt-2">
                                 <input
@@ -138,21 +177,38 @@ const Register = () => {
                                     required
                                     value={confirmPassword}
                                     onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                    className={`appearance-none block w-full px-4 py-3 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
+                                        confirmPassword && password !== confirmPassword
+                                            ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
+                                            : confirmPassword && password === confirmPassword
+                                            ? 'border-emerald-400 dark:border-emerald-500 focus:ring-emerald-500'
+                                            : 'border-slate-300 dark:border-slate-600 focus:ring-brand-500'
+                                    }`}
                                     placeholder="••••••••"
                                 />
                             </div>
+                            {confirmPassword && password !== confirmPassword && (
+                                <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1">
+                                    <span>❌</span>
+                                    <span>Las contraseñas no coinciden</span>
+                                </p>
+                            )}
+                            {confirmPassword && password === confirmPassword && (
+                                <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
+                                    <span>✅</span>
+                                    <span>Las contraseñas coinciden</span>
+                                </p>
+                            )}
                         </div>
 
-                        <div>
                             <button
                                 type="submit"
-                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all"
+                                disabled={!validatePasswordStrength(password).isValid || password !== confirmPassword}
+                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
                             >
-                                <span>Register</span>
+                                <span>Registrarse</span>
                                 <ArrowRight size={18} />
                             </button>
-                        </div>
                     </form>
                 </div>
             </div>

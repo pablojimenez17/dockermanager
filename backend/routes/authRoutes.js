@@ -5,14 +5,44 @@ import authMiddleware from '../middleware/auth.js';
 
 const router = express.Router();
 
+// Validar fortaleza de contraseña
+const validatePasswordStrength = (password) => {
+    const criteria = {
+        length: password.length >= 8,
+        lowercase: /[a-z]/.test(password),
+        uppercase: /[A-Z]/.test(password),
+        numbers: /[0-9]/.test(password),
+        special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password),
+    };
+
+    const errors = [];
+    if (!criteria.length) errors.push('La contraseña debe tener al menos 8 caracteres');
+    if (!criteria.lowercase) errors.push('La contraseña debe contener letras minúsculas');
+    if (!criteria.uppercase) errors.push('La contraseña debe contener letras mayúsculas');
+    if (!criteria.numbers) errors.push('La contraseña debe contener números');
+    if (!criteria.special) errors.push('La contraseña debe contener caracteres especiales (!@#$%^&*)');
+
+    return {
+        isValid: errors.length === 0,
+        errors,
+        message: errors.join('; ')
+    };
+};
+
 router.post('/register', async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
+        // Validar contraseña
+        const passwordValidation = validatePasswordStrength(password);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ message: passwordValidation.message });
+        }
+
         // Check if user exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: 'User already exists with this email' });
+            return res.status(400).json({ message: 'El usuario ya existe con este correo' });
         }
 
         const role = 'user';
@@ -31,7 +61,7 @@ router.post('/register', async (req, res) => {
         });
 
         res.status(201).json({ 
-            message: 'User created successfully', 
+            message: 'Usuario creado correctamente', 
             token,
             name: user.name,
             email: user.email,
@@ -40,7 +70,7 @@ router.post('/register', async (req, res) => {
             limits: user.limits
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error creating user', error: error.message });
+        res.status(500).json({ message: 'Error al crear usuario', error: error.message });
     }
 });
 
