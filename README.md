@@ -17,11 +17,23 @@ docker-compose up -d --build
 
 Una vez que termine (la primera vez puede tardar un par de minutos descargando dependencias y compilando Node/React), tendrás acceso a todos los servicios locales a través de los siguientes enlaces:
 
+### 🌐 Acceso Local (Development)
+
 | Servicio | Enlace Local | Credenciales por Defecto |
 |---|---|---|
 | **Plataforma Web (Frontend)** | [http://localhost](http://localhost) | Regístrate con un usuario nuevo directamente |
 | **Monitor IPS del Firewall (EveBox)** | [http://localhost:5636](http://localhost:5636) | Sin contraseñas (Acceso libre en local) |
 | **Bóveda de Discos y Backups (MinIO)** | [http://localhost:9001](http://localhost:9001) | Usuario: `admin` <br> Pass: `password123` |
+| **Panel de Monitorización (Grafana)** | [http://localhost:3000](http://localhost:3000) | Usuario: `admin` <br> Pass: `admin` |
+
+### 🔗 Acceso en Producción (Subdomios - orbitcloud.app)
+
+| Servicio | Enlace Producción | Credenciales |
+|---|---|---|
+| **Plataforma Web (Frontend)** | [https://orbitcloud.app](https://orbitcloud.app) | Regístrate con un usuario nuevo directamente |
+| **Monitor IPS del Firewall (EveBox)** | [https://evebox.orbitcloud.app](https://evebox.orbitcloud.app) | Sin contraseñas (Acceso libre) |
+| **Bóveda de Discos y Backups (MinIO)** | [https://minio.orbitcloud.app](https://minio.orbitcloud.app) | Usuario: `admin` <br> Pass: `password123` |
+| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | Usuario: `admin` <br> Pass: `admin` |
 
 > [!TIP]
 > Si en algún momento necesitas apagar toda la infraestructura de golpe para descansar, recuerda ejecutar `docker-compose down`. Tus bases de datos e imágenes guardadas de tus inquilinos persistirán a salvo gracias a los Volúmenes que hemos configurado.

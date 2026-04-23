@@ -49,12 +49,18 @@ services:
     image: jasonish/evebox:latest
     container_name: dockermanager-evebox
     command: evebox server --datastore sqlite --sqlite /tmp/evebox.sqlite -i /var/log/suricata/eve.json --no-tls --no-auth
-    ports:
-      - "5636:5636"
     volumes:
       - suricata-logs:/var/log/suricata:ro
     networks:
       - public_net
+      - dmz_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.constraint-label=dmz-proxy"
+      - "traefik.http.routers.evebox.rule=Host(`evebox.orbitcloud.app`)"
+      - "traefik.http.routers.evebox.entrypoints=web,websecure"
+      - "traefik.http.routers.evebox.tls.certresolver=letsencrypt"
+      - "traefik.http.services.evebox.loadbalancer.server.port=5636"
 
   # 2. Reverse Proxy (Traefik) - Proxy Inverso
   proxy-inverso:
@@ -166,7 +172,7 @@ services:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
       - "traefik.http.routers.frontend.rule=Host(`orbitcloud.app`)"
-      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.entrypoints=web,websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
@@ -201,6 +207,14 @@ services:
       - minio-data:/data
     networks:
       - storage_net
+      - dmz_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.constraint-label=dmz-proxy"
+      - "traefik.http.routers.minio-console.rule=Host(`minio.orbitcloud.app`)"
+      - "traefik.http.routers.minio-console.entrypoints=web,websecure"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
 
   # 10. Observability: Prometheus
   prometheus:
@@ -224,14 +238,19 @@ services:
     container_name: dockermanager-grafana
     networks:
       - dmz_net
-    ports:
-      - "3000:3000"
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
+    labels:
+      - "traefik.enable=true"
+      - "traefik.constraint-label=dmz-proxy"
+      - "traefik.http.routers.grafana.rule=Host(`grafana.orbitcloud.app`)"
+      - "traefik.http.routers.grafana.entrypoints=web,websecure"
+      - "traefik.http.routers.grafana.tls.certresolver=letsencrypt"
+      - "traefik.http.services.grafana.loadbalancer.server.port=3000"
 
   # 12. Observability: Node Exporter (Host Metrics)
   node-exporter:
