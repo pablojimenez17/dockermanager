@@ -38,6 +38,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust the first proxy (Traefik) so rate-limit & IP detection work correctly
+app.set('trust proxy', 1);
+
 // ── Security Middlewares ──
 // 1. Set security HTTP headers
 app.use(helmet());
