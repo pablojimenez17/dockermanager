@@ -27,7 +27,7 @@ const Register = () => {
         }
 
         if (password !== confirmPassword) {
-            setError('Las contraseñas no coinciden');
+            setError('Passwords do not match');
             return;
         }
 
@@ -39,10 +39,10 @@ const Register = () => {
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);
 
-            setSuccess('Registro exitoso. Accediendo al panel...');
+            setSuccess('Registration successful. Accessing dashboard...');
             setTimeout(() => window.location.href = '/app', 1000);
         } catch (err) {
-            setError(err.response?.data?.message || 'Registro fallido');
+            setError(err.response?.data?.message || 'Registration failed');
         }
     };
 
@@ -58,19 +58,19 @@ const Register = () => {
         const passedCount = Object.values(criteria).filter(Boolean).length;
 
         if (!criteria.length) {
-            return { isValid: false, message: 'La contraseña debe tener al menos 8 caracteres' };
+            return { isValid: false, message: 'Password must be at least 8 characters long' };
         }
         if (!criteria.lowercase) {
-            return { isValid: false, message: 'La contraseña debe contener letras minúsculas' };
+            return { isValid: false, message: 'Password must contain lowercase letters' };
         }
         if (!criteria.uppercase) {
-            return { isValid: false, message: 'La contraseña debe contener letras mayúsculas' };
+            return { isValid: false, message: 'Password must contain uppercase letters' };
         }
         if (!criteria.numbers) {
-            return { isValid: false, message: 'La contraseña debe contener números' };
+            return { isValid: false, message: 'Password must contain numbers' };
         }
         if (!criteria.special) {
-            return { isValid: false, message: 'La contraseña debe contener caracteres especiales (!@#$%^&*)' };
+            return { isValid: false, message: 'Password must contain special characters (!@#$%^&*)' };
         }
 
         return { isValid: true, message: '' };
@@ -94,12 +94,12 @@ const Register = () => {
                     </div>
                 </Link>
                 <h2 className="text-center text-3xl font-extrabold text-slate-900 dark:text-white">
-                    Crea tu cuenta
+                    Create your account
                 </h2>
                 <p className="mt-2 text-center text-sm text-slate-600 dark:text-slate-400">
-                    ¿Ya tienes cuenta?{' '}
+                    Already have an account?{' '}
                     <Link to="/login" className="font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 transition-colors">
-                        Inicia sesión aquí
+                        Sign in here
                     </Link>
                 </p>
             </div>
@@ -120,7 +120,7 @@ const Register = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Nombre Completo
+                                Full Name
                             </label>
                             <div className="mt-2">
                                 <input
@@ -129,14 +129,14 @@ const Register = () => {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="Juan Pérez"
+                                    placeholder="Jane Doe"
                                 />
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Correo Electrónico
+                                Email Address
                             </label>
                             <div className="mt-2">
                                 <input
@@ -145,14 +145,14 @@ const Register = () => {
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="tu@ejemplo.com"
+                                    placeholder="you@example.com"
                                 />
                             </div>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Contraseña
+                                Password
                             </label>
                             <div className="mt-2">
                                 <input
@@ -169,7 +169,7 @@ const Register = () => {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Confirmar Contraseña
+                                Confirm Password
                             </label>
                             <div className="mt-2">
                                 <input
@@ -190,13 +190,13 @@ const Register = () => {
                             {confirmPassword && password !== confirmPassword && (
                                 <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1">
                                     <span>❌</span>
-                                    <span>Las contraseñas no coinciden</span>
+                                    <span>Passwords do not match</span>
                                 </p>
                             )}
                             {confirmPassword && password === confirmPassword && (
                                 <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
                                     <span>✅</span>
-                                    <span>Las contraseñas coinciden</span>
+                                    <span>Passwords match</span>
                                 </p>
                             )}
                         </div>
@@ -206,7 +206,7 @@ const Register = () => {
                                 disabled={!validatePasswordStrength(password).isValid || password !== confirmPassword}
                                 className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
                             >
-                                <span>Registrarse</span>
+                                <span>Register</span>
                                 <ArrowRight size={18} />
                             </button>
                     </form>
