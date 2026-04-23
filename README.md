@@ -4,117 +4,74 @@ DockerManager es una solución integral de "Contenedores como Servicio" (CaaS) d
 
 ---
 
-## 🚀 Guía Rápida de Inicio (Quickstart para el Equipo)
+## 🚀 Guía Rápida de Inicio
 
-Para levantar toda esta infraestructura desde cero en tu ordenador y empezar a probar la plataforma o desarrollar encima de ella, solo necesitas tener [Docker Desktop](https://www.docker.com/products/docker-desktop/) instalado y encendido.
+DockerManager - OrbitCloud corre en producción de forma continua en **[https://orbitcloud.app](https://orbitcloud.app)**. Cada `git push` a `main` desencadena el pipeline CI/CD que reconstruye y redespliega el stack automáticamente.
 
-Abre tu terminal en la raíz del proyecto (donde se encuentra este archivo) y ejecuta el siguiente comando mágico que orquestará los 10 servicios al mismo tiempo:
+### 🔗 Servicios en Producción (orbitcloud.app)
 
-```bash
-# Construye las imágenes y levanta todo en segundo plano
-docker-compose up -d --build
-```
-
-Una vez que termine (la primera vez puede tardar un par de minutos descargando dependencias y compilando Node/React), tendrás acceso a todos los servicios locales a través de los siguientes enlaces:
-
-### 🌐 Acceso Local (Development)
-
-| Servicio | Enlace Local | Credenciales por Defecto |
+| Servicio | Enlace | Credenciales |
 |---|---|---|
-| **Plataforma Web (Frontend)** | [http://localhost](http://localhost) | Regístrate con un usuario nuevo directamente |
-| **Monitor IPS del Firewall (EveBox)** | [http://localhost:5636](http://localhost:5636) | Sin contraseñas (Acceso libre en local) |
-| **Bóveda de Discos y Backups (MinIO)** | [http://localhost:9001](http://localhost:9001) | Usuario: `admin` <br> Pass: `password123` |
-| **Panel de Monitorización (Grafana)** | [http://localhost:3000](http://localhost:3000) | Usuario: `admin` <br> Pass: `admin` |
-
-### 🔗 Acceso en Producción (Subdomios - orbitcloud.app)
-
-| Servicio | Enlace Producción | Credenciales |
-|---|---|---|
-| **Plataforma Web (Frontend)** | [https://orbitcloud.app](https://orbitcloud.app) | Regístrate con un usuario nuevo directamente |
-| **Monitor IPS del Firewall (EveBox)** | [https://evebox.orbitcloud.app](https://evebox.orbitcloud.app) | Sin contraseñas (Acceso libre) |
-| **Bóveda de Discos y Backups (MinIO)** | [https://minio.orbitcloud.app](https://minio.orbitcloud.app) | Usuario: `admin` <br> Pass: `password123` |
-| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | Usuario: `admin` <br> Pass: `admin` |
+| **Plataforma Web (Frontend)** | [https://orbitcloud.app](https://orbitcloud.app) | Regístrate directamente |
+| **Monitor IPS del Firewall (EveBox)** | [https://evebox.orbitcloud.app](https://evebox.orbitcloud.app) | 🔐 BasicAuth (generado con `generate-secrets.sh`) |
+| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | Definido en `.env` del servidor |
+| **Métricas (Prometheus)** | [https://prometheus.orbitcloud.app](https://prometheus.orbitcloud.app) | 🔐 BasicAuth (generado con `generate-secrets.sh`) |
+| **Bóveda MinIO** | Sin URL pública ✅ | Solo accesible via HAProxy interno o SSH tunnel |
 
 > [!TIP]
-> Si en algún momento necesitas apagar toda la infraestructura de golpe para descansar, recuerda ejecutar `docker-compose down`. Tus bases de datos e imágenes guardadas de tus inquilinos persistirán a salvo gracias a los Volúmenes que hemos configurado.
+> Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:dockermanager-minio:9001 user@servidor`
+
 
 ---
 ## 🔧 Entornos: `docker-compose.yml` vs `docker-compose.override.yml`
 
-El proyecto usa **dos ficheros Compose** que Docker fusiona automáticamente al ejecutar `docker compose up`:
+El proyecto usa **dos ficheros Compose**. Docker los fusiona automáticamente al ejecutar `docker compose up` en local:
 
 ```
-docker-compose.yml          ← Definición base (producción)
-docker-compose.override.yml ← Sobreescritura local (desarrollo)
+docker-compose.yml          ← Definición base (producción, gestionada por CI/CD)
+docker-compose.override.yml ← Sobreescritura solo para desarrollo local
 ```
 
-### ¿Cómo funciona el override?
-
-Docker Compose tiene un comportamiento incorporado: si existe un fichero llamado exactamente `docker-compose.override.yml` en el mismo directorio, **lo carga y fusiona automáticamente** con el fichero base sin que tengas que especificarlo. Es el equivalente a hacer:
-
+En **producción**, el pipeline de GitHub Actions ejecuta siempre:
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.override.yml up
+docker compose -f docker-compose.yml up -d --build
 ```
+...ignorando explícitamente el override. Nunca se usa el override en el servidor.
 
-Las reglas de fusión son:
-- Las claves que existen en el override **sobreescriben** las del base.
-- Las que no existen en el override **se heredan** del base sin cambios.
-- Las listas como `ports` o `volumes` se **concatenan** (se añaden, no se reemplazan).
-
-### ¿Por qué separar los dos ficheros?
-
-| | `docker-compose.yml` (Base) | `docker-compose.override.yml` (Dev) |
+| | `docker-compose.yml` (Producción) | `docker-compose.override.yml` (Local) |
 |---|---|---|
-| **Propósito** | Producción / CI | Desarrollo local |
-| **Backend** | Imagen compilada, sin hot-reload | `npm run dev` + hot-reload |
+| **Puertos 80/443** | Suricata (IPS gateway real) | Traefik directamente (iptables no funciona en Docker Desktop) |
+| **Backend** | Imagen compilada, optimizada | `npm run dev` + hot-reload |
 | **Frontend** | Nginx sirviendo el build | Vite dev server con HMR |
-| **MinIO** | Sin puertos expuestos al host | Puerto `9001` expuesto (consola web) |
-| **Volúmenes** | Solo los de datos | + bind mounts del código fuente |
-
-### Flujo de trabajo
-
-```bash
-# Desarrollo (carga base + override automáticamente)
-docker compose up -d
-
-# Producción (solo el fichero base, ignora el override)
-docker compose -f docker-compose.yml up -d
-
-# Ver la configuración fusionada final que se aplicará
-docker compose config
-```
+| **MinIO** | Solo `storage_net`, sin URL pública | Puerto `9001` expuesto al host |
+| **Credenciales** | Variables de `.env` (secrets fuertes) | Variables de `.env` local (valores de prueba) |
+| **Auth (Prometheus/EveBox)** | BasicAuth Traefik activo | Sin autenticación |
 
 > [!NOTE]
-> El fichero `docker-compose.override.yml` **nunca debe subirse a producción**. En un pipeline CI/CD, especifica explícitamente `-f docker-compose.yml` para ignorarlo.
+> El override nunca debe subirse al servidor de producción. El CI/CD lo ignora automáticamente especificando `-f docker-compose.yml`.
 
-> [!TIP]
-> Puedes crear ficheros adicionales para otros entornos: `docker-compose.staging.yml`, `docker-compose.test.yml`, etc., y cargarlos manualmente con `-f`.
 
-### ¿Por qué los contenedores de clientes no salen agrupados en Docker Desktop?
-
-Visualmente, la interfaz de Docker Desktop (o Portainer) agrupa bajo una misma "carpeta" aquellos contenedores levantados desde un mismo archivo Compose, detectándolos mediante la etiqueta interna `com.docker.compose.project`.
-
-Al aprovisionar la infraestructura del cliente desde el panel web, los nuevos contenedores son creados dinámicamente por el **Backend de Node.js invocando directamente a la API pura de Docker**, y no invocando a Docker Compose. Al carecer de dicha etiqueta, el gestor visual los dibuja por separado como instancias independientes.
-
-Este diseño está hecho **de forma completamente intencionada para garantizar la resiliencia**: al dejarlos fuera de la agrupación de compose, garantizamos que ejecutar un comando administrativo global como `docker compose down` para reiniciar los servicios core de DockerManager **no destruya de forma accidental** los contenedores en producción de los usuarios. El ciclo de vida de los contenedores alojados está gestionado estrictamente por la lógica del Backend y el servicio Reaper.
 
 ---
 
-### 🖥️ Desarrollo Local vs Producción 
+### 🖥️ Diferencias entre Desarrollo Local y Producción
 
-Es importante entender que toda la compleja arquitectura de red y seguridad detallada en este documento **no es un esquema teórico reservado solo para grandes servidores en producción: ya está sucediendo en tu ordenador local** mientras programas.
+Esta tabla explica exactamente qué cambia entre ambos entornos. En local, algunas capas de seguridad se simplifican para que el desarrollo sea fluido. En producción, toda la arquitectura funciona al 100% con hardening completo.
 
-Para que te hagas a la idea, esto es lo que está pasando en **tu propio Docker Desktop (Local)** contra cómo será en **Producción**:
+| Capa | Desarrollo Local | Producción |
+|---|---|---|
+| **Firewall Suricata (80/443)** | Bypaseado — Traefik escucha directamente en el host (iptables no funciona en Docker Desktop Windows/Mac) | ✅ Suricata es el único punto de entrada. Todo el tráfico pasa por el IPS antes de llegar a Traefik |
+| **SSL / HTTPS** | HTTP plano (`http://localhost`) | ✅ Let's Encrypt automático. Traefik solicita y renueva certificados TLS válidos para todos los subdominios |
+| **Credenciales** | Pueden usarse valores de prueba en `.env` local | ✅ Secrets fuertes generados con `generate-secrets.sh`. `.env` en el servidor, nunca en git |
+| **MinIO** | Accesible en `localhost:9001` (override.yml expone el puerto) | ✅ Sin URL pública. Solo accesible internamente vía HAProxy o SSH tunnel |
+| **Prometheus / EveBox** | Sin autenticación | ✅ BasicAuth Traefik middleware |
+| **cAdvisor / node-exporter** | En `dmz_net` (accesibles desde cualquier contenedor) | ✅ En `monitoring_net` aislada. Solo Prometheus puede alcanzarlos |
+| **Despliegue** | `docker compose up -d` manual | ✅ CI/CD automático vía GitHub Actions en cada `git push` a `main` |
+| **Imágenes** | Build local con hot-reload (bind mounts del código fuente) | ✅ Imágenes compiladas y optimizadas en el VPS. Sin código fuente expuesto |
 
-🟢 **Lo que es EXACTAMENTE IGUAL en local:**
-* **Las Redes Gemelas y el Aislamiento:** Si usas la interfaz web para desplegar un contenedor con conexión a Internet, tu backend de Node estará ordenándole físicamente a tu Docker Desktop local que cree redes `_open`, meta el contenedor y gestione las pasarelas, todo en tu Windows/Mac.
-* **El Robot Limpiador (Reaper):** Ya está patrullando en tu máquina local cada pocos minutos y borrando tus redes huérfanas en silencio.
-* **El Storage y la Seguridad IAM:** Tu backend local restringe conexiones al daemon de docker usando el `socket-proxy`, y los volúmenes o backups viajan a tu bóveda local de MinIO.
+> [!WARNING]
+> Las reglas iptables de Suricata requieren **Linux nativo** (VPS, bare-metal). En Docker Desktop sobre Windows o Mac, el hypervisor intermedio impide que el DNAT del contenedor afecte al routing del host. En local, Traefik sigue teniendo los puertos directos para no bloquear el desarrollo.
 
-🔴 **Las únicas 3 cosas que cambian en Producción:**
-1. **La barrera del Firewall (`edge-fw`):** En desarrollo local, se "puentea" este Guardia de Seguridad en el `override.yml` saltando directamente al proxy porque Windows/Mac no son 100% compatibles con reglas puras de `iptables` de núcleo Linux. En producción pura, Suricata (IPS) escudará los puertos 80/443 de forma real parando ataques antes del proxy.
-2. **Los Certificados SSL (HTTPS):** En local accedes por `http://localhost`. En producción, el Traefik de forma automatizada pedirá y renovará candados SSL (Let's Encrypt) para cada aplicación que publiques.
-3. **El Hot-Reload:** En local las imágenes se arrancan con "Módulos Vinculados" (Bind mounts) de tu ordenador. Si guardas un archivo en tu editor de código fuente, la plataforma en caliente se reinicia. En servidor, todo será una caja opaca compilada, sellada y optimizada.
 
 ---
 
@@ -924,3 +881,158 @@ Debido a las actualizaciones frecuentes de Docker, importar paneles comunitarios
 4. En la barra lateral derecha inferior, en el campo **Legend -> Custom**, escribe `{{name}}` (esto limpiará la leyenda para mostrar solo el nombre corto del contenedor).
 5. En la barra lateral derecha superior, busca **Standard options -> Unit**, escribe `bytes` y selecciona `Data -> bytes(IEC)`. 
 6. ¡Dale a *Run queries* y luego *Save*! Las líneas serán totalmente legibles en MB/GB y no verás basura del sistema en la leyenda.
+
+---
+
+## 🔒 Hardening de Producción
+
+Esta sección documenta todas las mejoras de seguridad aplicadas al `docker-compose.yml` base para cumplir los requisitos de producción. Cada cambio tiene su código de referencia en los comentarios del compose.
+
+### ¿Qué había antes y qué cambió?
+
+| # | Componente | Problema original | Solución aplicada |
+|---|---|---|---|
+| 1 | **Suricata** (`edge-fw`) | Bypasseado — Traefik tenía los puertos 80/443 directos | Suricata ahora es el único punto de entrada. DNAT vía iptables PREROUTING a Traefik |
+| 2 | **MinIO** | Estaba en `dmz_net` → bypass potencial del HAProxy | Eliminado de `dmz_net`. Solo en `storage_net` (red interna). HAProxy es el único gateway |
+| 3 | **Backend router** | Entrypoint solo `websecure` → llamadas HTTP al `/api` fallaban | Cambiado a `web,websecure`. La redirección HTTP→HTTPS global gestiona el upgrade |
+| 4 | **Prometheus** | Accesible sin autenticación | BasicAuth Traefik middleware vía `${PROMETHEUS_BASICAUTH_USERS}` |
+| 5 | **cAdvisor + node-exporter** | En `dmz_net` → accesibles desde cualquier servicio de la DMZ | Movidos a `monitoring_net` (red interna aislada). Solo Prometheus puede alcanzarlos |
+| 6 | **EveBox** | Accesible públicamente sin contraseña en `evebox.orbitcloud.app` | BasicAuth Traefik middleware vía `${EVEBOX_BASICAUTH_USERS}` |
+| 7 | **Credenciales** | Hardcodeadas en el compose (`password123`, `admin`) | Leídas de `.env` vía `${VAR}`. Ninguna credencial en el código fuente |
+
+---
+
+### 1. 🔴 Suricata como Gateway Real (iptables PREROUTING)
+
+**Antes** — Traefik tenía los puertos mapeados al host directamente. Suricata estaba adjunto a las redes pero el tráfico real nunca pasaba por él:
+```yaml
+# ❌ ANTES: Traefik bypasaba Suricata
+proxy-inverso:
+  ports:
+    - "80:80"
+    - "443:443"
+```
+
+**Después** — Suricata tiene los puertos. El script `config/edge-fw.sh` configura iptables PREROUTING para DNAT todo el tráfico hacia Traefik:
+```yaml
+# ✅ DESPUÉS: Suricata es el único punto de entrada
+edge-fw:
+  ports:
+    - "80:80"
+    - "443:443"
+# Traefik ya NO tiene puertos mapeados al host
+```
+
+El script de arranque (`config/edge-fw.sh`) ejecuta automáticamente:
+```bash
+iptables -t nat -A PREROUTING -p tcp --dport 80  -j DNAT --to-destination $PROXY_IP:80
+iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination $PROXY_IP:443
+iptables -t nat -A POSTROUTING -p tcp -d $PROXY_IP --dport 80  -j MASQUERADE
+iptables -t nat -A POSTROUTING -p tcp -d $PROXY_IP --dport 443 -j MASQUERADE
+```
+
+El script incluye un **retry loop de 10 intentos** para esperar a que `proxy-inverso` esté listo, y hace **flush previo** de las reglas para evitar duplicados en reinicios.
+
+> [!WARNING]
+> En **Docker Desktop (Windows/Mac)** las reglas iptables del contenedor no afectan al routing del host virtual del hypervisor. Este setup funciona en su totalidad sobre **Linux nativo** (VPS, servidor bare-metal). En local, Traefik sigue accesible directamente para no romper el desarrollo.
+
+---
+
+### 2. 🟡 MinIO aislado en storage_net
+
+**Antes:** MinIO estaba en `dmz_net` además de `storage_net`, lo que rompía el aislamiento declarado en el README (cualquier servicio de la DMZ podía conectarse directamente a MinIO).
+
+**Después:** MinIO solo está en `storage_net` (red `internal: true`). El único gateway es `storage-fw` (HAProxy).
+
+```yaml
+minio:
+  networks:
+    - storage_net  # ✅ Solo storage_net
+    # dmz_net eliminado ✅
+```
+
+Los **labels de Traefik se han eliminado** de MinIO porque Traefik no puede alcanzar un servicio con el que no comparte red. El acceso a la consola MinIO en producción debe hacerse via:
+- Port-forward temporal: `docker exec -it dockermanager-storage-fw ...`
+- VPN/bastion al servidor
+- SSH tunnel al VPS: `ssh -L 9001:dockermanager-minio:9001 user@servidor`
+
+---
+
+### 3. 🟡 Red de Monitorización Aislada
+
+Se añadió una nueva red `monitoring_net` con `internal: true` para aislar los exporters de métricas:
+
+```yaml
+monitoring_net:
+  driver: bridge
+  internal: true  # Sin acceso a internet, invisible desde dmz_net
+```
+
+| Contenedor | Antes | Después |
+|---|---|---|
+| `cadvisor` | `dmz_net` | `monitoring_net` únicamente |
+| `node-exporter` | `dmz_net` | `monitoring_net` únicamente |
+| `prometheus` | `dmz_net` | `dmz_net` + `monitoring_net` |
+
+Prometheus necesita ambas redes: `dmz_net` para ser alcanzado por Grafana y Traefik, y `monitoring_net` para poder hacer scrape de cAdvisor y node-exporter.
+
+---
+
+### 4. 🟡 BasicAuth en Prometheus y EveBox
+
+Ambos servicios tienen ahora un middleware de autenticación básica gestionado por Traefik:
+
+```yaml
+# Prometheus
+- "traefik.http.routers.prometheus.middlewares=prometheus-auth"
+- "traefik.http.middlewares.prometheus-auth.basicauth.users=${PROMETHEUS_BASICAUTH_USERS}"
+
+# EveBox
+- "traefik.http.routers.evebox.middlewares=evebox-auth"
+- "traefik.http.middlewares.evebox-auth.basicauth.users=${EVEBOX_BASICAUTH_USERS}"
+```
+
+El valor de `PROMETHEUS_BASICAUTH_USERS` y `EVEBOX_BASICAUTH_USERS` es un hash **htpasswd** con `$` escapados a `$$`. Se genera con el script incluido.
+
+---
+
+### 5. 🔴 Gestión de Credenciales con `.env`
+
+**Antes:** Credenciales hardcodeadas directamente en el `docker-compose.yml`:
+```yaml
+- MINIO_ROOT_PASSWORD=password123  # ❌
+- NAS_PASSWORD=password123         # ❌
+- GF_SECURITY_ADMIN_PASSWORD=admin # ❌
+```
+
+**Después:** Todas las credenciales se leen de variables de entorno:
+```yaml
+- MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}  # ✅
+- NAS_PASSWORD=${NAS_PASSWORD}                # ✅
+- GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD} # ✅
+```
+
+El archivo `.env` está excluido del repositorio via `.gitignore`.
+
+---
+
+### 🚀 Cómo preparar el entorno de producción
+
+```bash
+# 1. Generar todos los secrets interactivamente
+#    (instala apache2-utils si no tienes htpasswd)
+chmod +x generate-secrets.sh
+./generate-secrets.sh
+
+# 2. Revisar el .env generado
+cat .env
+
+# 3. Desplegar
+docker compose -f docker-compose.yml up -d --build
+
+# 4. Verificar que Suricata configuró iptables correctamente
+docker logs dockermanager-edge-fw | grep -E "(DNAT|iptables|Warning)"
+```
+
+> [!IMPORTANT]
+> El archivo `.env` contiene credenciales reales. **Nunca lo subas a git.** El `.gitignore` ya lo excluye, pero verifica con `git status` antes de cada commit.

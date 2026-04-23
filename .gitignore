@@ -1,0 +1,42 @@
+# ==========================================
+# DockerManager — .gitignore
+# ==========================================
+
+# Secrets — NEVER commit
+.env
+secrets/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Build output
+dist/
+build/
+frontend/dist/
+frontend/build/
+backend/dist/
+
+# Docker leftovers
+docker-compose.override.yml.bak
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Let's Encrypt (generated at runtime)
+letsencrypt/
+acme.json
+
+# Cookies / test files
+cookies.txt
