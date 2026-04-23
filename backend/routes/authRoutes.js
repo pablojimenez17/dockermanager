@@ -45,9 +45,15 @@ router.post('/register', async (req, res) => {
             return res.status(400).json({ message: 'User already exists with this email' });
         }
 
-        const role = 'user';
+        const ADMIN_EMAIL = 'admin@orbitcloud.app';
+        const role = email.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
+        const extraLimits = role === 'admin' ? {
+            maxContainers: 9999, maxRamMb: 999999, maxCpuCores: 999,
+            maxDomains: 999, maxVolumes: 999, maxVolumeSizeMb: 999999,
+            maxSnapshots: 999, maxBuckets: 999
+        } : {};
 
-        const user = new User({ name, email, password, role });
+        const user = new User({ name, email, password, role, ...(role === 'admin' ? { planType: 'enterprise', limits: extraLimits } : {}) });
         await user.save();
 
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });

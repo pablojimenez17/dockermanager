@@ -138,37 +138,6 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
         } catch (backupErr) {
             console.error('Failed to start Backup Scheduler:', backupErr);
         }
-
-        // Seed default admin user if not exists
-        try {
-            const ADMIN_EMAIL = 'admin@orbitcloud.app';
-            const existingAdmin = await User.findOne({ email: ADMIN_EMAIL, role: 'admin' });
-            if (!existingAdmin) {
-                const adminUser = new User({
-                    name: 'Admin',
-                    email: ADMIN_EMAIL,
-                    password: '!@6pYN2qJEUpAEc',  // hashed by pre-save hook
-                    role: 'admin',
-                    planType: 'enterprise',
-                    limits: {
-                        maxContainers: 9999,
-                        maxRamMb: 999999,
-                        maxCpuCores: 999,
-                        maxDomains: 999,
-                        maxVolumes: 999,
-                        maxVolumeSizeMb: 999999,
-                        maxSnapshots: 999,
-                        maxBuckets: 999
-                    }
-                });
-                await adminUser.save();
-                console.log(`✅ Admin user "${ADMIN_EMAIL}" created successfully.`);
-            } else {
-                console.log(`✅ Admin user "${ADMIN_EMAIL}" already exists.`);
-            }
-        } catch (error) {
-            console.error('❌ Error seeding admin user:', error);
-        }
     })
     .catch((err) => console.error('Error connecting to MongoDB:', err));
 
