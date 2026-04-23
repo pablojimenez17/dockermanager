@@ -299,6 +299,7 @@ const AdminDashboard = () => {
                             <thead className="bg-slate-50 dark:bg-slate-900/50">
                                 <tr className="text-slate-500 dark:text-slate-400">
                                     <th className="p-3 pl-4 rounded-tl-xl">Filename</th>
+                                    <th className="p-3">Bucket</th>
                                     <th className="p-3">Size</th>
                                     <th className="p-3 rounded-tr-xl">Created</th>
                                 </tr>
@@ -309,6 +310,13 @@ const AdminDashboard = () => {
                                         <td className="p-3 pl-4 font-mono text-xs text-slate-700 dark:text-slate-300 flex items-center gap-2">
                                             <CheckCircle size={12} className="text-emerald-500 shrink-0" />
                                             {b.filename}
+                                        </td>
+                                        <td className="p-3">
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                                b.bucket === 'backups-mongodb' ? 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' :
+                                                b.bucket === 'backups-server' ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400' :
+                                                'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400'
+                                            }`}>{b.bucket?.replace('backups-', '')}</span>
                                         </td>
                                         <td className="p-3 text-slate-500 dark:text-slate-400">{b.sizeMb} MB</td>
                                         <td className="p-3 text-slate-500 dark:text-slate-400 flex items-center gap-1">

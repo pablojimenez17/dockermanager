@@ -82,15 +82,17 @@ router.delete('/containers/:id', async (req, res) => {
             return res.status(404).json({ message: 'Container not found' });
         }
 
-        const container = docker.getContainer(dbContainer.dockerId);
+        // Try to stop/remove from Docker — tolerate if it no longer exists
         try {
-            await container.stop();
-        } catch (e) { }
-        await container.remove();
+            const container = docker.getContainer(dbContainer.dockerId);
+            try { await container.stop(); } catch (_) {}
+            await container.remove();
+        } catch (dockerErr) {
+            console.warn(`[Admin] Container ${dbContainer.dockerId} not found in Docker, removing from DB only.`);
+        }
 
         await Container.deleteOne({ _id: req.params.id });
 
-        // Audit Log
         await AuditLog.create({
             userId: req.user.userId,
             action: 'FORCE_DELETE_CONTAINER',
@@ -138,7 +140,7 @@ router.post('/backup/run', async (req, res) => {
     }
 });
 
-// List all available backup files on the NAS (fetching from MinIO Bucket)
+// List all available backup files across all MinIO buckets
 router.get('/backup/list', async (req, res) => {
     const minioClient = new Minio.Client({
         endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
@@ -148,21 +150,31 @@ router.get('/backup/list', async (req, res) => {
         secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
     });
 
-    const BUCKET_NAME = 'backups-mongodb';
+    const BUCKETS = ['backups-mongodb', 'backups-server', 'backups-web'];
 
     try {
-        const objects = [];
-        const stream = minioClient.listObjects(BUCKET_NAME, '', true);
-        
-        for await (const obj of stream) {
-            objects.push({
-                filename: obj.name,
-                sizeMb: (obj.size / (1024 * 1024)).toFixed(2),
-                createdAt: obj.lastModified
-            });
+        const allObjects = [];
+
+        for (const bucket of BUCKETS) {
+            try {
+                const exists = await minioClient.bucketExists(bucket);
+                if (!exists) continue;
+
+                const stream = minioClient.listObjects(bucket, '', true);
+                for await (const obj of stream) {
+                    allObjects.push({
+                        filename: obj.name,
+                        bucket,
+                        sizeMb: (obj.size / (1024 * 1024)).toFixed(2),
+                        createdAt: obj.lastModified
+                    });
+                }
+            } catch (bucketErr) {
+                console.warn(`[Backup List] Could not list bucket ${bucket}:`, bucketErr.message);
+            }
         }
 
-        res.json(objects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+        res.json(allObjects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (err) {
         res.status(500).json({ message: 'Could not fetch remote backup list from MinIO', error: err.message });
     }
