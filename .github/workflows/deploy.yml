@@ -1,5 +1,4 @@
 name: Deploy to VPS
-
 on:
   push:
     branches:
@@ -21,8 +20,24 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           envs: GITHUB_TOKEN
           script: |
+            set -e
             export PATH=$PATH:/usr/local/bin
             cd /opt/dockermanager
+
+            echo ">>> Pulling latest code..."
             git pull https://x-access-token:${GITHUB_TOKEN}@github.com/pablojimenez17/dockermanager.git main
-            # Usar docker compose (con espacio) que viene integrado con Docker V2 moderno
-            docker compose up -d --build
+
+            echo ">>> Stopping containers gracefully..."
+            docker compose down --timeout 30
+
+            echo ">>> Pruning stale images (optional, libera espacio)..."
+            docker image prune -f
+
+            echo ">>> Building and starting containers..."
+            docker compose up -d --build --remove-orphans
+
+            echo ">>> Waiting for containers to be healthy..."
+            sleep 5
+            docker compose ps
+
+            echo ">>> Deploy completed successfully"
