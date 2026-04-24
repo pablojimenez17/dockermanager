@@ -46,29 +46,31 @@ services:
       - suricata-rules:/var/lib/suricata
     entrypoint: ["/bin/sh", "/docker-entrypoint.sh"]
 
-  # 1.5 Edge Firewall UI (EveBox)
-  # FIX #6: EveBox protected with BasicAuth via Traefik middleware
-  evebox:
-    image: jasonish/evebox:latest
-    container_name: dockermanager-evebox
-    entrypoint: ["/bin/sh", "/etc/evebox/start.sh"]
+  # 1.5 Log Aggregation (Loki) — stores Suricata eve.json events
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: dockermanager-loki
+    command: -config.file=/etc/loki/loki.yaml
+    volumes:
+      - loki-data:/loki
+      - ./infrastructure/loki/loki.yaml:/etc/loki/loki.yaml:ro
+    networks:
+      - monitoring_net
+    restart: unless-stopped
+
+  # 1.6 Log Shipper (Promtail) — reads eve.json and sends to Loki
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: dockermanager-promtail
+    command: -config.file=/etc/promtail/promtail.yaml
     volumes:
       - suricata-logs:/var/log/suricata:ro
-      - evebox-data:/var/lib/evebox
-      - ./infrastructure/evebox/start.sh:/etc/evebox/start.sh:ro
+      - ./infrastructure/promtail/promtail.yaml:/etc/promtail/promtail.yaml:ro
     networks:
-      - public_net
-      - dmz_net
-    labels:
-      - "traefik.enable=true"
-      - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.evebox.rule=Host(`evebox.orbitcloud.app`)"
-      - "traefik.http.routers.evebox.entrypoints=web,websecure"
-      - "traefik.http.routers.evebox.tls.certresolver=letsencrypt"
-      - "traefik.http.services.evebox.loadbalancer.server.port=5636"
-      # FIX #6: BasicAuth middleware — protect IDS/IPS events from public access
-      - "traefik.http.routers.evebox.middlewares=evebox-auth"
-      - "traefik.http.middlewares.evebox-auth.basicauth.users=${EVEBOX_BASICAUTH_USERS}"
+      - monitoring_net
+    restart: unless-stopped
+    depends_on:
+      - loki
 
   # 2. Reverse Proxy (Traefik) - Proxy Inverso
   # FIX #1: Traefik no longer binds 80/443 directly — receives forwarded traffic from Suricata
@@ -320,3 +322,4 @@ volumes:
   prometheus-data:
   grafana-data:
   evebox-data:
+  loki-data:
