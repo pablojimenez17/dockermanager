@@ -19,7 +19,7 @@ DockerManager - OrbitCloud corre en producción de forma continua en **[https://
 | **Bóveda MinIO** | Sin URL pública ✅ | Solo accesible via HAProxy interno o SSH tunnel |
 
 > [!TIP]
-> Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:dockermanager-minio:9001 user@servidor`
+> Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:dockermanager-minio:9001 root@167.99.252.155`
 
 
 ---
