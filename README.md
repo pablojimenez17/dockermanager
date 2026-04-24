@@ -10,14 +10,11 @@ DockerManager - OrbitCloud corre en producción de forma continua en **[https://
 
 ### 🔗 Servicios en Producción (orbitcloud.app)
 
-| Servicio | Enlace | Credenciales |
-|---|---|---|
-| **Plataforma Web (Frontend)** | [https://orbitcloud.app](https://orbitcloud.app) | Regístrate directamente |
-| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | `GF_SECURITY_ADMIN_PASSWORD` en `.env` del servidor |
-| **Métricas (Prometheus)** | [https://prometheus.orbitcloud.app](https://prometheus.orbitcloud.app) | 🔐 BasicAuth (generado con `generate-secrets.sh`) |
-| **Eventos Suricata (Grafana → Loki)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) → Explore → datasource Loki | Mismas credenciales de Grafana |
-| **Bóveda MinIO** | Sin URL pública ✅ | Solo accesible via HAProxy interno o SSH tunnel |
-
+| Servicio                                  | Enlace                         | Credenciales                                    |
+|-------------------------------------------|--------------------------------|-------------------------------------------------|
+| Plataforma Web (Frontend)                 | https://orbitcloud.app         | Regístrate directamente                         |
+| Panel de Monitorizacion + Monit. Suricata | https://grafana.orbitcloud.app | GF_SECURITY_ADMIN_PASSWORD en .env del servidor |
+| Bóveda MinIO                              | Sin URL pública ✅              | Solo accesible via HAProxy interno o SSH tunnel |
 > [!TIP]
 > Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:dockermanager-minio:9001 root@167.99.252.155`
 
