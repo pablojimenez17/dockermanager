@@ -1,0 +1,49 @@
+# Suricata Configuration for High-Throughput Traffic Inspection
+# This file contains optimized settings for Suricata to handle high-throughput traffic, utilizing multithreading, memory pooling, and packet capture tuning.
+
+# Global settings
+runmode: 
+  - af-packet      # Use af-packet mode for performance, suitable for high data rate inspection
+  - standalone     # Run in standalone mode, perfect for dedicated instances
+  - pcap-file:    # Change to the .pcap capture file if not using live traffic
+
+# Thread settings
+threads:
+  - 4              # Specify number of threads; adjust based on system cores for parallel processing
+
+# Memory Pooling settings
+memory-pool: 
+  - 1G             # Allocates 1GB memory pool; adjust based on system resources
+
+# Packet capture settings
+pcap:
+  - buffer-size: 1048576  # Buffer size of 1MB for packet capture to handle high data rates
+  - max-packets: 100000    # Tune max packets to capture before processing
+
+# Rule management 
+rule-files:  # Specify the rule files to load
+  - /etc/suricata/rules/*.rules  # Load all rules from the directory
+
+# Logging settings
+logging:
+  - outputs:
+      - file:
+          enabled: yes
+          filename: /var/log/suricata/suricata.log  # Log file path
+          level: info
+
+# Alert settings
+outputs:
+  - alert:
+      enabled: yes
+      alert-file: /var/log/suricata/alert.log
+
+# Interface settings
+interface:
+  - eth0            # Specify the network interface to monitor
+
+# Performance tuning recommendations:
+# - Keep Suricata updated with the latest rules and engine for optimal performance.
+# - Monitor system resources closely to ensure threads are well-distributed across CPUs.
+# - Consider utilizing more threads if the system allows for it.
+# - Regularly review and optimize rules based on traffic patterns and false positives.
