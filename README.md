@@ -825,30 +825,93 @@ DockerManager incluye un stack completo de observabilidad integrado en el `docke
 
 ### Los 5 Pilares de la Monitorización
 
-1. 📥 **Prometheus** — El corazón del sistema. Cada 15 segundos pregunta automáticamente al servidor y los contenedores cómo se encuentran, guardando el histórico en su base de datos de series temporales (`prometheus-data`).
-
-2. 📈 **Grafana** — El panel de control visual. Se conecta a Prometheus y Loki para mostrar dashboards interactivos de rendimiento y seguridad en `https://grafana.orbitcloud.app`.
-
-3. 🖥️ **Node Exporter** — El termómetro del hardware. Expone las **métricas del servidor físico** (no de los contenedores) a Prometheus:
-   - **CPU real** del host: porcentaje de uso, iowait, system, user, idle
-   - **RAM física**: total, usada, cacheada y libre
-   - **Disco del VPS**: espacio libre, velocidad de lectura/escritura
-   - **Red**: bytes enviados/recibidos por interfaz
-   - **Uptime** y carga del sistema (load average)
-   
-   El **Dashboard `1860` ("Node Exporter Full")** muestra todo esto en +20 paneles profesionales preconfigurados.
-
-4. 📦 **cAdvisor** — El espía de contenedores. Mira **cada contenedor Docker individualmente**: cuánta RAM y CPU consume en tiempo real. Ideal para detectar el "noisy neighbor".
-
-5. 🪵 **Loki + Promtail** — El analizador de seguridad. Promtail lee el `eve.json` de Suricata y lo envía a Loki. Desde Grafana se consultan alertas, flows TLS y escaneos con LogQL.
+1. 📥 **Prometheus** — Cada 15s scrape de métricas al servidor y contenedores. Base de datos de series temporales en `prometheus-data`.
+2. 📈 **Grafana** — Panel visual en `https://grafana.orbitcloud.app`. Se conecta a Prometheus y Loki.
+3. 🖥️ **Node Exporter** — Métricas del servidor físico: CPU, RAM, disco, red, uptime.
+4. 📦 **cAdvisor** — Métricas de cada contenedor Docker individualmente.
+5. 🪵 **Loki + Promtail** — Promtail lee `eve.json` de Suricata y lo envía a Loki. Grafana consulta con LogQL.
 
 ### 🗣️ Dashboards disponibles
 
-| Dashboard | Cómo importarlo | Qué muestra |
-|---|---|---|
-| **Node Exporter Full** | Dashboards → Import → ID `1860` | CPU, RAM, disco, red del servidor físico |
-| **Docker Containers** | Dashboards → Import → ID `14282` | Métricas individuales por contenedor (cAdvisor) |
-| **Suricata IDS/IPS** | Dashboards → Import → pegar `infrastructure/grafana/dashboards/suricata.json` | Alertas y eventos de seguridad de Suricata |
+| Dashboard | Cómo importarlo | Datasource | Qué muestra |
+|---|---|---|---|
+| **Node Exporter Full** | Import → ID `1860` | `prometheus` | CPU, RAM, disco, red del servidor físico |
+| **Docker Containers** | Import → pegar `infrastructure/grafana/dashboards/cadvisor.json` | `prometheus` | Métricas individuales por contenedor |
+| **Suricata IDS/IPS** | Import → pegar `infrastructure/grafana/dashboards/suricata.json` | `loki` | Alertas y eventos de seguridad |
+
+---
+
+### 🖥️ Dashboard: Node Exporter Full (ID 1860)
+
+Monitoriza el **servidor físico** (el VPS/host, no los contenedores).
+
+**Importar:** Dashboards → New → Import → escribe `1860` → Load → datasource `prometheus` → Import
+
+**Paneles:**
+- **Quick CPU / Mem / Disk**: gauges del estado actual del servidor
+- **CPU Basic**: histórico de uso por tipo (system, user, iowait, idle)
+- **Memory Basic**: RAM total / usada / cacheada / libre
+- **Disk I/O**: velocidad de lectura y escritura del disco físico
+- **Network**: tráfico de red de la interfaz principal
+- **Uptime**: tiempo encendido desde el último reinicio
+
+---
+
+### 📦 Dashboard: Docker Containers (cadvisor.json)
+
+Monitoriza **cada contenedor Docker individualmente** con métricas en tiempo real.
+
+**Importar:** Dashboards → New → Import → pegar contenido de `infrastructure/grafana/dashboards/cadvisor.json` → datasource `prometheus` → Import
+
+**Paneles:**
+- **Stat cards**: contenedores activos, % CPU total, RAM total usada, tráfico de red
+- **CPU por contenedor** (timeseries): evolución del uso de CPU de cada contenedor
+- **RAM por contenedor** (timeseries): memoria consumida por cada contenedor en MB/GB
+- **Red por contenedor** (timeseries): bytes/s recibidos
+- **Top 10 por RAM** (bargauge): ranking de contenedores más voraces en memoria
+- **Top 10 por CPU** (bargauge): ranking de contenedores más exigentes en CPU
+
+> [!TIP]
+> Usa este dashboard para detectar el **"noisy neighbor"**: el contenedor que consume recursos desproporcionados y degrada el rendimiento del resto de inquilinos.
+
+---
+
+### 🛡️ Dashboard: Suricata IDS/IPS (suricata.json)
+
+Visualiza los **eventos de seguridad de red** capturados por Suricata (~3s de delay).
+
+**Importar:** Dashboards → New → Import → pegar contenido de `infrastructure/grafana/dashboards/suricata.json` → datasource `loki` → Import
+
+**Paneles:**
+- **Stat cards**: alertas 24h, eventos totales 6h, conexiones TLS, alertas última hora
+- **Alertas formateadas**: `🚨 IP_origen:puerto → IP_destino:puerto | Proto | Sev:N | Firma detectada`
+- **Volumen por tipo** (timeseries): alert, tls, flow, http, ssh, stats, anomaly
+- **Protocolos** (donut chart): TCP / UDP / IPv6-ICMP
+- **Eventos TLS**: `🔒 IP → dominio_sni | TLS 1.3`
+- **Stream completo**: todos los eventos con tipo, IPs y protocolo
+
+**Queries LogQL útiles en Explore:**
+```logql
+{job="suricata", event_type="alert"} | json | alert_severity="1"        # alertas críticas
+{job="suricata", event_type="alert"} | json | alert_signature=~".*SCAN.*" # escaneos
+{job="suricata"} | json | src_ip="185.15.54.12"                          # IP concreta
+```
+
+**Live mode:** En Grafana → Explore → Loki → query `{job="suricata"}` → botón ▶ **Live** para stream en tiempo real.
+
+---
+
+### ⚠️ IDS (detección) vs IPS (prevención)
+
+| Modo | Comportamiento | Config | Riesgo |
+|---|---|---|---|
+| **IDS** ✅ (actual) | Detecta y registra — el tráfico malicioso **pasa igualmente** | `af-packet` (pasivo) | Ninguno |
+| **IPS** 🚧 | Detecta **y bloquea** activamente los paquetes maliciosos | `nfqueue` (inline) | Falsos positivos pueden cortar tráfico legítimo |
+
+En el dashboard verás `action: allowed` en todas las alertas — esto confirma que Suricata está en **modo IDS** (solo observa, no bloquea).
+
+> [!WARNING]
+> Activar IPS en producción sin afinar las reglas puede bloquear tráfico legítimo. Se recomienda ejecutar en modo IDS durante al menos 2 semanas, revisar los falsos positivos en el dashboard, y solo entonces activar el bloqueo.
 
 ### 🔧 Configurar datasources en Grafana
 
