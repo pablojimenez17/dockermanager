@@ -1,0 +1,15 @@
+# EveBox 0.24.x configuration
+# https://evebox.org/docs/
+
+database:
+  type: sqlite
+
+input:
+  filename: /var/log/suricata/eve.json
+
+http:
+  tls:
+    enabled: false
+
+authentication:
+  required: false

@@ -51,9 +51,11 @@ services:
   evebox:
     image: jasonish/evebox:latest
     container_name: dockermanager-evebox
-    command: evebox server --datastore sqlite --sqlite /tmp/evebox.sqlite -i /var/log/suricata/eve.json --no-tls --no-auth
+    command: evebox server -c /etc/evebox/evebox.yaml -D /var/lib/evebox
     volumes:
       - suricata-logs:/var/log/suricata:ro
+      - evebox-data:/var/lib/evebox
+      - ./infrastructure/evebox/evebox.yaml:/etc/evebox/evebox.yaml:ro
     networks:
       - public_net
       - dmz_net
@@ -317,3 +319,4 @@ volumes:
   suricata-rules:
   prometheus-data:
   grafana-data:
+  evebox-data:
