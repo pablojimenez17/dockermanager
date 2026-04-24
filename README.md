@@ -13,9 +13,9 @@ DockerManager - OrbitCloud corre en producción de forma continua en **[https://
 | Servicio | Enlace | Credenciales |
 |---|---|---|
 | **Plataforma Web (Frontend)** | [https://orbitcloud.app](https://orbitcloud.app) | Regístrate directamente |
-| **Monitor IPS del Firewall (EveBox)** | [https://evebox.orbitcloud.app](https://evebox.orbitcloud.app) | 🔐 BasicAuth (generado con `generate-secrets.sh`) |
-| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | Definido en `.env` del servidor |
+| **Panel de Monitorización (Grafana)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) | `GF_SECURITY_ADMIN_PASSWORD` en `.env` del servidor |
 | **Métricas (Prometheus)** | [https://prometheus.orbitcloud.app](https://prometheus.orbitcloud.app) | 🔐 BasicAuth (generado con `generate-secrets.sh`) |
+| **Eventos Suricata (Grafana → Loki)** | [https://grafana.orbitcloud.app](https://grafana.orbitcloud.app) → Explore → datasource Loki | Mismas credenciales de Grafana |
 | **Bóveda MinIO** | Sin URL pública ✅ | Solo accesible via HAProxy interno o SSH tunnel |
 
 > [!TIP]
@@ -45,7 +45,8 @@ docker compose -f docker-compose.yml up -d --build
 | **Frontend** | Nginx sirviendo el build | Vite dev server con HMR |
 | **MinIO** | Solo `storage_net`, sin URL pública | Puerto `9001` expuesto al host |
 | **Credenciales** | Variables de `.env` (secrets fuertes) | Variables de `.env` local (valores de prueba) |
-| **Auth (Prometheus/EveBox)** | BasicAuth Traefik activo | Sin autenticación |
+| **Auth (Prometheus)** | BasicAuth Traefik activo | Sin autenticación |
+| **Logs Suricata** | Promtail → Loki → Grafana | Volume compartido (desarrollo, sin ingestión) |
 
 > [!NOTE]
 > El override nunca debe subirse al servidor de producción. El CI/CD lo ignora automáticamente especificando `-f docker-compose.yml`.
@@ -167,7 +168,7 @@ graph TD
 
 ### 🧩 Referencia de los "Enanos de Seguridad" (Contenedores de Infraestructura)
 
-Para que tus aplicaciones corran de manera profesional y aislada, a tu alrededor trabajan en secreto **9 contenedores de infraestructura** fijos. Piensa en ellos como la plantilla de trabajadores de un hotel de lujo:
+Para que tus aplicaciones corran de manera profesional y aislada, a tu alrededor trabajan en secreto **11 contenedores de infraestructura** fijos. Piensa en ellos como la plantilla de trabajadores de un hotel de lujo:
 
 ---
 
@@ -277,22 +278,46 @@ Sistema de almacenamiento centralizado e interno. Utilizado para almacenar de ma
 | | |
 |---|---|
 | **Imagen** | `prom/prometheus:latest` |
-| **Redes** | `dmz_net` |
+| **Redes** | `dmz_net` + `monitoring_net` |
 | **Volumen** | `prometheus-data:/prometheus` |
 
-Se encarga de conectarse cada 15 segundos a los demás contenedores y al servidor para raspar ("scrape") sus métricas (RAM, CPU, Disco). Actúa como la base de datos temporal hiper-optimizada que guarda todo este histórico de rendimiento en la DMZ de forma privada.
+Se encarga de conectarse cada 15 segundos a los demás contenedores y al servidor para raspar ("scrape") sus métricas (RAM, CPU, Disco). Actúa como la base de datos temporal hiper-optimizada que guarda todo este histórico de rendimiento.
 
 ---
 
-#### 11. 📈 `dockermanager-grafana` — El Panel de Control (Grafana)
+#### 11. 📈 `dockermanager-grafana` — El Panel de Control Visual (Grafana)
 | | |
 |---|---|
 | **Imagen** | `grafana/grafana:latest` |
-| **Redes** | `dmz_net` |
+| **Redes** | `monitoring_net` |
 | **Volumen** | `grafana-data:/var/lib/grafana` |
-| **Puerto Expuesto**| `3000` |
+| **URL Producción** | `https://grafana.orbitcloud.app` |
 
-La herramienta visual definitiva. Se conecta a Prometheus y dibuja espectaculares cuadros de mando interactivos que permiten al administrador revisar cuellos de botella y configurar alertas de infraestructura.
+La herramienta visual definitiva. Se conecta a **Prometheus** (métricas de rendimiento) y a **Loki** (eventos de seguridad de Suricata) para ofrecer un panel de control unificado: rendimiento + seguridad en el mismo lugar.
+
+---
+
+#### 12. 🪵 `dockermanager-loki` — El Almacén de Logs (Loki)
+| | |
+|---|---|
+| **Imagen** | `grafana/loki:2.9.0` |
+| **Redes** | `monitoring_net` |
+| **Volumen** | `loki-data:/loki` |
+| **Config** | `./infrastructure/loki/loki.yaml` |
+
+Base de datos de logs optimizada de Grafana. Recibe los eventos de Suricata procesados por Promtail y los almacena eficientemente para que Grafana pueda consultarlos con LogQL. Es la alternativa robusta a EveBox, integrada directamente en el stack de observabilidad.
+
+---
+
+#### 13. 📨 `dockermanager-promtail` — El Lector de Logs (Promtail)
+| | |
+|---|---|
+| **Imagen** | `grafana/promtail:2.9.0` |
+| **Redes** | `monitoring_net` |
+| **Volumen** | `suricata-logs:/var/log/suricata:ro` |
+| **Config** | `./infrastructure/promtail/promtail.yaml` |
+
+Agente de recolección de logs. Lee en tiempo real el archivo `eve.json` generado por Suricata y lo envía a Loki añadiendo etiquetas (`event_type`, `proto`) para poder filtrar fácilmente alertas, flows y eventos TLS desde Grafana.
 
 ---
 
@@ -419,8 +444,8 @@ Formato: `{componente}-{tipo}-{ISO8601}.{ext}` — ordenables cronológicamente.
 |---|---|---|
 | `MINIO_ENDPOINT` | `storage-fw` | Punto de entrada S3 (a través del firewall) |
 | `MINIO_PORT` | `9000` | Puerto del API S3 |
-| `NAS_USERNAME` | `admin` | Access Key de MinIO |
-| `NAS_PASSWORD` | `password123` | Secret Key de MinIO |
+| `MINIO_ROOT_USER` | `admin` | Access Key de MinIO |
+| `MINIO_ROOT_PASSWORD` | — | Secret Key de MinIO (definir en `.env`) |
 | `BACKUP_INTERVAL_MS` | `86400000` (24h) | Intervalo entre backups automáticos |
 | `BACKUP_RETENTION` | `7` | Número de copias a conservar |
 
@@ -442,7 +467,8 @@ cat mongo-backup-XXX.archive.gz | docker exec -i dockermanager-mongo mongorestor
 | Endpoint | Método | Descripción |
 |---|---|---|
 | `/api/admin/backup/run` | `POST` | Fuerza un backup inmediato (útil antes de actualizaciones) |
-| `/api/admin/backup/list` | `GET` | Lista todos los backups disponibles con tamaño y fecha |
+| `/api/admin/backup/list` | `GET` | Lista los backups de los 3 buckets (`mongodb`, `server`, `web`) con bucket, tamaño y fecha |
+| `/api/admin/backup/:bucket/:filename` | `DELETE` | Elimina un archivo específico de un bucket de MinIO |
 
 ---
 
@@ -579,14 +605,46 @@ Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unif
 
 ---
 
-## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
+## 👁️ Vigilancia de Red Suricata → Loki → Grafana
 
-**Acceso:** http://localhost:5636
+DockerManager utiliza un pipeline de observabilidad de seguridad basado en el stack de Grafana. Los eventos de red capturados por Suricata (alertas, flows TLS, estadísticas) se visualizan directamente en **Grafana** a través de **Loki** como datasource de logs.
 
-Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y muestra al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
+```
+dockermanager-edge-fw (Suricata)
+        │ escribe eve.json
+        ▼
+   suricata-logs (Docker Volume)
+        │ lee en tiempo real
+        ▼
+dockermanager-promtail (Promtail)
+        │ envía con etiquetas
+        ▼
+dockermanager-loki (Loki:3100)
+        │ almacena y sirve
+        ▼
+  grafana.orbitcloud.app → Explore → Loki
+```
 
-- **Volumen de Logs Compartido**: Suricata reporta en silencio los logs de alertas a un volumen Docker llamado `suricata-logs` (generando el archivo `eve.json`).
-- **Data-Store SQLite de Alto Rendimiento**: EveBox consume en caliente ese `.json` renderizando un visor con filtros de búsqueda ultra avanzado en el puerto `5636`.
+### 🔍 Consultas LogQL útiles en Grafana
+
+Desde **Grafana → Explore → datasource: Loki**:
+
+```logql
+# Todos los eventos de Suricata
+{job="suricata"}
+
+# Solo alertas de seguridad
+{job="suricata", event_type="alert"}
+
+# Solo eventos TLS
+{job="suricata", event_type="tls"}
+
+# Filtrar por IP origen
+{job="suricata"} | json | src_ip="185.15.54.12"
+
+# Alertas de severidad alta
+{job="suricata", event_type="alert"} | json | alert_severity="1"
+```
 
 ### 🚀 Arranque con Reglas Automáticas
 
@@ -598,45 +656,29 @@ El script de arranque del firewall (`config/edge-fw.sh`) ejecuta automáticament
 ### ⚠️ Limitación en Docker Desktop (Windows/Mac)
 
 > [!WARNING]
-> **Por qué EveBox puede aparecer vacío en desarrollo local:**
-> En Docker Desktop sobre Windows o Mac, los contenedores de una misma red se comunican a través de un switch virtual interno del hypervisor (Hyper-V/VirtIO). Este switch **no replica el tráfico entre las interfaces de los contenedores**, por lo que Suricata, aunque esté escuchando en `eth0`, `eth1` y `eth2`, no llega a ver los paquetes que intercambian otros contenedores.
->
-> **Esto es una limitación de arquitectura de Docker Desktop, no un bug de nuestra configuración.** En producción sobre Linux nativo, Suricata captura el tráfico de forma completa porque los bridges de Linux sí replican los paquetes.
+> En Docker Desktop sobre Windows o Mac, Suricata no captura tráfico inter-contenedor porque el switch virtual del hypervisor no replica paquetes. El `eve.json` tendrá muy poco contenido en local. **En producción sobre Linux nativo**, Suricata captura el tráfico completo y Loki lo recibirá automáticamente.
 
-### 🧪 Cómo Generar Alertas de Prueba
+### 🧪 Cómo Verificar el Pipeline
 
-Para verificar que el pipeline Suricata → EveBox funciona correctamente, hay dos formas:
-
-**Opción A — Tráfico real desde dentro del firewall** (funciona en todos los entornos):
 ```bash
-# Desde dentro del contenedor del firewall, que sí genera tráfico visible
-docker exec dockermanager-edge-fw curl -s http://testmyids.com
-```
-Esta URL está diseñada explícitamente para disparar la regla **GPL ATTACK_RESPONSE id check returned root** (SID 2100498). La respuesta `uid=0(root)` es la firma que detecta Suricata.
+# Verificar que eve.json tiene datos recientes
+docker exec dockermanager-edge-fw tail -3 /var/log/suricata/eve.json
 
-**Opción B — Inyección directa de evento de prueba** (para demos sin red):
-```bash
-docker exec dockermanager-edge-fw python3 -c "
-import json, time, datetime
-log_file = '/var/log/suricata/eve.json'
-now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f') + '+0000'
-alert = {
-    'timestamp': now, 'flow_id': int(time.time()), 'in_iface': 'eth0',
-    'event_type': 'alert', 'src_ip': '185.15.54.12', 'src_port': 54321,
-    'dest_ip': '10.0.0.5', 'dest_port': 80, 'proto': 'TCP',
-    'alert': {'action': 'allowed', 'gid': 1, 'signature_id': 2100498, 'rev': 7,
-              'signature': 'GPL ATTACK_RESPONSE id check returned root',
-              'category': 'Potentially Bad Traffic', 'severity': 1},
-    'app_proto': 'http'
-}
-open(log_file, 'a').write(json.dumps(alert) + '\n')
-print('Alert injected at', now)
-"
-docker restart dockermanager-evebox
-```
-Tras reiniciar EveBox y pulsar **Refresh**, el evento aparecerá en el Inbox.
+# Verificar que Promtail está enviando a Loki
+docker logs dockermanager-promtail --tail 20
 
-**En producción sobre Linux**, el tráfico real disparará alertas automáticamente sin ningún paso adicional.
+# Verificar que Loki recibe datos
+docker logs dockermanager-loki --tail 10
+```
+
+### 🔧 Añadir Loki como datasource en Grafana
+
+1. **Connections → Data Sources → Add new data source**
+2. Selecciona **Loki**
+3. URL: `http://dockermanager-loki:3100`
+4. **Save & Test** → ✅
+
+Ya puedes usar Explore con las queries LogQL de arriba.
 
 ---
 
@@ -774,113 +816,51 @@ Tanto el estado local (Light mode/Oscura) se nutren del mismo archivo raíz unif
 
 ---
 
-## 👁️ EveBox — La Torre de Vigilancia (Dashboard del IPS)
+## 📊 Observabilidad y Monitorización (Grafana + Prometheus + Loki)
 
-**Acceso:** http://localhost:5636
+DockerManager incluye un stack completo de observabilidad integrado en el `docker-compose.yml`. Desde **[grafana.orbitcloud.app](https://grafana.orbitcloud.app)** el administrador tiene una visión unificada de dos dimensiones:
 
-Acompañando a nuestro sistema de Cortafuegos Perimetral transparente (Suricata), un contenedor adicional **(EveBox)** monitoriza y muestra al usuario final de manera web pura la visión de las amenazas y los eventos de red cazados en la "Calle".
+- 💪 **Rendimiento** — CPU, RAM, disco y red del servidor y de cada contenedor (Prometheus)
+- 🔒 **Seguridad** — Eventos de red capturados por Suricata en tiempo real (Loki)
 
-- **Volumen de Logs Compartido**: Suricata reporta en silencio los logs de alertas a un volumen Docker llamado `suricata-logs` (generando el archivo `eve.json`).
-- **Data-Store SQLite de Alto Rendimiento**: EveBox consume en caliente ese `.json` renderizando un visor con filtros de búsqueda ultra avanzado en el puerto `5636`.
+### Los 5 Pilares de la Monitorización
 
-### 🚀 Arranque con Reglas Automáticas
+1. 📥 **Prometheus** — El corazón del sistema. Cada 15 segundos pregunta automáticamente al servidor y los contenedores cómo se encuentran, guardando el histórico en su base de datos de series temporales (`prometheus-data`).
 
-El script de arranque del firewall (`config/edge-fw.sh`) ejecuta automáticamente `suricata-update` al iniciarse, descargando el **ET Open Ruleset (~49.500 reglas)** antes de arrancar el motor. Las reglas se persisten en el volumen `suricata-rules` para no tener que descargarlas en cada reinicio.
+2. 📈 **Grafana** — El panel de control visual. Se conecta a Prometheus y Loki para mostrar dashboards interactivos de rendimiento y seguridad en `https://grafana.orbitcloud.app`.
 
-> [!NOTE]
-> El primer arranque tarda 2-3 minutos extra mientras descarga las reglas de internet. Los reinicios posteriores son instantáneos al usar el caché del volumen.
+3. 🖥️ **Node Exporter** — El termómetro del hardware. Expone las **métricas del servidor físico** (no de los contenedores) a Prometheus:
+   - **CPU real** del host: porcentaje de uso, iowait, system, user, idle
+   - **RAM física**: total, usada, cacheada y libre
+   - **Disco del VPS**: espacio libre, velocidad de lectura/escritura
+   - **Red**: bytes enviados/recibidos por interfaz
+   - **Uptime** y carga del sistema (load average)
+   
+   El **Dashboard `1860` ("Node Exporter Full")** muestra todo esto en +20 paneles profesionales preconfigurados.
 
-### ⚠️ Limitación en Docker Desktop (Windows/Mac)
+4. 📦 **cAdvisor** — El espía de contenedores. Mira **cada contenedor Docker individualmente**: cuánta RAM y CPU consume en tiempo real. Ideal para detectar el "noisy neighbor".
 
-> [!WARNING]
-> **Por qué EveBox puede aparecer vacío en desarrollo local:**
-> En Docker Desktop sobre Windows o Mac, los contenedores de una misma red se comunican a través de un switch virtual interno del hypervisor (Hyper-V/VirtIO). Este switch **no replica el tráfico entre las interfaces de los contenedores**, por lo que Suricata, aunque esté escuchando en `eth0`, `eth1` y `eth2`, no llega a ver los paquetes que intercambian otros contenedores.
->
-> **Esto es una limitación de arquitectura de Docker Desktop, no un bug de nuestra configuración.** En producción sobre Linux nativo, Suricata captura el tráfico de forma completa porque los bridges de Linux sí replican los paquetes.
+5. 🪵 **Loki + Promtail** — El analizador de seguridad. Promtail lee el `eve.json` de Suricata y lo envía a Loki. Desde Grafana se consultan alertas, flows TLS y escaneos con LogQL.
 
-### 🧪 Cómo Generar Alertas de Prueba
+### 🗣️ Dashboards disponibles
 
-Para verificar que el pipeline Suricata → EveBox funciona correctamente, hay dos formas:
+| Dashboard | Cómo importarlo | Qué muestra |
+|---|---|---|
+| **Node Exporter Full** | Dashboards → Import → ID `1860` | CPU, RAM, disco, red del servidor físico |
+| **Docker Containers** | Dashboards → Import → ID `14282` | Métricas individuales por contenedor (cAdvisor) |
+| **Suricata IDS/IPS** | Dashboards → Import → pegar `infrastructure/grafana/dashboards/suricata.json` | Alertas y eventos de seguridad de Suricata |
 
-**Opción A — Tráfico real desde dentro del firewall** (funciona en todos los entornos):
-```bash
-# Desde dentro del contenedor del firewall, que sí genera tráfico visible
-docker exec dockermanager-edge-fw curl -s http://testmyids.com
-```
-Esta URL está diseñada explícitamente para disparar la regla **GPL ATTACK_RESPONSE id check returned root** (SID 2100498). La respuesta `uid=0(root)` es la firma que detecta Suricata.
+### 🔧 Configurar datasources en Grafana
 
-**Opción B — Inyección directa de evento de prueba** (para demos sin red):
-```bash
-docker exec dockermanager-edge-fw python3 -c "
-import json, time, datetime
-log_file = '/var/log/suricata/eve.json'
-now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S.%f') + '+0000'
-alert = {
-    'timestamp': now, 'flow_id': int(time.time()), 'in_iface': 'eth0',
-    'event_type': 'alert', 'src_ip': '185.15.54.12', 'src_port': 54321,
-    'dest_ip': '10.0.0.5', 'dest_port': 80, 'proto': 'TCP',
-    'alert': {'action': 'allowed', 'gid': 1, 'signature_id': 2100498, 'rev': 7,
-              'signature': 'GPL ATTACK_RESPONSE id check returned root',
-              'category': 'Potentially Bad Traffic', 'severity': 1},
-    'app_proto': 'http'
-}
-open(log_file, 'a').write(json.dumps(alert) + '\n')
-print('Alert injected at', now)
-"
-docker restart dockermanager-evebox
-```
-Tras reiniciar EveBox y pulsar **Refresh**, el evento aparecerá en el Inbox.
+**Prometheus** (métricas de rendimiento):
+1. Connections → Data Sources → Add → **Prometheus**
+2. URL: `http://dockermanager-prometheus:9090`
+3. Save & Test → ✅
 
-**En producción sobre Linux**, el tráfico real disparará alertas automáticamente sin ningún paso adicional.
-
----
-
-## 📊 Observabilidad y Monitorización (Grafana + Prometheus)
-
-Para asegurar la estabilidad en producción, DockerManager incluye un stack completo de métricas integrado directamente en el `docker-compose.yml`. A diferencia de EveBox que vigila intrusiones (Seguridad/IPS), este stack vigila la **salud del rendimiento** del servidor y los contenedores aportando telemetría en tiempo real.
-
-**Accesos y Puertos:**
-- **Grafana (Dashboard Visual)**: `http://localhost:3000` (Usuario: `admin` / Contraseña: `admin`)
-- **Prometheus (Motor de Series Temporales)**: *Oculto en la red DMZ (No expuesto directamente al público por seguridad).*
-
-### Los 4 Pilares de la Monitorización
-
-1. 📥 **Prometheus (El Recolector):** Es el corazón del sistema. Cada 15 segundos se dedica a preguntar automáticamente al resto de los componentes cómo se encuentran, y guarda todo el histórico de métricas de forma súper eficiente en una base de datos propia (`prometheus-data`).
-
-2. 📈 **Grafana (El Visualizador):** Prometheus por sí solo solo guarda números puros. Grafana se conecta a Prometheus y te permite crear paneles de control (Dashboards) preciosos y fáciles de entender con gráficos sobre consumo de RAM, alertas por correo si se cae un servidor, etc.
-
-3. 🖥️ **Node Exporter (Métricas del Host/Hardware):** Un pequeño "chivato" o agente instalado mediante un contenedor. Informa a Prometheus exclusivamente sobre el estado de la **máquina real (El servidor Ubuntu/Debian host)**:
-   - ¿Queda espacio libre en el disco duro físico?
-   - ¿La CPU está al 100% de uso?
-   - ¿Se está consumiendo la memoria RAM del servidor?
-
-4. 📦 **cAdvisor (Métricas de Contenedores de Google):** Mientras Node Exporter mira el servidor, cAdvisor (Container Advisor) mira **hacia dentro de Docker**. Le chiva a Prometheus exactamente cuánta RAM y CPU está consumiendo individualmente *cada* contenedor en tiempo real, lo que te permite descubrir qué aplicación de qué inquilino se está comiendo los recursos ("Noisy neighbor").
-
-### 🛠️ Cómo configurar Grafana paso a paso (Tutorial GUI)
-
-Grafana viene en blanco por defecto. Sigue estos 3 simples pasos desde el navegador (`http://localhost:3000`) para activar toda la telemetría:
-
-**Paso 1: Conectar a Grafana con Prometheus (La fuente de los datos)**
-1. En Grafana, ve al menú izquierdo, dale al ícono de tuerca ⚙️ (**Connections -> Data sources**).
-2. Haz clic en el botón azul **"Add data source"** y selecciona **Prometheus**.
-3. En la casilla **URL**, introduce exactamente: `http://prometheus:9090` (este es su nombre en la red interna).
-4. Baja hasta el final y dale a **"Save & test"**. Saldrá un check verde.
-
-**Paso 2: Importar el Dashboard del Servidor (Node Exporter)**
-En lugar de crear paneles desde cero, aprovecharemos el trabajo de la comunidad.
-1. En Grafana, pulsa el botón **`+`** arriba a la derecha y dale a **Import dashboard**.
-2. Escribe el ID oficial **`1860`** (Panel maestro de Node Exporter) y pulsa "Load".
-3. Abajo del todo te pedirá elegir la base de datos que creamos en el Paso 1 (Suele salir como `prometheus default`). Selecciónala y pulsa **Import**. 
-*¡Disfruta de paneles profesionales automáticos de la salud de tu servidor!*
-
-**Paso 3: Crear paneles de Contenedores (cAdvisor) limpios**
-Debido a las actualizaciones frecuentes de Docker, importar paneles comunitarios de cAdvisor suele dar errores. Te enseñamos cómo crear el tuyo propio perfecto en 1 minuto:
-1. Dale a la tuerca **`+` -> New Dashboard -> + Add visualization**.
-2. Selecciona **prometheus** como fuente de datos.
-3. En la caja inferior de código ("Metrics browser") escribe: `container_memory_usage_bytes{name!=""}`
-4. En la barra lateral derecha inferior, en el campo **Legend -> Custom**, escribe `{{name}}` (esto limpiará la leyenda para mostrar solo el nombre corto del contenedor).
-5. En la barra lateral derecha superior, busca **Standard options -> Unit**, escribe `bytes` y selecciona `Data -> bytes(IEC)`. 
-6. ¡Dale a *Run queries* y luego *Save*! Las líneas serán totalmente legibles en MB/GB y no verás basura del sistema en la leyenda.
+**Loki** (logs de seguridad Suricata):
+1. Connections → Data Sources → Add → **Loki**
+2. URL: `http://dockermanager-loki:3100`
+3. Save & Test → ✅
 
 ---
 
@@ -897,8 +877,9 @@ Esta sección documenta todas las mejoras de seguridad aplicadas al `docker-comp
 | 3 | **Backend router** | Entrypoint solo `websecure` → llamadas HTTP al `/api` fallaban | Cambiado a `web,websecure`. La redirección HTTP→HTTPS global gestiona el upgrade |
 | 4 | **Prometheus** | Accesible sin autenticación | BasicAuth Traefik middleware vía `${PROMETHEUS_BASICAUTH_USERS}` |
 | 5 | **cAdvisor + node-exporter** | En `dmz_net` → accesibles desde cualquier servicio de la DMZ | Movidos a `monitoring_net` (red interna aislada). Solo Prometheus puede alcanzarlos |
-| 6 | **EveBox** | Accesible públicamente sin contraseña en `evebox.orbitcloud.app` | BasicAuth Traefik middleware vía `${EVEBOX_BASICAUTH_USERS}` |
+| 6 | **Logs Suricata** | EveBox 0.24.x incompatible (server/agent separados sin soporte en single-container) | Reemplazado por **Loki + Promtail**. Promtail lee `eve.json` y alimenta Loki. Grafana visualiza con LogQL |
 | 7 | **Credenciales** | Hardcodeadas en el compose (`password123`, `admin`) | Leídas de `.env` vía `${VAR}`. Ninguna credencial en el código fuente |
+| 8 | **Admin user seeding** | Script de seed en startup creaba admin con contraseña hardcodeada | Eliminado. El rol `admin` se asigna automáticamente al registrarse con `admin@orbitcloud.app` |
 
 ---
 

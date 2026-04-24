@@ -265,6 +265,7 @@ services:
     container_name: dockermanager-grafana
     networks:
       - dmz_net
+      - monitoring_net  # needed to reach Loki (dockermanager-loki:3100)
     volumes:
       - grafana-data:/var/lib/grafana
     environment:
