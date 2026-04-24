@@ -1,0 +1,180 @@
+# ============================================================
+# Suricata IDS/IPS Configuration — Optimized for Production
+# FIX #8 (NEW): High-throughput config with CPU affinity
+# ============================================================
+
+%define CONFDIR /etc/suricata
+%define RUNDIR /var/run/suricata
+
+# ────────────────────────────────────────────────────────────
+# 🎯 OPERATION MODE: IDS (Intrusion Detection System)
+# ────────────────────────────────────────────────────────────
+default-rule-path: $CONFDIR/rules
+rule-files:
+  - suricata.rules
+
+vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+    DMZ_NET: "[10.0.1.0/24]"
+    HTTP_PORTS: "[80, 8080, 8888, 8000]"
+    SHELLCODE_PORTS: "!80"
+    SSH_PORTS: "[22]"
+
+# ────────────────────────────────────────────────────────────
+# 📦 PACKET CAPTURE: AF_PACKET with Ring Buffer Optimization
+# ────────────────────────────────────────────────────────────
+af-packet:
+  - interface: eth0  # Public Internet Gateway
+    threads: auto
+    cluster-id: 99
+    cluster-type: cluster_qm    # QUEUE_MPSC (best performance)
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 100000           # 100k buffer = ~2.4GB (avoid packet loss on spikes)
+    block-size: 32768
+    timeout: 10
+    use-emergency-flush: yes
+    copy-mode: ips              # IPS mode (can drop packets)
+    bpf-filter: "tcp port 80 or tcp port 443"  # Only capture HTTP/HTTPS
+
+  - interface: eth1  # Transit Proxy (Admin Traffic)
+    threads: auto
+    cluster-id: 98
+    cluster-type: cluster_qm
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 100000
+    block-size: 32768
+    copy-mode: ids              # IDS mode (read-only)
+
+  - interface: eth2  # Transit LAN (User Traffic)
+    threads: auto
+    cluster-id: 97
+    cluster-type: cluster_qm
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 100000
+    block-size: 32768
+    copy-mode: ids
+
+# ────────────────────────────────────────────────────────────
+# 🧵 MULTITHREADING: CPU Affinity for Optimal Distribution
+# ────────────────────────────────────────────────────────────
+threading:
+  set-cpu-affinity: yes
+  cpu-affinity:
+    - management-cpu-set:
+        cpu: [ 0 ]              # CPU 0: Management/Control
+    - receive-cpu-set:
+        cpu: [ 1 ]              # CPU 1: Packet reception
+    - decode-cpu-set:
+        cpu: [ 2, 3 ]           # CPUs 2-3: Packet decoding
+    - stream-cpu-set:
+        cpu: [ 4 ]              # CPU 4: Stream state tracking
+    - detect-cpu-set:
+        cpu: [ 5, 6, 7 ]        # CPUs 5-7: Threat detection (rules matching)
+    - output-cpu-set:
+        cpu: [ 0 ]              # CPU 0: Alert output
+
+# ────────────────────────────────────────────────────────────
+# 💾 MEMORY POOLING: Pre-allocated for Zero-Copy Performance
+# ────────────────────────────────────────────────────────────
+memcap: 2GB                     # Total memory cap for flow state
+flow:
+  memcap: 256MB                 # Flow state memory pool
+  hash-size: 131072             # Double default (131k buckets)
+  prealloc: 10000               # Pre-allocate 10k flows
+  emergency-recovery: 30        # Free 30% mem on emergency
+
+stream:
+  memcap: 512MB                 # Stream reassembly buffer
+  checksum-validation: yes
+
+# ────────────────────────────────────────────────────────────
+# 🔍 DETECTION ENGINE: Optimized for High-Volume Matching
+# ────────────────────────────────────────────────────────────
+detect:
+  profile: high
+  custom-values:
+    toclient-groups: 3
+    toserver-groups: 20
+
+# ────────────────────────────────────────────────────────────
+# 🚨 OUTPUT MODULES: EVE JSON for EveBox Integration
+# ────────────────────────────────────────────────────────────
+outputs:
+  - eve-log:
+      enabled: yes
+      filename: /var/log/suricata/eve.json
+      types:
+        - alert:
+            payload: yes
+            payload-printable: yes
+            packet: yes
+            metadata: yes
+            tagged-packets: yes
+        - http:
+            extended: yes
+        - dns:
+            version: 2
+            types: [query, answer]
+        - tls:
+            extended: yes
+        - files:
+            force-magic: yes
+            force-md5: no
+        - smtp:
+        - flow:
+            netflow: yes
+            extended: yes
+      pcap-file: false
+      xff:
+        enabled: yes
+        mode: extra-data
+        deployment: reverse
+        header: X-Forwarded-For
+
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      interval: 30
+      totals: yes
+
+# ────────────────────────────────────────────────────────────
+# 🔐 SECURITY: Protocol Settings
+# ────────────────────────────────────────────────────────────
+http-log:
+  enabled: no
+
+tls-log:
+  enabled: no
+
+pcap-log:
+  enabled: no
+
+# ────────────────────────────────────────────────────────────
+# ⚙️ LOGGING: Debug & Error Output
+# ────────────────────────────────────────────────────────────
+logging:
+  default-log-level: info       # info, debug, verbose
+  outputs:
+    - file:
+        filename: /var/log/suricata/suricata.log
+        level: info
+
+# ────────────────────────────────────────────────────────────
+# 🛡️ IDS/IPS ENGINE SETTINGS
+# ────────────────────────────────────────────────────────────
+engine-analysis-file: /var/log/suricata/engine-analysis.yaml
+
+# Delay rules reload (avoid mid-flow disruptions)
+reload-delay: 5
+
+# Classification file
+classification-file: $CONFDIR/classification.config
+reference-config-file: $CONFDIR/reference.config
