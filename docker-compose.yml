@@ -49,12 +49,13 @@ services:
   # 1.5 Edge Firewall UI (EveBox)
   # FIX #6: EveBox protected with BasicAuth via Traefik middleware
   evebox:
-    image: jasonish/evebox:0.17
+    image: jasonish/evebox:latest
     container_name: dockermanager-evebox
-    command: evebox server --datastore sqlite --sqlite /var/lib/evebox/evebox.sqlite -i /var/log/suricata/eve.json --no-tls --no-auth
+    entrypoint: ["/bin/sh", "/etc/evebox/start.sh"]
     volumes:
       - suricata-logs:/var/log/suricata:ro
       - evebox-data:/var/lib/evebox
+      - ./infrastructure/evebox/start.sh:/etc/evebox/start.sh:ro
     networks:
       - public_net
       - dmz_net
