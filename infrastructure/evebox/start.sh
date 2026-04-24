@@ -2,8 +2,8 @@
 # EveBox 0.24.x: server + agent must run together for file ingestion
 set -e
 
-echo "[EveBox] Starting server..."
-evebox server --no-auth -D /var/lib/evebox &
+echo "[EveBox] Starting server (SQLite mode)..."
+evebox server --no-auth -D /var/lib/evebox --datastore sqlite &
 SERVER_PID=$!
 
 # Wait for server to be ready
