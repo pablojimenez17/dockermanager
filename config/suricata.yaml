@@ -63,6 +63,19 @@ af-packet:
     copy-mode: ids
 
 # ────────────────────────────────────────────────────────────
+# 🛡️ INTRUSION PREVENTION SYSTEM (IPS): NFQUEUE Setup
+# ────────────────────────────────────────────────────────────
+nfq:
+  mode: accept
+  repeat-mark: 1
+  repeat-mask: 1
+  bypass-mark: 1
+  bypass-mask: 1
+  route-queue: 2
+  batchcount: 20
+  fail-open: yes
+
+# ────────────────────────────────────────────────────────────
 # 🧵 MULTITHREADING: CPU Affinity for Optimal Distribution
 # ────────────────────────────────────────────────────────────
 threading:
