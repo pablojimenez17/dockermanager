@@ -93,8 +93,12 @@ Antiguamente los firewalls tradicionales se regían simplemente por escuchar pas
 OrbitCloud ahora blinda en Capa 4 a través de Netfilter Queue (NFQUEUE):
 
 1. **La Front-Door:** El Firewall (`edge-fw`) secuestra por completo los puertos del Host (80/443). Ni siquiera el proxy tiene control sobre la placa de red directamente.
-2. **Cola de Enrutamiento:** En vez de que `iptables` enrute mediante DNAT el tráfico a ciegas, se implementó una redirección a una cola maestra mediante la bandera `-j NFQUEUE --queue-num 0`.
-3. **Decisión por Lotes:** Suricata levanta el motor de prevención IPS (`-q 0`) analizando el contenido binario del TCP. Si una firma cruza base de datos maligna con un veredicto de bloqueo explícito (`DROP`), este desintegra nativamente el TCP sin delegarlo a Traefik. Si es benigno (o carece de firmas malignas), la función aprueba (`ACCEPT`) completando el NAT y abriendo paso hacia las VPC.
+2. **Enrutamiento y Reglas IPTables:** Todo se gestiona mediante reglas estrictas de iptables que aseguran que ningún tráfico escape la verificación.
+   - **DNAT y MASQUERADE:** Todo el tráfico entrante a los puertos web (80/443) es capturado y redireccionado forzosamente (`PREROUTING -j DNAT`) hacia el Proxy Interno (Traefik). Se aplica `MASQUERADE` al retornar a fin de garantizar el flujo bidireccional correcto.
+   - **Cola de Prevención IPS:** En vez de que las reglas de reenvío pasen a ciegas, se aplica un embudo maestro a través de las reglas:
+     `iptables -I FORWARD -p tcp --dport 80 -j NFQUEUE --queue-num 0 --queue-bypass` (y análogas para el puerto 443).
+     Esto evita romper conexiones internas (como los WebSockets locales de Docker o puertos de administración internos), auditando **únicamente** la navegación web expuesta.
+3. **Decisión por Lotes (Veredictos):** Suricata levanta el motor de prevención IPS (`-q 0`) interceptando el canal del NFQUEUE. Aquí, en lugar de realizar cálculos de Checksum (`checksum-validation: no` desactivado para evitar choques con el offloading de las redes virtuales inter-Docker), el motor cruza los paquetes TCP contra las Firmas Malignas. Si se detecta un intruso con firma `DROP`, Suricata envía la orden de abortar la conexión; en caso contrario, devuelve `ACCEPT` e iptables continúa la ruta habitual hasta el VPC.
 
 ### 🛡️ Escudo Daemon (Socket-Proxy)
 En sistemas convencionales el API del Orquestador suele montar y acceder libremente a `/var/run/docker.sock` poseyendo permisos infinitos como *Root*. Aquí un contenedor proxy en medio restringe todas las directrices, y si el código madre es vulnerado por un usuario mediante comandos mal intencionados en Node, el `Socket Proxy` rechazará peticiones de "Borrado Masivo", "Escalada de Permisos" y "Privilegios" en `/run/docker.sock`.

@@ -115,7 +115,11 @@ iptables -t nat -A POSTROUTING -p tcp -d "$PROXY_IP" --dport 443 -j MASQUERADE
 # FIX: Enable IPS (Intrusion Prevention System) via NFQUEUE
 # ========================================================
 log "[*] Configuring iptables NFQUEUE rules for Suricata IPS..."
-iptables -I FORWARD -j NFQUEUE --queue-num 0 --queue-bypass
+# Only queue inbound/outbound traffic for the public web ports 80/443
+iptables -I FORWARD -p tcp --dport 80 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --sport 80 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --dport 443 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --sport 443 -j NFQUEUE --queue-num 0 --queue-bypass
 
 log "[✓] iptables DNAT and NFQUEUE rules configured successfully"
 log "[✓] ALL inbound traffic (80/443) will be inspected by Suricata IPS"
