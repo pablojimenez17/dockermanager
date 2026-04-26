@@ -1,18 +1,21 @@
-# 🐳 DockerManager: Plataforma CaaS/PaaS con Aislamiento VPC
+# 🐳 OrbitCloud: Plataforma CaaS/PaaS con Aislamiento VPC
 
-DockerManager es una solución integral de "Contenedores como Servicio" (CaaS) diseñada para entornos multi-tenant. Permite a usuarios y organizaciones aprovisionar, gestionar y exponer aplicaciones Docker de forma segura, estructurada bajo un modelo de **Defensa en Profundidad** que combina aislamiento de red VPC (Capa 2), inspección de tráfico perimetral activo (Suricata IPS) y políticas de retención automatizadas.
+OrbitCloud es una solución integral de "Contenedores como Servicio" (CaaS) diseñada para entornos multi-tenant. Permite a usuarios y organizaciones aprovisionar, gestionar y exponer aplicaciones Docker de forma segura, estructurada bajo un modelo de **Defensa en Profundidad** que combina aislamiento de red VPC (Capa 2), inspección de tráfico perimetral activo (Suricata IPS) y políticas de retención automatizadas.
 
 ---
 
 ## 🌟 1. Introducción y Acceso a Producción
 
-La infraestructura de DockerManager (OrbitCloud) ejecuta en producción integrando de forma continua código mediante acciones de CI/CD para garantizar que el despliegue de las actualizaciones carezca de interrupciones (*zero-downtime*).
+La infraestructura de OrbitCloud ejecuta en producción integrando de forma continua código mediante acciones de CI/CD para garantizar que el despliegue de las actualizaciones carezca de interrupciones (*zero-downtime*).
 
 | Servicio                                  | Enlace                         | Notas de Acceso |
 |-------------------------------------------|--------------------------------|-----------------|
 | **Plataforma Web (Frontend)**             | https://orbitcloud.app         | Registro abierto público |
 | **Monitorización (Grafana + Loki)**       | https://grafana.orbitcloud.app | Requiere credenciales Admin generadas en `.env` |
 | **Bóveda de Backups (MinIO)**             | *Sin acceso público*           | Solo accesible vía SSH Tunnel al puerto 9001 del VPS |
+
+> [!TIP]
+> Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:orbitcloud-minio:9001 root@167.99.252.155`
 
 ---
 
@@ -47,11 +50,11 @@ graph TD
 
     Internet(((🌐 Internet))):::internet
 
-    subgraph public_net [Capa 1: Red Pública Perimetral]
+    subgraph public_net [Capa 1: Red Publica Perimetral]
         EdgeFW[🛡️ Firewall Suricata IPS]:::firewall
     end
 
-    subgraph proxies [Capa 2: Tránsito Neutro]
+    subgraph proxies [Capa 2: Transito Neutro]
         AdminProxy[🎩 Proxy Inverso]:::proxy
         UserProxy[🚦 Proxy Local LAN]:::proxy
     end
@@ -62,13 +65,13 @@ graph TD
         SocketProxy[🦺 Socket Shield]:::dmz
     end
 
-    subgraph user_vpc [Capa 4: VPC Limitadas (Usuarios)]
+    subgraph user_vpc [Capa 4: VPC Limitadas Usuarios]
         User1[📦 App Usuari A]:::private
         User2[📦 App Usuari B]:::private
     end
 
-    Internet -- Todo el Tráfico --> EdgeFW
-    EdgeFW -- Tráfico Limpio --> AdminProxy
+    Internet -- Todo el Trafico --> EdgeFW
+    EdgeFW -- Trafico Limpio --> AdminProxy
     EdgeFW -- Dominios Propios --> UserProxy
     AdminProxy -- Rutas Maestras --> Backend
     UserProxy -. Ruteo seguro .-> User1
@@ -87,7 +90,7 @@ El Backend administra al invocar la API la creencia del patrón VPC Gemelo:
 
 ### 🚫 De Detector (IDS) a Bloqueador Nítido (IPS)
 Antiguamente los firewalls tradicionales se regían simplemente por escuchar pasivamente el tráfico con interfaces clonadas (`af-packet / PCAP`) alertando sobre intrusiones sin intervenir.
-DockerManager ahora blinda en Capa 4 a través de Netfilter Queue (NFQUEUE):
+OrbitCloud ahora blinda en Capa 4 a través de Netfilter Queue (NFQUEUE):
 
 1. **La Front-Door:** El Firewall (`edge-fw`) secuestra por completo los puertos del Host (80/443). Ni siquiera el proxy tiene control sobre la placa de red directamente.
 2. **Cola de Enrutamiento:** En vez de que `iptables` enrute mediante DNAT el tráfico a ciegas, se implementó una redirección a una cola maestra mediante la bandera `-j NFQUEUE --queue-num 0`.
@@ -132,15 +135,15 @@ Una Plataforma de este tamaño dispone de un panel propio paralelo unificado baj
 
 ## ⚖️ 8. Modelo de Responsabilidad Compartida
 
-| Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en DockerManager |
+| Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en OrbitCloud |
 |-----------------------|-------------------------|--------------------------------|
-| **Bloqueo Network DOS/Escaneo** | DockerManager ✅ | Suricata IPS dropa tráfico hostil e infiltración masiva en red (NFQUEUE). |
-| **Separación de Lógica (Capa 2)** | DockerManager ✅ | VPC prefijadas internas prohibidas al resto. Cifrado RSA/AES. |
-| **Versión del OS Docker / Engine**| DockerManager ✅ | Mantenimiento a cargo de los administradores. CI/CD nativo Traefik/Mongo. |
+| **Bloqueo Network DOS/Escaneo** | OrbitCloud ✅ | Suricata IPS dropa tráfico hostil e infiltración masiva en red (NFQUEUE). |
+| **Separación de Lógica (Capa 2)** | OrbitCloud ✅ | VPC prefijadas internas prohibidas al resto. Cifrado RSA/AES. |
+| **Versión del OS Docker / Engine**| OrbitCloud ✅ | Mantenimiento a cargo de los administradores. CI/CD nativo Traefik/Mongo. |
 | **Librerias Interiores/Base Apps**| Usuario ⚠️ | Elegir PHP 5 vulnerable en tu app privada recae en tu irresponsabilidad. |
 | **Roles / Autenticación CMS App** | Usuario ⚠️ | Configurar un Wordpress propio `admin/1234` será bajo tus secuelas. |
 | **Archivos en Volúmenes App**     | Usuario ⚠️ | Persistir en Minio (S3 Snapshot) requiere que se inicie bajo petición. |
 
 --- 
 
-_Documentación estructurada y consolidada para OrbitCloud SaaS / DockerManager_
+_Documentación estructurada y consolidada para OrbitCloud SaaS_
