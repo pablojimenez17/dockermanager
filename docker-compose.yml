@@ -133,8 +133,8 @@ services:
       - BUILD=1
       - POST=1 # Allow POST requests like create, start, stop, kill, pull
       - DELETE=1 # Allow DELETE requests like rm
-      # Explicitly deny full system access
-      - SYSTEM=0
+      # Allow system info and df (required for storage calculations)
+      - SYSTEM=1
       - INFO=1
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro # Read-only!
@@ -169,7 +169,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.backend.rule=Host(`orbitcloud.app`) && PathPrefix(`/api`)"
+      - "traefik.http.routers.backend.rule=Host(`orbitcloud.app`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
       # FIX #3: Accept both HTTP and HTTPS — global redirect handles the upgrade
       - "traefik.http.routers.backend.entrypoints=web,websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
