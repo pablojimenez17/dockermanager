@@ -101,6 +101,7 @@ log "    → POSTROUTING: Return traffic masqueraded back"
 # Flush any previous rules to avoid duplicates on restart
 iptables -t nat -F PREROUTING 2>/dev/null || true
 iptables -t nat -F POSTROUTING 2>/dev/null || true
+iptables -F FORWARD 2>/dev/null || true
 
 # DNAT: forward incoming 80/443 to Traefik
 iptables -t nat -A PREROUTING -p tcp --dport 80  -j DNAT --to-destination "$PROXY_IP:80"
@@ -110,8 +111,18 @@ iptables -t nat -A PREROUTING -p tcp --dport 443 -j DNAT --to-destination "$PROX
 iptables -t nat -A POSTROUTING -p tcp -d "$PROXY_IP" --dport 80  -j MASQUERADE
 iptables -t nat -A POSTROUTING -p tcp -d "$PROXY_IP" --dport 443 -j MASQUERADE
 
-log "[✓] iptables DNAT rules configured successfully"
-log "[✓] ALL inbound traffic (80/443) will be inspected by Suricata"
+# ========================================================
+# FIX: Enable IPS (Intrusion Prevention System) via NFQUEUE
+# ========================================================
+log "[*] Configuring iptables NFQUEUE rules for Suricata IPS..."
+# Only queue inbound/outbound traffic for the public web ports 80/443
+iptables -I FORWARD -p tcp --dport 80 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --sport 80 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --dport 443 -j NFQUEUE --queue-num 0 --queue-bypass
+iptables -I FORWARD -p tcp --sport 443 -j NFQUEUE --queue-num 0 --queue-bypass
+
+log "[✓] iptables DNAT and NFQUEUE rules configured successfully"
+log "[✓] ALL inbound traffic (80/443) will be inspected by Suricata IPS"
 
 # ========================================================
 # Start Suricata IDS/IPS
@@ -127,10 +138,10 @@ if command -v suricata >/dev/null 2>&1; then
     # FIX #8: Use configuration file if available
     if [ -f /etc/suricata/suricata.yaml ]; then
         log "[✓] Using custom Suricata configuration: /etc/suricata/suricata.yaml"
-        exec suricata -c /etc/suricata/suricata.yaml -i eth0 -i eth1 -i eth2
+        exec suricata -c /etc/suricata/suricata.yaml -q 0
     else
         log "[*] Using default Suricata configuration"
-        exec suricata -i eth0 -i eth1 -i eth2
+        exec suricata -q 0
     fi
 else
     log "[⚠] Suricata binary not in PATH. Running dummy loop (dev mode)..."
