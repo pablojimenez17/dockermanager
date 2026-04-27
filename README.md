@@ -56,29 +56,32 @@ graph TD
     classDef proxy fill:#3498db,stroke:#2980b9,stroke-width:2px,color:white;
     classDef private fill:#2ecc71,stroke:#27ae60,stroke-width:2px,color:white;
     classDef storage fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:white;
-    classDef internet fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:white;
+    classDef monitor fill:#16a085,stroke:#1abc9c,stroke-width:2px,color:white;
 
-    1(((1. Internet))):::internet --> 2[2. Firewall IPS]:::firewall
-    2 -->|Dominios| 3[3. Proxy VPC]:::proxy
-    2 -->|Plataforma| 4[4. Proxy DMZ]:::proxy
+    1(((1. Internet))) --> 2[2. Edge Firewall IPS]:::firewall
+    2 -->|Dominios| 3[3. Proxy VPC LAN]:::proxy
+    2 -->|Plataforma| 4[4. Proxy DMZ Inverso]:::proxy
     
     3 --> 5[5. Apps de Usuarios]:::private
     5 -. Salida Vigilada .-> 2
     
-    4 --> 6[6. Backend / BBDD]:::dmz
-    6 --> 7[7. Firewall Almacenamiento]:::storage
+    4 --> 6[6. Core DMZ]:::dmz
+    4 --> 9[9. Stack Observabilidad]:::monitor
+    
+    6 --> 7[7. Storage Firewall]:::storage
     7 --> 8[(8. Bóveda Backups)]:::storage
 ```
 
-### 📖 Leyenda del Esquema
-1. **Internet**: Origen del tráfico y salida global.
-2. **Firewall IPS (Suricata)**: Escudo perimetral. Intercepta TODO el tráfico (puertos 80/443).
-3. **Proxy VPC (Traefik LAN)**: Enrutador exclusivo para conectar a las apps de los clientes.
-4. **Proxy DMZ (Traefik Inverso)**: Enrutador exclusivo para el panel administrativo y API.
-5. **Apps de Usuarios (Capa 2 Aislada)**: Contenedores VPC. No se pueden ver entre sí.
-6. **Backend / BBDD (DMZ)**: El cerebro. Invisible a Internet y a los usuarios.
-7. **Firewall Almacenamiento (HAProxy)**: Peaje cortafuegos de un solo sentido (TCP 9000).
-8. **Bóveda Backups (MinIO)**: Zero-Trust Storage. Intocable desde fuera.
+### 📖 Leyenda del Esquema Completo
+1. **Internet**: Origen y destino global.
+2. **Edge Firewall (Suricata IPS)**: El escudo perimetral. Intercepta los puertos 80/443 del servidor real e inspecciona tráfico malicioso.
+3. **Proxy VPC (Traefik LAN)**: Enrutador dedicado a redireccionar el tráfico hacia los contenedores expuestos de los clientes.
+4. **Proxy DMZ (Traefik Inverso)**: Enrutador maestro para acceso a servicios de la plataforma.
+5. **Apps de Usuarios (VPCs)**: Contenedores creados por los clientes. Redes de Capa 2 aisladas por completo.
+6. **Core DMZ (`backend`, `frontend`, `mongodb`, `socket-proxy`, `ollama`)**: El núcleo central. Contiene el cerebro de Node.js, la interfaz Vite, la base de datos de usuarios, la Inteligencia Artificial local y el Socket-Proxy que evita comandos maliciosos hacia Docker. Todo es invisible a Internet.
+7. **Storage Firewall (HAProxy)**: Peaje cortafuegos de un solo sentido limitando el tráfico hacia el protocolo S3.
+8. **Bóveda Backups (MinIO)**: Zero-Trust Storage. Cajas fuertes de datos herméticas.
+9. **Observabilidad (`grafana`, `prometheus`, `loki`, `promtail`, `cadvisor`, `node-exporter`)**: Red paralela de recolección de telemetría (Logs de IDS, consumo de CPU de contenedores, estado del hardware de los nodos).
 
 ### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
 Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
