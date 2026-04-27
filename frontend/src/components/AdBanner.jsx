@@ -16,7 +16,7 @@ const AdBanner = () => {
             {/* The actual ad container would be populated by the external script */}
             <ins className="adsbygoogle"
                  style={{ display: 'block', minHeight: '90px', width: '100%' }}
-                 data-ad-client="ca-pub-XXXXXXXXXXXXXXX"
+                 data-ad-client="ca-pub-6070230906652526"
                  data-ad-slot="XXXXXXXXXX"
                  data-ad-format="auto"
                  data-full-width-responsive="true"></ins>
