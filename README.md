@@ -73,15 +73,26 @@ graph TD
 ```
 
 ### 📖 Leyenda del Esquema Completo
-1. **Internet**: Origen y destino global.
-2. **Edge Firewall (Suricata IPS)**: El escudo perimetral. Intercepta los puertos 80/443 del servidor real e inspecciona tráfico malicioso.
-3. **Proxy VPC (Traefik LAN)**: Enrutador dedicado a redireccionar el tráfico hacia los contenedores expuestos de los clientes.
-4. **Proxy DMZ (Traefik Inverso)**: Enrutador maestro para acceso a servicios de la plataforma.
-5. **Apps de Usuarios (VPCs)**: Contenedores creados por los clientes. Redes de Capa 2 aisladas por completo.
-6. **Core DMZ (`backend`, `frontend`, `mongodb`, `socket-proxy`, `ollama`)**: El núcleo central. Contiene el cerebro de Node.js, la interfaz Vite, la base de datos de usuarios, la Inteligencia Artificial local y el Socket-Proxy que evita comandos maliciosos hacia Docker. Todo es invisible a Internet.
-7. **Storage Firewall (HAProxy)**: Peaje cortafuegos de un solo sentido limitando el tráfico hacia el protocolo S3.
-8. **Bóveda Backups (MinIO)**: Zero-Trust Storage. Cajas fuertes de datos herméticas.
-9. **Observabilidad (`grafana`, `prometheus`, `loki`, `promtail`, `cadvisor`, `node-exporter`)**: Red paralela de recolección de telemetría (Logs de IDS, consumo de CPU de contenedores, estado del hardware de los nodos).
+1. **Internet**: Origen y destino global del tráfico.
+2. **Edge Firewall IPS** (`dockermanager-edge-fw`): Escudo perimetral físico (Suricata). Intercepta los puertos 80/443 reales e inspecciona tráfico malicioso.
+3. **Proxy VPC LAN** (`dockermanager-lan-proxy`): Enrutador Traefik dedicado en exclusiva a redireccionar el tráfico web de los clientes a sus propios contenedores.
+4. **Proxy DMZ Inverso** (`dockermanager-proxy`): Enrutador Traefik maestro para dar acceso a los servicios administrativos de la plataforma.
+5. **Apps de Usuarios**: Redes temporales y aisladas (VPCs L2) que contienen los servicios levantados dinámicamente por los clientes.
+6. **Core DMZ** (El núcleo central invisible a Internet):
+   - `dockermanager-backend`: Cerebro de la API en Node.js.
+   - `dockermanager-frontend`: Panel web de clientes (Vite/React).
+   - `dockermanager-mongo`: Base de datos de estado global.
+   - `dockermanager-socket-proxy`: Escudo de seguridad (Daemon proxy) que limita los permisos del Backend sobre el motor Docker.
+   - `dockermanager-ollama`: Motor de Inteligencia Artificial local.
+7. **Storage Firewall** (`dockermanager-storage-fw`): Cortafuegos interno HAProxy que ejerce como peaje de un solo sentido (TCP 9000).
+8. **Bóveda Backups** (`dockermanager-minio`): Zero-Trust Storage. Caja fuerte S3 desconectada del resto de la plataforma.
+9. **Stack Observabilidad** (Telemetría y Monitorización):
+   - `dockermanager-grafana`: Panel de visualización de datos.
+   - `dockermanager-prometheus`: Motor de extracción de métricas.
+   - `dockermanager-loki`: Base de datos transaccional de Logs.
+   - `dockermanager-promtail`: Recolector de logs de ataques del firewall.
+   - `dockermanager-cadvisor`: Monitorización de CPU/RAM de contenedores.
+   - `dockermanager-node-exporter`: Monitorización del hardware del VPS.
 
 ### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
 Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
