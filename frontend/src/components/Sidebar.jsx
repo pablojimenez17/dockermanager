@@ -7,6 +7,7 @@ import axios from 'axios';
 import { useOrg } from '../context/OrgContext';
 import { useNotifications } from '../context/NotificationContext';
 import InvitesModal from './InvitesModal';
+import AdBanner from './AdBanner';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
     const navigate = useNavigate();
@@ -176,6 +177,12 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                     </div>
                 ))}
             </nav>
+
+            {planType === 'free' && (
+                <div className="px-4 shrink-0 mb-2">
+                    <AdBanner />
+                </div>
+            )}
 
             <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2 shrink-0 border-b">
                 <button

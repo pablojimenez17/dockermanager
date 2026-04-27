@@ -66,6 +66,7 @@ const Plans = () => {
                 '1 CPU Core equivalent',
                 '1 GB Persistent Storage (1 Disk)',
                 'No Custom Domains',
+                'Ad-supported experience',
                 'Community Support'
             ],
             color: 'bg-white/80 dark:bg-slate-800/80 backdrop-blur-md text-slate-800 dark:text-slate-200 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300',
@@ -84,6 +85,7 @@ const Plans = () => {
                 '4 CPU Cores equivalent',
                 '10 GB Persistent Storage (5 Disks)',
                 '3 Custom Domains',
+                '✨ Ad-free experience',
                 'Priority Support',
                 'Advanced Network Modes'
             ],
@@ -103,6 +105,7 @@ const Plans = () => {
                 '16 CPU Cores equivalent',
                 '100 GB Persistent Storage (20 Disks)',
                 'Unlimited Custom Domains',
+                '✨ Ad-free experience',
                 '24/7 Dedicated Support',
                 'Custom Node Mapping'
             ],
@@ -123,6 +126,7 @@ const Plans = () => {
                 '1 TB Persistent Storage',
                 'Multi-Tenant Organization Management',
                 'Custom Roles & RBAC',
+                '✨ Ad-free experience',
                 'White-glove 24/7 Support'
             ],
             color: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-900/20 dark:to-orange-900/20 border-amber-200 dark:border-amber-500/30 backdrop-blur-md text-amber-900 dark:text-amber-100 hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 ring-1 ring-amber-500/20',

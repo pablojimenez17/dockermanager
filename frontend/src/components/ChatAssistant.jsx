@@ -157,7 +157,7 @@ const ChatAssistant = () => {
                             </button>
                         </form>
                         <div className="text-center mt-2">
-                            <p className="text-[10px] text-slate-400 dark:text-slate-500">Local AI runs natively on your server. Speed depends on CPU/RAM.</p>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500">AI does not save your data but can make mistakes.</p>
                         </div>
                     </div>
 
