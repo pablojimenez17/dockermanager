@@ -77,12 +77,11 @@ graph TD
 2. **Edge Firewall IPS** (`dockermanager-edge-fw`): Escudo perimetral físico (Suricata). Intercepta los puertos 80/443 reales e inspecciona tráfico malicioso.
 3. **Proxy VPC LAN** (`dockermanager-lan-proxy`): Enrutador Traefik dedicado en exclusiva a redireccionar el tráfico web de los clientes a sus propios contenedores.
 4. **Proxy DMZ Inverso** (`dockermanager-proxy`): Enrutador Traefik maestro para dar acceso a los servicios administrativos de la plataforma.
-5. **Apps de Usuarios**: Redes temporales y aisladas (VPCs L2) que contienen los servicios levantados dinámicamente por los clientes.
+5. **Apps de Usuarios** (Contenedores Dinámicos, ej. `user-app-xyz`): Redes temporales y aisladas (VPCs L2) que contienen los servicios levantados por los clientes.
 6. **Core DMZ** (El núcleo central invisible a Internet):
    - `dockermanager-backend`: Cerebro de la API en Node.js.
    - `dockermanager-frontend`: Panel web de clientes (Vite/React).
    - `dockermanager-mongo`: Base de datos de estado global.
-   - `dockermanager-socket-proxy`: Escudo de seguridad (Daemon proxy) que limita los permisos del Backend sobre el motor Docker.
    - `dockermanager-ollama`: Motor de Inteligencia Artificial local.
 7. **Storage Firewall** (`dockermanager-storage-fw`): Cortafuegos interno HAProxy que ejerce como peaje de un solo sentido (TCP 9000).
 8. **Bóveda Backups** (`dockermanager-minio`): Zero-Trust Storage. Caja fuerte S3 desconectada del resto de la plataforma.
@@ -93,6 +92,10 @@ graph TD
    - `dockermanager-promtail`: Recolector de logs de ataques del firewall.
    - `dockermanager-cadvisor`: Monitorización de CPU/RAM de contenedores.
    - `dockermanager-node-exporter`: Monitorización del hardware del VPS.
+
+### 🔐 Conceptos Clave de Seguridad en el Esquema
+*   **La "Salida Vigilada" (Egress Filtering)**: Cuando los contenedores de los clientes intentan conectarse a Internet por su cuenta (por ejemplo, para descargar un virus, hacer peticiones externas o lanzar un ataque DDoS), este tráfico está forzado a salir a través de la red física del anfitrión. El contenedor `dockermanager-edge-fw` intercepta silenciosamente este tráfico saliente usando `NFQUEUE`, inspeccionando los paquetes y cortando de raíz cualquier intento de conexión hacia servidores maliciosos o botnets.
+*   **El "Socket Shield" (`dockermanager-socket-proxy`)**: En sistemas normales, el backend de Node.js tiene control absoluto sobre el motor de Docker (acceso *root* al host). Si un hacker encontrara una vulnerabilidad en tu backend, podría destruir todo el servidor físico. Para impedirlo, el backend está obligado a hablar con Docker a través de este proxy intermedio. El `socket-proxy` intercepta las órdenes y solo deja pasar comandos inofensivos (como arrancar o parar los contenedores de los clientes), bloqueando permanentemente comandos letales (como borrar redes maestras, acceder al sistema de archivos del host o escalar privilegios).
 
 ### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
 Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
