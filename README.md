@@ -58,55 +58,27 @@ graph TD
     classDef storage fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:white;
     classDef internet fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:white;
 
-    Internet(((🌐 Mundo Real / Internet))):::internet
-
-    subgraph capa1 [Capa 1: Red Pública Perimetral]
-        EdgeFW[🛡️ Firewall Suricata IPS]:::firewall
-    end
-
-    subgraph capa2 [Capa 2: Proxies de Tránsito]
-        UserProxy[🚦 Proxy VPC LAN]:::proxy
-        AdminProxy[🎩 Proxy DMZ Inverso]:::proxy
-    end
-
-    subgraph capa3 [Capa 3: VPCs Aisladas de Usuarios]
-        subgraph vpc_a [VPC Usuario A]
-            User1[📦 App Privada]:::private
-        end
-        subgraph vpc_b [VPC Usuario B]
-            User2[📦 App Privada]:::private
-        end
-    end
-
-    subgraph capa4 [Capa 4: DMZ - Zona Desmilitarizada]
-        Backend[🧠 Cerebro Node.js]:::dmz
-        Mongo[(🗄️ MongoDB)]:::dmz
-        SocketProxy[🦺 Socket Shield]:::dmz
-    end
-
-    subgraph capa5 [Capa 5: Zero-Trust Storage]
-        StorageFW[🧱 Storage FW HAProxy]:::storage
-        MinIO[(🗃️ Bóveda MinIO S3)]:::storage
-    end
-
-    Internet -- "Tráfico Global (80/443)" --> EdgeFW
+    1(((1. Internet))):::internet --> 2[2. Firewall IPS]:::firewall
+    2 -->|Dominios| 3[3. Proxy VPC]:::proxy
+    2 -->|Plataforma| 4[4. Proxy DMZ]:::proxy
     
-    EdgeFW -- "Rutas Clientes" --> UserProxy
-    EdgeFW -- "Rutas Plataforma" --> AdminProxy
-
-    UserProxy -. "Enrutado Aislado (L2)" .-> User1
-    UserProxy -. "Enrutado Aislado (L2)" .-> User2
+    3 --> 5[5. Apps de Usuarios]:::private
+    5 -. Salida Vigilada .-> 2
     
-    User1 -- "Salida Inspeccionada" --> EdgeFW
-    User2 -- "Salida Inspeccionada" --> EdgeFW
-
-    AdminProxy -- "Validación Web" --> Backend
-    Backend --> Mongo
-    Backend -- "Control Perimetrado" --> SocketProxy
-    
-    Backend -- "S3 Auth (TCP 9000)" --> StorageFW
-    StorageFW -- "Túnel Unidireccional" --> MinIO
+    4 --> 6[6. Backend / BBDD]:::dmz
+    6 --> 7[7. Firewall Almacenamiento]:::storage
+    7 --> 8[(8. Bóveda Backups)]:::storage
 ```
+
+### 📖 Leyenda del Esquema
+1. **Internet**: Origen del tráfico y salida global.
+2. **Firewall IPS (Suricata)**: Escudo perimetral. Intercepta TODO el tráfico (puertos 80/443).
+3. **Proxy VPC (Traefik LAN)**: Enrutador exclusivo para conectar a las apps de los clientes.
+4. **Proxy DMZ (Traefik Inverso)**: Enrutador exclusivo para el panel administrativo y API.
+5. **Apps de Usuarios (Capa 2 Aislada)**: Contenedores VPC. No se pueden ver entre sí.
+6. **Backend / BBDD (DMZ)**: El cerebro. Invisible a Internet y a los usuarios.
+7. **Firewall Almacenamiento (HAProxy)**: Peaje cortafuegos de un solo sentido (TCP 9000).
+8. **Bóveda Backups (MinIO)**: Zero-Trust Storage. Intocable desde fuera.
 
 ### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
 Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
