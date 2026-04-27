@@ -35,9 +35,19 @@ Se sitúa en un entorno autogestionado `.github/workflows/deploy.yml`. Cada `git
 
 ---
 
-## 🏗️ 3. Arquitectura de Red (El Modelo VPC)
+## 🏗️ 3. Arquitectura de Red (El Modelo de Defensa en Profundidad)
 
-A diferencia de un hosting básico, no conviven los contenedores de inquilinos en un mismo hub. Emplea un sistema **VPC dinámico** dividiéndose en un tablero multicapa de seguridad extrema:
+La infraestructura de OrbitCloud no es un simple alojamiento donde los contenedores conviven desordenadamente. Emplea un modelo estricto de **Defensa en Profundidad (Defense in Depth)**, estructurado en **5 capas herméticas** que garantizan el aislamiento, la inspección de tráfico y la protección de los datos:
+
+1. **Capa 1: Red Pública Perimetral (Firewall IDS/IPS):** Todo el tráfico real de Internet colisiona primero contra **Suricata**. Nada entra al servidor sin que este motor analice las firmas de los paquetes. Si detecta tráfico malicioso, lo bloquea. También inspecciona el tráfico de *salida* de los contenedores para evitar que participen en botnets o ciberataques.
+2. **Capa 2: Tránsito Neutro (Enrutadores Proxy):** Una vez Suricata limpia el tráfico, este se bifurca a dos proxies Traefik independientes:
+   - **Proxy DMZ Inverso:** Exclusivo para la plataforma administrativa y API.
+   - **Proxy VPC LAN:** Exclusivo para enrutar tráfico a las aplicaciones de los clientes.
+3. **Capa 3: VPCs Aisladas de Usuarios (Aislamiento L2):** Los contenedores de cada cliente residen en redes puente de Docker independientes. A nivel de kernel de Linux (iptables), redes distintas **no pueden comunicarse entre sí**. El contenedor del Usuario A jamás podrá ver al del Usuario B.
+4. **Capa 4: Zona Desmilitarizada (DMZ):** Aquí habitan el Cerebro (Backend), Frontend Vite y MongoDB. Son **invisibles** tanto a Internet como a los propios usuarios. Además, el Backend no ejecuta comandos Docker como Root, sino a través de un **Socket Shield** que bloquea operaciones destructivas.
+5. **Capa 5: Zero-Trust Storage (Bóveda MinIO):** Los backups del sistema NO residen en la DMZ, viven en su propia red (`storage_net`). Para que el Backend almacene datos, debe cruzar un **Firewall de Almacenamiento (HAProxy)** que actúa como un túnel unidireccional estricto. Si la DMZ sufriera un hackeo, sería imposible formatear o comprometer la bóveda de backups.
+
+### Esquema del Flujo de Red
 
 ```mermaid
 graph TD
@@ -48,41 +58,61 @@ graph TD
     classDef storage fill:#9b59b6,stroke:#8e44ad,stroke-width:2px,color:white;
     classDef internet fill:#34495e,stroke:#2c3e50,stroke-width:2px,color:white;
 
-    Internet(((🌐 Internet))):::internet
+    Internet(((🌐 Mundo Real / Internet))):::internet
 
-    subgraph public_net [Capa 1: Red Publica Perimetral]
+    subgraph capa1 [Capa 1: Red Pública Perimetral]
         EdgeFW[🛡️ Firewall Suricata IPS]:::firewall
     end
 
-    subgraph proxies [Capa 2: Transito Neutro]
-        AdminProxy[🎩 Proxy Inverso]:::proxy
-        UserProxy[🚦 Proxy Local LAN]:::proxy
+    subgraph capa2 [Capa 2: Proxies de Tránsito]
+        UserProxy[🚦 Proxy VPC LAN]:::proxy
+        AdminProxy[🎩 Proxy DMZ Inverso]:::proxy
     end
 
-    subgraph dmz_net [Capa 3: Zona Desmilitarizada]
+    subgraph capa3 [Capa 3: VPCs Aisladas de Usuarios]
+        subgraph vpc_a [VPC Usuario A]
+            User1[📦 App Privada]:::private
+        end
+        subgraph vpc_b [VPC Usuario B]
+            User2[📦 App Privada]:::private
+        end
+    end
+
+    subgraph capa4 [Capa 4: DMZ - Zona Desmilitarizada]
         Backend[🧠 Cerebro Node.js]:::dmz
         Mongo[(🗄️ MongoDB)]:::dmz
         SocketProxy[🦺 Socket Shield]:::dmz
     end
 
-    subgraph user_vpc [Capa 4: VPC Limitadas Usuarios]
-        User1[📦 App Usuari A]:::private
-        User2[📦 App Usuari B]:::private
+    subgraph capa5 [Capa 5: Zero-Trust Storage]
+        StorageFW[🧱 Storage FW HAProxy]:::storage
+        MinIO[(🗃️ Bóveda MinIO S3)]:::storage
     end
 
-    Internet -- Todo el Trafico --> EdgeFW
-    EdgeFW -- Trafico Limpio --> AdminProxy
-    EdgeFW -- Dominios Propios --> UserProxy
-    AdminProxy -- Rutas Maestras --> Backend
-    UserProxy -. Ruteo seguro .-> User1
-    Backend -- Restriccion Dockers API --> SocketProxy
+    Internet -- "Tráfico Global (80/443)" --> EdgeFW
+    
+    EdgeFW -- "Rutas Clientes" --> UserProxy
+    EdgeFW -- "Rutas Plataforma" --> AdminProxy
+
+    UserProxy -. "Enrutado Aislado (L2)" .-> User1
+    UserProxy -. "Enrutado Aislado (L2)" .-> User2
+    
+    User1 -- "Salida Inspeccionada" --> EdgeFW
+    User2 -- "Salida Inspeccionada" --> EdgeFW
+
+    AdminProxy -- "Validación Web" --> Backend
+    Backend --> Mongo
+    Backend -- "Control Perimetrado" --> SocketProxy
+    
+    Backend -- "S3 Auth (TCP 9000)" --> StorageFW
+    StorageFW -- "Túnel Unidireccional" --> MinIO
 ```
 
 ### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
 Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
 El Backend administra al invocar la API la creencia del patrón VPC Gemelo:
-- **Red por defecto Segura**: Cada usuario porta un prefijo (Ej: `usuario_default_vlan`) donde todo lo desplegado no alcanza salir jamás al exterior.
-- **Red Abierta (`_open`)**: Al solicitar Exposición Web en el panel, el Backend levanta otra gemela temporal inyectando conexión Proxy, despliega tu servicio allí y actualiza tu dominio. Si lo quitas, se borra instantáneamente esta pasarela en modo _Lazy_ sin afectar los demás recursos subyacentes desconectados en la base principal.
+- **Red por defecto Segura**: Cada usuario porta un prefijo (Ej: `usuario_default_vlan`) donde todo lo desplegado no alcanza salir jamás al exterior de forma directa sin pasar por el IPS.
+- **Red Abierta (`_open`)**: Al solicitar Exposición Web en el panel, el Backend levanta otra gemela temporal inyectando conexión al `Proxy VPC LAN`, despliega tu servicio allí y actualiza tu dominio. Si lo quitas, se borra instantáneamente esta pasarela en modo _Lazy_ sin afectar los demás recursos subyacentes desconectados en la base principal.
 
 ---
 
@@ -103,6 +133,8 @@ OrbitCloud ahora blinda en Capa 4 a través de Netfilter Queue (NFQUEUE):
 ### 🛡️ Escudo Daemon (Socket-Proxy)
 En sistemas convencionales el API del Orquestador suele montar y acceder libremente a `/var/run/docker.sock` poseyendo permisos infinitos como *Root*. Aquí un contenedor proxy en medio restringe todas las directrices, y si el código madre es vulnerado por un usuario mediante comandos mal intencionados en Node, el `Socket Proxy` rechazará peticiones de "Borrado Masivo", "Escalada de Permisos" y "Privilegios" en `/run/docker.sock`.
 
+*Actualización de permisos (Storage)*: Para calcular con precisión las cuotas de disco consumido (`docker system df`), el Socket Proxy tiene habilitado específicamente el comando de consulta de disco (`SYSTEM=1`), pero preserva bloqueados los accesos inseguros de control maestro.
+
 ---
 
 ## ⚙️ 5. Inteligencia del Backend "El Cerebro"
@@ -115,6 +147,8 @@ Para garantizar la economía del PaaS y controlar el abuso informático existe u
 
 ### Terminal Interactiva Segura (xterm.js)
 No se abren puertos SSH por cliente ni se abren puertos remotos. Las sesiones de consolas interactúan con XTERM generando una comunicación con WebSocket puenteada a través de Backend hacia el Socket Proxy. El usuario final dispone de un shell encapsulado e irreversible sobre su propio contenedor mediante una ventana renderizada en formato cine sin tocar comandos inseguros hacia afuera.
+
+*Resolución de Rutas y Websockets (Traefik)*: El tráfico para la consola terminal viaja por la ruta paralela `/socket.io/` gestionada íntegramente por Traefik, que evalúa explícitamente tanto el tráfico del API como el de los WebSockets (`PathPrefix('/api') || PathPrefix('/socket.io')`). Además, para evitar colisiones y timeouts (Error 504) causados por la pertenencia del Backend a múltiples redes simultáneas, se ha implementado la asignación estricta de red en Traefik (`traefik.docker.network=dmz_net`), garantizando el enrutamiento directo y exclusivo por la DMZ.
 
 ---
 
