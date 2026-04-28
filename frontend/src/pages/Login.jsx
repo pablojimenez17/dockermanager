@@ -22,6 +22,7 @@ const Login = () => {
             localStorage.setItem('name', res.data.name);
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);
+            localStorage.setItem('planType', res.data.planType || 'free');
             window.location.href = '/app';
         } catch (err) {
             setError(err.response?.data?.message || 'Login failed. Please check your credentials.');

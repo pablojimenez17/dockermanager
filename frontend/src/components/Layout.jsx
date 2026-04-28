@@ -2,10 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Menu } from 'lucide-react';
+import AdBanner from './AdBanner';
+import { useOrg } from '../context/OrgContext';
 
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
+    const { userPlan } = useOrg();
+    const planType = userPlan || 'free';
 
     // Dynamically update document title based on the active route
     useEffect(() => {
@@ -49,6 +53,13 @@ const Layout = () => {
                     </button>
                     <span className="font-bold text-lg tracking-wide text-brand-600 dark:text-brand-400">Orbit</span>
                 </div>
+
+                {/* Mobile Ad Banner Strip */}
+                {planType === 'free' && (
+                    <div className="md:hidden px-4 pt-4 shrink-0">
+                        <AdBanner />
+                    </div>
+                )}
 
                 <div className="container mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
                     <Outlet />
