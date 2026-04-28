@@ -44,6 +44,12 @@ const userSchema = new mongoose.Schema({
         maxVolumeSizeMb: { type: Number, default: 1024 },
         maxSnapshots: { type: Number, default: 0 },
         maxBuckets: { type: Number, default: 1 }
+    },
+    verificationCode: {
+        type: String
+    },
+    verificationCodeExpires: {
+        type: Date
     }
 }, { timestamps: true });
 

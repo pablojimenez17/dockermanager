@@ -11,38 +11,70 @@ const Register = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [step, setStep] = useState('register'); // 'register' or 'verify'
+    const [verificationCode, setVerificationCode] = useState('');
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleRegister = async (e) => {
         e.preventDefault();
         setError('');
+        setLoading(true);
 
         // Validar que la contraseña sea segura
         const passwordStrength = validatePasswordStrength(password);
         if (!passwordStrength.isValid) {
             setError(passwordStrength.message);
+            setLoading(false);
             return;
         }
 
         if (password !== confirmPassword) {
             setError('Passwords do not match');
+            setLoading(false);
             return;
         }
 
         try {
             const res = await axios.post('/api/auth/register', { name, email, password });
             
-            // Auto login
+            if (res.data.requireVerification) {
+                setStep('verify');
+                setSuccess(`Code sent to ${email}`);
+            } else {
+                // Auto login fallback
+                localStorage.setItem('name', res.data.name);
+                localStorage.setItem('email', res.data.email);
+                localStorage.setItem('role', res.data.role);
+
+                setSuccess('Registration successful. Accessing dashboard...');
+                setTimeout(() => window.location.href = '/app', 1000);
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Registration failed');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerify = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
             localStorage.setItem('name', res.data.name);
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);
-
-            setSuccess('Registration successful. Accessing dashboard...');
+            localStorage.setItem('planType', res.data.planType || 'free');
+            setSuccess('Verification successful. Accessing dashboard...');
             setTimeout(() => window.location.href = '/app', 1000);
         } catch (err) {
-            setError(err.response?.data?.message || 'Registration failed');
+            setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -106,110 +138,188 @@ const Register = () => {
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white dark:bg-slate-800/50 py-8 px-4 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 sm:rounded-3xl sm:px-10 border border-slate-200 dark:border-slate-700 backdrop-blur-xl">
-                    <form className="space-y-6" onSubmit={handleRegister}>
-                        {error && (
-                            <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-xl text-center">
-                                {error}
-                            </div>
-                        )}
-                        {success && (
-                            <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-xl text-center">
-                                {success}
-                            </div>
-                        )}
+                    {step === 'register' ? (
+                        <form className="space-y-6" onSubmit={handleRegister}>
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-xl text-center">
+                                    {error}
+                                </div>
+                            )}
+                            {success && (
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-xl text-center">
+                                    {success}
+                                </div>
+                            )}
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Full Name
-                            </label>
-                            <div className="mt-2">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Full Name
+                                </label>
+                                <div className="mt-2">
+                                    <input
+                                        type="text"
+                                        required
+                                        value={name}
+                                        onChange={(e) => setName(e.target.value)}
+                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        placeholder="Jane Doe"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Email Address
+                                </label>
+                                <div className="mt-2">
+                                    <input
+                                        type="email"
+                                        required
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        placeholder="you@example.com"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Password
+                                </label>
+                                <div className="mt-2">
+                                    <input
+                                        type="password"
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                                {password.length > 0 && <PasswordStrengthMeter password={password} />}
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
+                                    Confirm Password
+                                </label>
+                                <div className="mt-2">
+                                    <input
+                                        type="password"
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className={`appearance-none block w-full px-4 py-3 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
+                                            confirmPassword && password !== confirmPassword
+                                                ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
+                                                : confirmPassword && password === confirmPassword
+                                                ? 'border-emerald-400 dark:border-emerald-500 focus:ring-emerald-500'
+                                                : 'border-slate-300 dark:border-slate-600 focus:ring-brand-500'
+                                        }`}
+                                        placeholder="••••••••"
+                                    />
+                                </div>
+                                {confirmPassword && password !== confirmPassword && (
+                                    <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1">
+                                        <span>❌</span>
+                                        <span>Passwords do not match</span>
+                                    </p>
+                                )}
+                                {confirmPassword && password === confirmPassword && (
+                                    <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
+                                        <span>✅</span>
+                                        <span>Passwords match</span>
+                                    </p>
+                                )}
+                            </div>
+
+                                <button
+                                    type="submit"
+                                    disabled={loading || !validatePasswordStrength(password).isValid || password !== confirmPassword}
+                                    className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
+                                >
+                                    {loading ? (
+                                        <>
+                                            <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                            </svg>
+                                            Registering...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>Register</span>
+                                            <ArrowRight size={18} />
+                                        </>
+                                    )}
+                                </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleVerify} className="space-y-6">
+                            {error && (
+                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-xl text-center">
+                                    {error}
+                                </div>
+                            )}
+                            {success && (
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-xl text-center">
+                                    {success}
+                                </div>
+                            )}
+                            
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 text-center mb-4">
+                                    Enter the 6-digit code sent to your email
+                                </label>
                                 <input
                                     type="text"
                                     required
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="Jane Doe"
+                                    maxLength={6}
+                                    value={verificationCode}
+                                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full px-4 py-3 rounded-xl
+                                               bg-white dark:bg-slate-900
+                                               border border-slate-300 dark:border-slate-600
+                                               text-slate-900 dark:text-white
+                                               placeholder-slate-400 dark:placeholder-slate-500
+                                               text-center text-2xl tracking-[0.5em] font-mono
+                                               focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500
+                                               shadow-sm transition-all"
+                                    placeholder="------"
                                 />
                             </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Email Address
-                            </label>
-                            <div className="mt-2">
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="you@example.com"
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Password
-                            </label>
-                            <div className="mt-2">
-                                <input
-                                    type="password"
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            {password.length > 0 && <PasswordStrengthMeter password={password} />}
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
-                                Confirm Password
-                            </label>
-                            <div className="mt-2">
-                                <input
-                                    type="password"
-                                    required
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className={`appearance-none block w-full px-4 py-3 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
-                                        confirmPassword && password !== confirmPassword
-                                            ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
-                                            : confirmPassword && password === confirmPassword
-                                            ? 'border-emerald-400 dark:border-emerald-500 focus:ring-emerald-500'
-                                            : 'border-slate-300 dark:border-slate-600 focus:ring-brand-500'
-                                    }`}
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            {confirmPassword && password !== confirmPassword && (
-                                <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1">
-                                    <span>❌</span>
-                                    <span>Passwords do not match</span>
-                                </p>
-                            )}
-                            {confirmPassword && password === confirmPassword && (
-                                <p className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 flex items-center space-x-1">
-                                    <span>✅</span>
-                                    <span>Passwords match</span>
-                                </p>
-                            )}
-                        </div>
 
                             <button
                                 type="submit"
-                                disabled={!validatePasswordStrength(password).isValid || password !== confirmPassword}
-                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
+                                disabled={loading || verificationCode.length !== 6}
+                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                                <span>Register</span>
-                                <ArrowRight size={18} />
+                                {loading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                        </svg>
+                                        Verifying...
+                                    </>
+                                ) : (
+                                    <>
+                                        <span>Verify & Enter</span>
+                                        <ArrowRight size={18} />
+                                    </>
+                                )}
                             </button>
-                    </form>
+                            
+                            <button
+                                type="button"
+                                onClick={() => setStep('register')}
+                                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-center block"
+                            >
+                                Back to registration
+                            </button>
+                        </form>
+                    )}
                 </div>
             </div>
         </div>

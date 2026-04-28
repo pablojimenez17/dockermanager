@@ -9,6 +9,8 @@ const Login = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
+    const [step, setStep] = useState('login'); // 'login' or 'verify'
+    const [verificationCode, setVerificationCode] = useState('');
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
@@ -19,13 +21,36 @@ const Login = () => {
         setError('');
         try {
             const res = await axios.post('/api/auth/login', { email, password });
+            if (res.data.requireVerification) {
+                setStep('verify');
+            } else {
+                // Fallback if verification not needed (though backend always requires it now)
+                localStorage.setItem('name', res.data.name);
+                localStorage.setItem('email', res.data.email);
+                localStorage.setItem('role', res.data.role);
+                localStorage.setItem('planType', res.data.planType || 'free');
+                window.location.href = '/app';
+            }
+        } catch (err) {
+            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleVerify = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
             localStorage.setItem('name', res.data.name);
             localStorage.setItem('email', res.data.email);
             localStorage.setItem('role', res.data.role);
             localStorage.setItem('planType', res.data.planType || 'free');
             window.location.href = '/app';
         } catch (err) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            setError(err.response?.data?.message || 'Verification failed. Please check your code.');
         } finally {
             setLoading(false);
         }
@@ -133,12 +158,20 @@ const Login = () => {
                 <div className="w-full max-w-sm">
                     {/* Header */}
                     <div className="mb-8">
-                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1.5">Welcome back</h2>
+                        <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1.5">
+                            {step === 'login' ? 'Welcome back' : 'Verification Required'}
+                        </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-500">
-                            Don't have an account?{' '}
-                            <Link to="/register" className="text-brand-500 dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 font-medium transition-colors">
-                                Sign up free
-                            </Link>
+                            {step === 'login' ? (
+                                <>
+                                    Don't have an account?{' '}
+                                    <Link to="/register" className="text-brand-500 dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 font-medium transition-colors">
+                                        Sign up free
+                                    </Link>
+                                </>
+                            ) : (
+                                `We sent a 6-digit code to ${email}`
+                            )}
                         </p>
                     </div>
 
@@ -150,43 +183,19 @@ const Login = () => {
                     )}
 
                     {/* Form */}
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        {/* Email */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                Email Address
-                            </label>
-                            <input
-                                type="email"
-                                required
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                className="w-full px-4 py-3 rounded-xl
-                                           bg-white dark:bg-white/5
-                                           border border-slate-200 dark:border-white/10
-                                           text-slate-900 dark:text-white
-                                           placeholder-slate-400 dark:placeholder-slate-600
-                                           text-sm
-                                           focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30
-                                           dark:focus:bg-white/8 focus:bg-slate-50
-                                           shadow-sm dark:shadow-none
-                                           transition-all"
-                                placeholder="you@example.com"
-                            />
-                        </div>
-
-                        {/* Password */}
-                        <div className="space-y-1.5">
-                            <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                Password
-                            </label>
-                            <div className="relative">
+                    {step === 'login' ? (
+                        <form onSubmit={handleLogin} className="space-y-4">
+                            {/* Email */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                    Email Address
+                                </label>
                                 <input
-                                    type={showPassword ? 'text' : 'password'}
+                                    type="email"
                                     required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    className="w-full px-4 py-3 pr-11 rounded-xl
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    className="w-full px-4 py-3 rounded-xl
                                                bg-white dark:bg-white/5
                                                border border-slate-200 dark:border-white/10
                                                text-slate-900 dark:text-white
@@ -196,41 +205,123 @@ const Login = () => {
                                                dark:focus:bg-white/8 focus:bg-slate-50
                                                shadow-sm dark:shadow-none
                                                transition-all"
-                                    placeholder="••••••••"
+                                    placeholder="you@example.com"
                                 />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                                >
-                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
                             </div>
-                        </div>
 
-                        {/* Submit */}
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-xl
-                                       bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
-                                       shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30
-                                       transition-all disabled:opacity-60 disabled:cursor-not-allowed
-                                       active:scale-[0.98]"
-                        >
-                            {loading ? (
-                                <>
-                                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                    </svg>
-                                    Signing in...
-                                </>
-                            ) : (
-                                <>Sign in <ArrowRight size={16} /></>
-                            )}
-                        </button>
-                    </form>
+                            {/* Password */}
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                    Password
+                                </label>
+                                <div className="relative">
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        required
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        className="w-full px-4 py-3 pr-11 rounded-xl
+                                                   bg-white dark:bg-white/5
+                                                   border border-slate-200 dark:border-white/10
+                                                   text-slate-900 dark:text-white
+                                                   placeholder-slate-400 dark:placeholder-slate-600
+                                                   text-sm
+                                                   focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30
+                                                   dark:focus:bg-white/8 focus:bg-slate-50
+                                                   shadow-sm dark:shadow-none
+                                                   transition-all"
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Submit */}
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-xl
+                                           bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
+                                           shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30
+                                           transition-all disabled:opacity-60 disabled:cursor-not-allowed
+                                           active:scale-[0.98]"
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                        </svg>
+                                        Signing in...
+                                    </>
+                                ) : (
+                                    <>Sign in <ArrowRight size={16} /></>
+                                )}
+                            </button>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleVerify} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                                    6-Digit Code
+                                </label>
+                                <input
+                                    type="text"
+                                    required
+                                    maxLength={6}
+                                    value={verificationCode}
+                                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full px-4 py-3 rounded-xl
+                                               bg-white dark:bg-white/5
+                                               border border-slate-200 dark:border-white/10
+                                               text-slate-900 dark:text-white
+                                               placeholder-slate-400 dark:placeholder-slate-600
+                                               text-center text-2xl tracking-[0.5em] font-mono
+                                               focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30
+                                               dark:focus:bg-white/8 focus:bg-slate-50
+                                               shadow-sm dark:shadow-none
+                                               transition-all"
+                                    placeholder="------"
+                                />
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading || verificationCode.length !== 6}
+                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-xl
+                                           bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
+                                           shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30
+                                           transition-all disabled:opacity-60 disabled:cursor-not-allowed
+                                           active:scale-[0.98]"
+                            >
+                                {loading ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                        </svg>
+                                        Verifying...
+                                    </>
+                                ) : (
+                                    <>Verify & Enter <ArrowRight size={16} /></>
+                                )}
+                            </button>
+                            
+                            <button
+                                type="button"
+                                onClick={() => setStep('login')}
+                                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                            >
+                                Back to login
+                            </button>
+                        </form>
+                    )}
 
                     {/* Divider */}
                     <div className="relative my-6">

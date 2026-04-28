@@ -2,9 +2,12 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
-import { sendWelcomeEmail } from '../services/emailService.js';
+import { sendWelcomeEmail, sendVerificationCode } from '../services/emailService.js';
 
 const router = express.Router();
+
+// Helper to generate OTP
+const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
 
 // Validate password strength
 const validatePasswordStrength = (password) => {
@@ -55,29 +58,19 @@ router.post('/register', async (req, res) => {
         } : {};
 
         const user = new User({ name, email, password, role, ...(role === 'admin' ? { planType: 'enterprise', limits: extraLimits } : {}) });
+        
+        const code = generateOTP();
+        user.verificationCode = code;
+        user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        // Send welcome email (asynchronous, we don't await so it doesn't block the response)
         sendWelcomeEmail(user.email, user.name);
-
-        const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
-
-        // Set HTTP-Only Cookie
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 24 * 60 * 60 * 1000 // 1 day
-        });
+        sendVerificationCode(user.email, code);
 
         res.status(201).json({ 
-            message: 'User created successfully', 
-            token,
-            name: user.name,
-            email: user.email,
-            role: user.role,
-            planType: user.planType,
-            limits: user.limits
+            message: 'User created successfully. Verification required.', 
+            requireVerification: true,
+            email: user.email
         });
     } catch (error) {
         res.status(500).json({ message: 'Error creating user', error: error.message });
@@ -98,9 +91,47 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
+        const code = generateOTP();
+        user.verificationCode = code;
+        user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        await user.save();
+
+        sendVerificationCode(user.email, code);
+
+        res.json({
+            message: 'Verification required.',
+            requireVerification: true,
+            email: user.email
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Error logging in', error: error.message });
+    }
+});
+
+router.post('/verify-code', async (req, res) => {
+    try {
+        const { email, code } = req.body;
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid request' });
+        }
+
+        if (!user.verificationCode || user.verificationCode !== code) {
+            return res.status(401).json({ message: 'Invalid verification code' });
+        }
+
+        if (user.verificationCodeExpires < new Date()) {
+            return res.status(401).json({ message: 'Verification code has expired' });
+        }
+
+        // Code valid, clear it
+        user.verificationCode = undefined;
+        user.verificationCodeExpires = undefined;
+        await user.save();
+
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
 
-        // Set HTTP-Only Cookie
         res.cookie('token', token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
@@ -109,7 +140,7 @@ router.post('/login', async (req, res) => {
         });
 
         res.json({
-            token, // Kept for backwards compatibility if needed during migration
+            token,
             name: user.name,
             email: user.email,
             role: user.role,
@@ -117,7 +148,7 @@ router.post('/login', async (req, res) => {
             limits: user.limits
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error logging in', error: error.message });
+        res.status(500).json({ message: 'Error verifying code', error: error.message });
     }
 });
 
