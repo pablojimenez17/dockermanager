@@ -59,7 +59,34 @@ export const sendVerificationCode = async (to, code) => {
   }
 };
 
+export const sendPasswordResetEmail = async (to, code) => {
+  const msg = {
+    to,
+    from: process.env.SENDGRID_FROM_EMAIL || 'noreply@orbitcloud.app',
+    subject: 'Restablecer Contraseña - OrbitCloud',
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2b6cb0;">Restablecer Contraseña</h2>
+        <p>Has solicitado restablecer tu contraseña. Aquí tienes tu código temporal:</p>
+        <div style="background-color: #f7fafc; border-radius: 8px; padding: 20px; text-align: center; margin: 20px 0;">
+          <h1 style="font-size: 36px; letter-spacing: 5px; margin: 0; color: #2d3748;">${code}</h1>
+        </div>
+        <p style="font-size: 14px; color: #718096;">Este código caducará en 10 minutos.</p>
+        <p>Si no has solicitado esto, puedes ignorar este mensaje o contactar con soporte.</p>
+      </div>
+    `,
+  };
+
+  try {
+    await sgMail.send(msg);
+    console.log(`Password reset code sent to ${to}`);
+  } catch (error) {
+    console.error('Error sending password reset code:', error);
+  }
+};
+
 export default {
   sendWelcomeEmail,
-  sendVerificationCode
+  sendVerificationCode,
+  sendPasswordResetEmail
 };

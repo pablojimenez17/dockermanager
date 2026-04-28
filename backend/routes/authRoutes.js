@@ -2,7 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
-import { sendWelcomeEmail, sendVerificationCode } from '../services/emailService.js';
+import { sendWelcomeEmail, sendVerificationCode, sendPasswordResetEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -149,6 +149,64 @@ router.post('/verify-code', async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ message: 'Error verifying code', error: error.message });
+    }
+});
+
+router.post('/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ email });
+        
+        if (!user) {
+            // Return 200 anyway to prevent email enumeration
+            return res.json({ message: 'If that email is in our database, we will send a recovery code.' });
+        }
+
+        const code = generateOTP();
+        user.resetPasswordCode = code;
+        user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+        await user.save();
+
+        sendPasswordResetEmail(user.email, code);
+
+        res.json({ message: 'If that email is in our database, we will send a recovery code.', success: true });
+    } catch (error) {
+        res.status(500).json({ message: 'Error processing request', error: error.message });
+    }
+});
+
+router.post('/reset-password', async (req, res) => {
+    try {
+        const { email, code, newPassword } = req.body;
+
+        // Validate password
+        const passwordValidation = validatePasswordStrength(newPassword);
+        if (!passwordValidation.isValid) {
+            return res.status(400).json({ message: passwordValidation.message });
+        }
+
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid request' });
+        }
+
+        if (!user.resetPasswordCode || user.resetPasswordCode !== code) {
+            return res.status(401).json({ message: 'Invalid recovery code' });
+        }
+
+        if (user.resetPasswordExpires < new Date()) {
+            return res.status(401).json({ message: 'Recovery code has expired' });
+        }
+
+        // Code valid, update password
+        user.password = newPassword;
+        user.resetPasswordCode = undefined;
+        user.resetPasswordExpires = undefined;
+        await user.save();
+
+        res.json({ message: 'Password has been reset successfully. You can now log in.' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error resetting password', error: error.message });
     }
 });
 

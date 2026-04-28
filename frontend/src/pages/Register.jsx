@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Server, ArrowRight, Sun, Moon } from 'lucide-react';
+import { Server, ArrowRight, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { useTheme } from '../components/ThemeContext';
 import PasswordStrengthMeter from '../components/PasswordStrengthMeter';
@@ -11,6 +11,8 @@ const Register = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [step, setStep] = useState('register'); // 'register' or 'verify'
     const [verificationCode, setVerificationCode] = useState('');
     const [error, setError] = useState('');
@@ -187,15 +189,22 @@ const Register = () => {
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Password
                                 </label>
-                                <div className="mt-2">
+                                <div className="mt-2 relative">
                                     <input
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        className="appearance-none block w-full px-4 py-3 pr-11 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
                                         placeholder="••••••••"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
                                 </div>
                                 {password.length > 0 && <PasswordStrengthMeter password={password} />}
                             </div>
@@ -204,13 +213,13 @@ const Register = () => {
                                 <label className="block text-sm font-medium text-slate-700 dark:text-slate-300">
                                     Confirm Password
                                 </label>
-                                <div className="mt-2">
+                                <div className="mt-2 relative">
                                     <input
-                                        type="password"
+                                        type={showConfirmPassword ? 'text' : 'password'}
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className={`appearance-none block w-full px-4 py-3 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
+                                        className={`appearance-none block w-full px-4 py-3 pr-11 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
                                             confirmPassword && password !== confirmPassword
                                                 ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
                                                 : confirmPassword && password === confirmPassword
@@ -219,6 +228,13 @@ const Register = () => {
                                         }`}
                                         placeholder="••••••••"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
+                                    >
+                                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
                                 </div>
                                 {confirmPassword && password !== confirmPassword && (
                                     <p className="mt-2 text-xs text-red-600 dark:text-red-400 flex items-center space-x-1">

@@ -4,6 +4,7 @@ import axios from 'axios';
 import Welcome from './pages/Welcome';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 import Dashboard from './pages/Dashboard';
 import CreateContainer from './pages/CreateContainer';
 import ViewContainers from './pages/ViewContainers';
@@ -130,6 +131,7 @@ const App = () => {
               <Route path="/" element={<PublicRoute><Welcome /></PublicRoute>} />
               <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
               <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
+              <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
               <Route path="/invite/:token" element={<InviteAccept />} />
 
               {/* Protected Routes */}
