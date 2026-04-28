@@ -161,7 +161,17 @@ Una Plataforma de este tamaño dispone de un panel propio paralelo unificado baj
 
 ---
 
-## ⚖️ 8. Modelo de Responsabilidad Compartida
+## 📧 8. Servicio de Correo y Autenticación 2FA
+
+OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y notificaciones transaccionales gestionadas a través del motor **SendGrid**. Esta capa adicional de seguridad protege el acceso al panel de control y a los entornos de los clientes.
+
+- **Doble Factor de Autenticación (2FA):** Al registrarse o iniciar sesión, la plataforma no entrega acceso inmediatamente. En su lugar, el Backend genera un código temporal (OTP de 6 dígitos) con caducidad estricta (10 minutos) que se envía al correo del usuario. Solo tras introducir y verificar correctamente este pin se establece la sesión mediante una cookie segura e invisible (`httpOnly`).
+- **Recuperación Segura de Credenciales:** Un flujo de *Forgot Password* protegido contra enumeración de correos. Genera pines efímeros transmitidos vía email que permiten validar la identidad y restablecer la contraseña en un entorno de cero confianza.
+- **Emails Transaccionales:** Sistema asíncrono para enviar correos de bienvenida (Onboarding) y alertas transaccionales a los clientes sin bloquear la latencia principal de la API Node.js.
+
+---
+
+## ⚖️ 9. Modelo de Responsabilidad Compartida
 
 | Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en OrbitCloud |
 |-----------------------|-------------------------|--------------------------------|
