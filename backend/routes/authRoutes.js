@@ -2,6 +2,7 @@ import express from 'express';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
+import { sendWelcomeEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -55,6 +56,9 @@ router.post('/register', async (req, res) => {
 
         const user = new User({ name, email, password, role, ...(role === 'admin' ? { planType: 'enterprise', limits: extraLimits } : {}) });
         await user.save();
+
+        // Send welcome email (asynchronous, we don't await so it doesn't block the response)
+        sendWelcomeEmail(user.email, user.name);
 
         const token = jwt.sign({ userId: user._id, role: user.role }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '1d' });
 
