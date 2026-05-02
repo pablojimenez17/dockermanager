@@ -46,6 +46,8 @@ const Marketplace = () => {
             try {
                 const cacheKey = `marketplace_cache_${activeOrg?._id || 'default'}`;
                 const cachedData = sessionStorage.getItem(cacheKey);
+
+                // Restore ONLY templates/secrets/networks/volumes from cache (never quotas)
                 if (cachedData) {
                     try {
                         const parsed = JSON.parse(cachedData);
@@ -54,11 +56,8 @@ const Marketplace = () => {
                             setAvailableSecrets(parsed.availableSecrets || []);
                             setNetworks(parsed.networks || []);
                             setAvailableVolumes(parsed.availableVolumes || []);
-                            setLimits(parsed.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
-                            setCurrentContainerCount(parsed.currentContainerCount || 0);
-                            setCurrentRamMb(parsed.currentRamMb || 0);
-                            setCurrentCpu(parsed.currentCpu || 0);
                             setLoading(false);
+                            // Don't restore limits/quotas from cache — always fetch fresh below
                         }
                     } catch (e) {}
                 }
@@ -111,8 +110,8 @@ const Marketplace = () => {
                 const newVolumes = volRes.data || [];
                 setAvailableVolumes(newVolumes);
 
-                const newLimits = resolveLimits(meRes.data);
-                setLimits(newLimits);
+                // Quotas — ALWAYS resolved fresh from planType, never from cache
+                setLimits(resolveLimits(meRes.data));
                 
                 const newContainerCount = myContainersRes.data.length;
                 setCurrentContainerCount(newContainerCount);
@@ -126,20 +125,15 @@ const Marketplace = () => {
                     }
                 });
                 
-                const newRamMb = Math.round(totalRam);
-                const newCpu = Math.round(totalCpu * 10) / 10;
-                setCurrentRamMb(newRamMb);
-                setCurrentCpu(newCpu);
+                setCurrentRamMb(Math.round(totalRam));
+                setCurrentCpu(Math.round(totalCpu * 10) / 10);
 
+                // Cache ONLY templates/secrets/networks/volumes — NOT limits or usage
                 sessionStorage.setItem(cacheKey, JSON.stringify({
                     templates: newTemplates,
                     availableSecrets: newSecrets,
                     networks: mappedNetworks,
-                    availableVolumes: newVolumes,
-                    limits: newLimits,
-                    currentContainerCount: newContainerCount,
-                    currentRamMb: newRamMb,
-                    currentCpu: newCpu
+                    availableVolumes: newVolumes
                 }));
 
             } catch (err) {
