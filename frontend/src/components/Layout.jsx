@@ -8,7 +8,7 @@ import { useOrg } from '../context/OrgContext';
 const Layout = () => {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
-    const { userPlan, activeOrg, orgs } = useOrg();
+    const { userPlan, activeOrg, orgs, loadingOrgs } = useOrg();
     const planType = userPlan || 'free';
 
     const routeTitles = {
@@ -71,7 +71,13 @@ const Layout = () => {
                 </div>
 
                 <div className="p-4 md:p-6 lg:p-8 w-full max-w-7xl mx-auto">
-                    <Outlet />
+                    {loadingOrgs ? (
+                        <div className="flex h-full min-h-[50vh] items-center justify-center">
+                            <span className="animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></span>
+                        </div>
+                    ) : (
+                        <Outlet />
+                    )}
                 </div>
             </main>
 
