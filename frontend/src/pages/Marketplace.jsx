@@ -63,16 +63,15 @@ const Marketplace = () => {
                 }
 
                 const token = localStorage.getItem('token');
-                const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
                 const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
-                    axios.get('/api/templates', authOptions),
-                    axios.get('/api/secrets', authOptions).catch(() => ({ data: [] })),
-                    axios.get('/api/auth/me', authOptions),
-                    axios.get('/api/containers', authOptions),
-                    axios.get('/api/snapshots', authOptions).catch(() => ({ data: [] })),
-                    axios.get('/api/networks', authOptions).catch(() => ({ data: [] })),
-                    axios.get('/api/volumes', authOptions).catch(() => ({ data: [] }))
+                    axios.get('/api/templates'),
+                    axios.get('/api/secrets').catch(() => ({ data: [] })),
+                    axios.get('/api/auth/me'),
+                    axios.get('/api/containers'),
+                    axios.get('/api/snapshots').catch(() => ({ data: [] })),
+                    axios.get('/api/networks').catch(() => ({ data: [] })),
+                    axios.get('/api/volumes').catch(() => ({ data: [] }))
                 ]);
 
                 const mappedSnapshots = (snapRes.data || []).map(snap => ({

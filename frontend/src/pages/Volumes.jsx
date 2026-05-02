@@ -21,7 +21,7 @@ const Volumes = () => {
         try {
             const [meRes, volRes] = await Promise.all([
                 axios.get('/api/auth/me'),
-                axios.get('/api/volumes')
+                axios.get('/api/volumes').catch(() => ({ data: [] }))
             ]);
 
             setLimits(resolveLimits(meRes.data));

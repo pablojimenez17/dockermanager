@@ -45,7 +45,7 @@ const GitDeploy = () => {
             }
         };
         fetchContext();
-    }, []);
+    }, [activeOrg]);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
