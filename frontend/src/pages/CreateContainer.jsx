@@ -229,6 +229,12 @@ const CreateContainer = () => {
                                         <div>
                                             <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center">
                                                 <Globe size={16} className="mr-2 text-brand-500" /> Expose to Internet
+                                                <div className="relative group/tooltip ml-2 flex items-center">
+                                                    <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-xl leading-relaxed">
+                                                        Permite acceso desde fuera de tu red aislando el puerto y generando certificado HTTPS automático a través del Proxy Inverso.
+                                                    </div>
+                                                </div>
                                             </h4>
                                             <p className="text-xs text-gray-500 mt-1">Route external traffic via Traefik proxy.</p>
                                         </div>
@@ -275,7 +281,15 @@ const CreateContainer = () => {
 
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Network Mode</label>
+                                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center">
+                                                        Network Mode
+                                                        <div className="relative group/tooltip ml-2 flex items-center">
+                                                            <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-xl leading-relaxed">
+                                                                La VPC te aísla de otros usuarios protegiendo el tráfico interno. "Isolated" significa que el contenedor no tendrá ningún acceso a red.
+                                                            </div>
+                                                        </div>
+                                                    </label>
                                                     <select value={c.networkMode} onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm">
                                                         <option value="bridge">Bridge (Default VPC)</option>
                                                         <option value="none">None (Isolated)</option>

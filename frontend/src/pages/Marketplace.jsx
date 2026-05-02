@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus, Globe, Lock } from 'lucide-react';
+import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus, Globe, Lock, Info } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
 
@@ -43,6 +43,25 @@ const Marketplace = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
+                const cacheKey = `marketplace_cache_${activeOrg?._id || 'default'}`;
+                const cachedData = sessionStorage.getItem(cacheKey);
+                if (cachedData) {
+                    try {
+                        const parsed = JSON.parse(cachedData);
+                        if (parsed.templates && parsed.templates.length > 0) {
+                            setTemplates(parsed.templates);
+                            setAvailableSecrets(parsed.availableSecrets || []);
+                            setNetworks(parsed.networks || []);
+                            setAvailableVolumes(parsed.availableVolumes || []);
+                            setLimits(parsed.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1 });
+                            setCurrentContainerCount(parsed.currentContainerCount || 0);
+                            setCurrentRamMb(parsed.currentRamMb || 0);
+                            setCurrentCpu(parsed.currentCpu || 0);
+                            setLoading(false);
+                        }
+                    } catch (e) {}
+                }
+
                 const token = localStorage.getItem('token');
                 const authOptions = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
 
@@ -51,37 +70,36 @@ const Marketplace = () => {
                     axios.get('/api/secrets', authOptions).catch(() => ({ data: [] })),
                     axios.get('/api/auth/me', authOptions),
                     axios.get('/api/containers', authOptions),
-                    // Catch snapshot fetch errors (e.g., Free tier users) so it doesn't break the marketplace loader
                     axios.get('/api/snapshots', authOptions).catch(() => ({ data: [] })),
                     axios.get('/api/networks', authOptions).catch(() => ({ data: [] })),
                     axios.get('/api/volumes', authOptions).catch(() => ({ data: [] }))
                 ]);
 
-                // Map snapshots into the expected "Template" format
                 const mappedSnapshots = (snapRes.data || []).map(snap => ({
                     id: snap._id,
                     name: snap.snapshotName,
                     description: `Custom backup snapshot taken from ${snap.containerName}. Contains all modified files and configurations.`,
                     category: 'My Snapshots',
-                    // Default snapshot/backup icon
                     icon: 'https://cdn-icons-png.flaticon.com/512/3208/3208726.png',
                     containers: [
                         {
                             name_prefix: snap.snapshotName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase(),
                             image: snap.imageId,
-                            // Default port 80 to allow domain exposure if the original image used web ports
                             ports: [{ host: "", container: 80 }],
-                            env: [] // Existing envs are baked into the snapshot image automatically
+                            env: []
                         }
                     ]
                 }));
 
-                setTemplates([...tplRes.data, ...mappedSnapshots]);
-                setAvailableSecrets(secRes.data || []);
+                const newTemplates = [...tplRes.data, ...mappedSnapshots];
+                setTemplates(newTemplates);
+                
+                const newSecrets = secRes.data || [];
+                setAvailableSecrets(newSecrets);
 
-                // Map Docker networks
+                let mappedNetworks = [];
                 if (netRes?.data) {
-                    const mappedNetworks = netRes.data.map(n => n.Name);
+                    mappedNetworks = netRes.data.map(n => n.Name);
                     if (!mappedNetworks.includes('bridge')) mappedNetworks.push('bridge');
                     setNetworks(mappedNetworks);
                     if (mappedNetworks.includes('dockermanager_lan_net')) {
@@ -89,12 +107,14 @@ const Marketplace = () => {
                     }
                 }
 
-                if (volRes?.data) {
-                    setAvailableVolumes(volRes.data);
-                }
+                const newVolumes = volRes.data || [];
+                setAvailableVolumes(newVolumes);
 
-                if (meRes.data.limits) setLimits(meRes.data.limits);
-                setCurrentContainerCount(myContainersRes.data.length);
+                const newLimits = meRes.data.limits || limits;
+                setLimits(newLimits);
+                
+                const newContainerCount = myContainersRes.data.length;
+                setCurrentContainerCount(newContainerCount);
 
                 let totalRam = 0;
                 let totalCpu = 0;
@@ -104,8 +124,23 @@ const Marketplace = () => {
                         totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
                     }
                 });
-                setCurrentRamMb(Math.round(totalRam));
-                setCurrentCpu(Math.round(totalCpu * 10) / 10);
+                
+                const newRamMb = Math.round(totalRam);
+                const newCpu = Math.round(totalCpu * 10) / 10;
+                setCurrentRamMb(newRamMb);
+                setCurrentCpu(newCpu);
+
+                sessionStorage.setItem(cacheKey, JSON.stringify({
+                    templates: newTemplates,
+                    availableSecrets: newSecrets,
+                    networks: mappedNetworks,
+                    availableVolumes: newVolumes,
+                    limits: newLimits,
+                    currentContainerCount: newContainerCount,
+                    currentRamMb: newRamMb,
+                    currentCpu: newCpu
+                }));
+
             } catch (err) {
                 console.error(err);
                 addToast('Failed to load marketplace data', 'error');
@@ -278,7 +313,7 @@ const Marketplace = () => {
                 <input
                     type="text"
                     placeholder="Search apps (e.g. WordPress, Database, Redis...)"
-                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl pl-12 pr-4 py-4 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
+                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm pl-12 pr-4 py-4 text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500/50 shadow-sm"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -286,7 +321,7 @@ const Marketplace = () => {
 
             {/* Quotas Visualization */}
             {!loading && (
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-sm mb-8">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-sm p-6 shadow-sm mb-8">
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
                         <ShieldAlert size={18} className="mr-2 text-brand-500" /> Plan Resource Quotas
                     </h4>
@@ -354,9 +389,9 @@ const Marketplace = () => {
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {catTemplates.map(template => (
-                                        <div key={template.id} className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group" onClick={() => openTemplate(template)}>
+                                        <div key={template.id} className="bg-white dark:bg-slate-800 rounded-sm border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-sm transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group" onClick={() => openTemplate(template)}>
                                             <div className="p-6 flex-1">
-                                                <div className="w-14 h-14 bg-slate-50 dark:bg-slate-900 rounded-xl flex items-center justify-center p-3 mb-4 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform">
+                                                <div className="w-14 h-14 bg-slate-50 dark:bg-slate-900 rounded-sm flex items-center justify-center p-3 mb-4 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform">
                                                     <img
                                                         src={template.icon}
                                                         alt={template.name}
@@ -391,11 +426,11 @@ const Marketplace = () => {
             {/* Deployment Modal */}
             {selectedTemplate && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-xl rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+                    <div className="bg-white dark:bg-slate-800 w-full max-w-xl rounded-sm shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-start bg-slate-50 dark:bg-slate-900/50">
                             <div className="flex items-center space-x-4">
-                                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-xl flex items-center justify-center p-2.5 shadow-sm border border-slate-200 dark:border-slate-700">
+                                <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-sm flex items-center justify-center p-2.5 shadow-sm border border-slate-200 dark:border-slate-700">
                                     <img
                                         src={selectedTemplate.icon}
                                         alt="icon"
@@ -426,7 +461,7 @@ const Marketplace = () => {
                                                 type="text"
                                                 value={customAppName}
                                                 onChange={e => setCustomAppName(e.target.value)}
-                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                                 placeholder={`e.g. my-${selectedTemplate.id}`}
                                             />
                                             <p className="text-xs text-slate-500 mt-2">Used as a prefix for your deployed containers.</p>
@@ -434,7 +469,7 @@ const Marketplace = () => {
 
                                         <div>
                                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Base Domain (Optional)</label>
-                                            <div className="flex rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500/50 transition-all">
+                                            <div className="flex rounded-sm shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500/50 transition-all">
                                                 <span className="inline-flex items-center px-4 rounded-l-md border-r bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-500 dark:text-slate-400 sm:text-sm">
                                                     https://
                                                 </span>
@@ -464,11 +499,11 @@ const Marketplace = () => {
                                                         type="text"
                                                         value={key}
                                                         readOnly
-                                                        className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 font-mono text-sm cursor-default"
+                                                        className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 font-mono text-sm cursor-default"
                                                     />
                                                     <span className="text-slate-400 dark:text-slate-500 font-bold hidden sm:inline">=</span>
                                                     {/* Type + Value */}
-                                                    <div className="flex flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl overflow-hidden focus-within:ring-1 focus-within:ring-brand-500">
+                                                    <div className="flex flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm overflow-hidden focus-within:ring-1 focus-within:ring-brand-500">
                                                         <select
                                                             value={field.type}
                                                             onChange={e => updateEnvField(key, 'type', e.target.value)}
@@ -514,11 +549,19 @@ const Marketplace = () => {
                                     <div className="space-y-4">
                                         {/* Network Selector */}
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Network Mode</label>
+                                            <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center">
+                                                Network Mode
+                                                <div className="relative group/tooltip ml-2 flex items-center">
+                                                    <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
+                                                        La VPC te aísla de otros usuarios protegiendo el tráfico interno. "Sin Red" significa que el contenedor no tendrá ningún acceso a red.
+                                                    </div>
+                                                </div>
+                                            </label>
                                             <select
                                                 value={selectedNetwork}
                                                 onChange={e => setSelectedNetwork(e.target.value)}
-                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                             >
                                                 <option value="bridge">🛡️ Red Privada Protegida (VPC)</option>
                                                 <option value="none">🔒 Sin Red (Aislado total)</option>
@@ -533,17 +576,23 @@ const Marketplace = () => {
 
                                         {/* Internet Access Toggle */}
                                         {selectedNetwork !== 'none' && (
-                                            <div className={`flex items-center justify-between p-3.5 rounded-xl border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}>
+                                            <div className={`flex items-center justify-between p-3.5 rounded-sm border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}>
                                                 <div className="flex items-center space-x-3">
                                                     {enableInternet
                                                         ? <Globe size={18} className="text-amber-500 shrink-0" />
                                                         : <Lock size={18} className="text-slate-400 shrink-0" />
                                                     }
                                                     <div>
-                                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200">
+                                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center">
                                                             {enableInternet ? 'Acceso a Internet Activado' : 'Contenedor Privado'}
+                                                            <div className="relative group/tooltip ml-2 flex items-center">
+                                                                <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
+                                                                    Permite acceso desde fuera de tu red aislando el puerto y generando certificado HTTPS automático a través del Proxy Inverso.
+                                                                </div>
+                                                            </div>
                                                         </p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                                             {enableInternet
                                                                 ? '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.'
                                                                 : 'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'
@@ -570,7 +619,7 @@ const Marketplace = () => {
                                                     max={limits.maxRamMb}
                                                     value={memoryLimit}
                                                     onChange={e => setMemoryLimit(Number(e.target.value))}
-                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                                 />
                                             </div>
                                             <div>
@@ -582,7 +631,7 @@ const Marketplace = () => {
                                                     max={limits.maxCpuCores}
                                                     value={cpuLimit}
                                                     onChange={e => setCpuLimit(Number(e.target.value))}
-                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                    className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                                 />
                                             </div>
                                         </div>
@@ -611,13 +660,13 @@ const Marketplace = () => {
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">Select existing Disks to persist database and application data. Unmounted data is lost upon container destruction. You can map custom paths or attach to default application directories.</p>
 
                                     {volumeMounts.length === 0 ? (
-                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 text-center border border-slate-200 dark:border-slate-700">
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-sm p-4 text-center border border-slate-200 dark:border-slate-700">
                                             <p className="text-sm text-slate-500">No volumes attached. Data will be ephemeral.</p>
                                         </div>
                                     ) : (
                                         <div className="space-y-4">
                                             {volumeMounts.map((vol, idx) => (
-                                                <div key={vol.id} className="flex flex-col sm:flex-row sm:space-x-4 items-start sm:items-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-200 dark:border-slate-700 relative group">
+                                                <div key={vol.id} className="flex flex-col sm:flex-row sm:space-x-4 items-start sm:items-center p-4 bg-slate-50 dark:bg-slate-900/50 rounded-sm border border-slate-200 dark:border-slate-700 relative group">
 
                                                     {!vol.isPredefined && (
                                                         <button
@@ -714,7 +763,7 @@ const Marketplace = () => {
                                 <button
                                     type="button"
                                     onClick={closeModal}
-                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors"
+                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-sm font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
@@ -722,7 +771,7 @@ const Marketplace = () => {
                                     type="submit"
                                     form="deployForm"
                                     disabled={deploying}
-                                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold shadow-lg shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
+                                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-sm font-bold shadow-lg shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
                                 >
                                     {deploying ? (
                                         <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> Deploying Stack...</>

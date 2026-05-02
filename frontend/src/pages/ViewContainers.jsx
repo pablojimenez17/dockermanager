@@ -218,8 +218,8 @@ const ViewContainers = () => {
                 </div>
             )}
 
-            <div className="panel overflow-x-auto">
-                <table className="table-industrial">
+            <div className="panel overflow-visible">
+                <table className="table-industrial w-full">
                     <thead>
                         <tr>
                             <th className="w-10"></th>
@@ -278,31 +278,46 @@ const ViewContainers = () => {
                                             <div className="flex items-center justify-end space-x-2">
                                                 {container.state === 'running' ? (
                                                     <>
-                                                        <button onClick={() => handleAction(container._id, 'stop')} className="text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Stop">
-                                                            <Square size={16} />
-                                                        </button>
-                                                        <button onClick={() => setRedeployConfirm({ id: container._id, name: container.name, image: container.image })} className="text-gray-500 hover:text-brand-600 dark:hover:text-brand-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Redeploy">
-                                                            <RefreshCw size={16} />
-                                                        </button>
-                                                        <button onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })} className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Terminal">
-                                                            <MonitorPlay size={16} />
-                                                        </button>
+                                                        <div className="relative group/tooltip">
+                                                            <button onClick={() => handleAction(container._id, 'stop')} className="text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                                                <Square size={16} />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-[100] font-medium shadow-lg">Stop Instance</div>
+                                                        </div>
+                                                        <div className="relative group/tooltip">
+                                                            <button onClick={() => setRedeployConfirm({ id: container._id, name: container.name, image: container.image })} className="text-gray-500 hover:text-brand-600 dark:hover:text-brand-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                                                <RefreshCw size={16} />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-[100] font-medium shadow-lg">Redeploy</div>
+                                                        </div>
+                                                        <div className="relative group/tooltip">
+                                                            <button onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })} className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                                                <MonitorPlay size={16} />
+                                                            </button>
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-[100] font-medium shadow-lg">Open Terminal</div>
+                                                        </div>
                                                     </>
                                                 ) : (
-                                                    <button onClick={() => handleAction(container._id, 'start')} className="text-gray-500 hover:text-green-600 dark:hover:text-green-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Start">
-                                                        <Play size={16} />
-                                                    </button>
+                                                    <div className="relative group/tooltip">
+                                                        <button onClick={() => handleAction(container._id, 'start')} className="text-gray-500 hover:text-green-600 dark:hover:text-green-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                                            <Play size={16} />
+                                                        </button>
+                                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-[100] font-medium shadow-lg">Start Instance</div>
+                                                    </div>
                                                 )}
                                                 
-                                                <button onClick={() => setLiveLogsTerminal({ id: container._id, name: container.name })} className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors" title="Logs">
-                                                    <Terminal size={16} />
-                                                </button>
+                                                <div className="relative group/tooltip">
+                                                    <button onClick={() => setLiveLogsTerminal({ id: container._id, name: container.name })} className="text-gray-500 hover:text-gray-900 dark:hover:text-white p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                                                        <Terminal size={16} />
+                                                    </button>
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover/tooltip:block bg-slate-800 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-[100] font-medium shadow-lg">View Logs</div>
+                                                </div>
                                                 
                                                 <div className="relative group inline-block text-left">
                                                     <button className="text-gray-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
                                                         <MoreVertical size={16} />
                                                     </button>
-                                                    <div className="origin-top-right absolute right-0 mt-2 w-48 rounded shadow-lg bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 ring-1 ring-black ring-opacity-5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-50">
+                                                    <div className="origin-top-right absolute right-0 mt-1 w-48 rounded shadow-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 ring-1 ring-black ring-opacity-5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-[100]">
                                                         <div className="py-1">
                                                             <button onClick={() => openEditModal(container)} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700">
                                                                 <Settings size={14} className="mr-2" /> Networking
