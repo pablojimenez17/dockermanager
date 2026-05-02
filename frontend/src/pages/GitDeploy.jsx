@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { GitBranch, Globe, HardDrive, Play, ShieldAlert, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { resolveLimits } from '../utils/planLimits';
 
 const GitDeploy = () => {
     const navigate = useNavigate();
@@ -28,7 +29,7 @@ const GitDeploy = () => {
                     axios.get('/api/containers')
                 ]);
 
-                if (meRes.data.limits) setLimits(meRes.data.limits);
+                setLimits(resolveLimits(meRes.data));
 
                 const activeContainers = containersRes.data;
                 const activeDomains = activeContainers.filter(c => c.domain && c.domain.trim() !== '').length;

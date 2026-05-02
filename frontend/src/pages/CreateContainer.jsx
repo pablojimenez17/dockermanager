@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, Globe, Lock, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { resolveLimits } from '../utils/planLimits';
 
 const getEmptyContainer = () => ({
     id: crypto.randomUUID(),
@@ -50,7 +51,7 @@ const CreateContainer = () => {
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
                 setAvailableSecrets(secRes.data || []);
-                if (meRes.data.limits) setLimits(meRes.data.limits);
+                setLimits(resolveLimits(meRes.data));
                 setCurrentContainerCount(myContainersRes.data.length);
 
                 let totalRam = 0;

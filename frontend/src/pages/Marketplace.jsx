@@ -3,6 +3,7 @@ import axios from 'axios';
 import { Search, Server, Play, ShieldAlert, Trash2, HardDrive, Plus, Globe, Lock, Info } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
+import { resolveLimits } from '../utils/planLimits';
 
 const Marketplace = () => {
     const { activeOrg } = useOrg();
@@ -110,7 +111,7 @@ const Marketplace = () => {
                 const newVolumes = volRes.data || [];
                 setAvailableVolumes(newVolumes);
 
-                const newLimits = meRes.data.limits || limits;
+                const newLimits = resolveLimits(meRes.data);
                 setLimits(newLimits);
                 
                 const newContainerCount = myContainersRes.data.length;

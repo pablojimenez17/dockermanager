@@ -6,6 +6,7 @@ import TerminalModal from '../components/TerminalModal';
 import LiveLogsModal from '../components/LiveLogsModal';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
+import { resolveLimits } from '../utils/planLimits';
 
 const ViewContainers = () => {
     const { activeOrg } = useOrg();
@@ -48,7 +49,7 @@ const ViewContainers = () => {
             const userRes = await axios.get('/api/auth/me', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
-            setUserLimits(userRes.data?.limits || { maxSnapshots: 0 });
+            setUserLimits(resolveLimits(userRes.data));
 
             setError('');
         } catch (err) {

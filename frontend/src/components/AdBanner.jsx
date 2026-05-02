@@ -1,11 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
 
 const AdBanner = () => {
+    const adRef = useRef(null);
+    const pushed = useRef(false);
+
     useEffect(() => {
+        // Guard: only push once per mount, prevents StrictMode double-invoke error
+        if (pushed.current) return;
+        // Guard: only push if the ins element hasn't been filled yet
+        if (adRef.current && adRef.current.dataset.adsbygoogleStatus) return;
+
         try {
-            // Mock initialization for AdSense or similar ad network
             (window.adsbygoogle = window.adsbygoogle || []).push({});
+            pushed.current = true;
         } catch (e) {
             console.error("AdSense error", e);
         }
@@ -15,6 +23,7 @@ const AdBanner = () => {
         <div className="w-full bg-gray-100 dark:bg-slate-800 rounded p-2 flex flex-col items-center justify-center min-h-[100px] border border-gray-200 dark:border-slate-700 relative overflow-hidden group">
             {/* The actual ad container would be populated by the external script */}
             <ins className="adsbygoogle"
+                 ref={adRef}
                  style={{ display: 'block', minHeight: '90px', width: '100%' }}
                  data-ad-client="ca-pub-6070230906652526"
                  data-ad-slot="6282568435"

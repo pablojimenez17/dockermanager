@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { HardDrive, Trash2, Plus, ShieldAlert, AlertCircle, RefreshCw } from 'lucide-react';
 import axios from 'axios';
 import { useOrg } from '../context/OrgContext';
+import { resolveLimits } from '../utils/planLimits';
 
 const Volumes = () => {
     const { activeOrg } = useOrg();
@@ -23,7 +24,7 @@ const Volumes = () => {
                 axios.get('/api/volumes')
             ]);
 
-            if (meRes.data.limits) setLimits(meRes.data.limits);
+            setLimits(resolveLimits(meRes.data));
 
             const fetchedVolumes = volRes.data || [];
             setVolumes(fetchedVolumes);

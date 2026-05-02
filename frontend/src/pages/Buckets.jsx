@@ -4,6 +4,7 @@ import { Database, Plus, Trash2, ArrowRight } from 'lucide-react';
 import { useToast } from '../components/ToastContext';
 import BucketView from './BucketView';
 import { useOrg } from '../context/OrgContext';
+import { resolveLimits } from '../utils/planLimits';
 
 const Buckets = () => {
     const { activeOrg } = useOrg();
@@ -30,9 +31,8 @@ const Buckets = () => {
 
             setBuckets(bucketRes.data || []);
 
-            const currentLimits = userRes.data?.limits || { maxBuckets: 1 };
+            const currentLimits = resolveLimits(userRes.data);
             setUserLimits(currentLimits);
-            localStorage.setItem('planType', userRes.data?.planType || 'free'); // Sync the cache 
         } catch (error) {
             console.error('Failed to load buckets from MinIO:', error);
             addToast('Error loading buckets.', 'error');
