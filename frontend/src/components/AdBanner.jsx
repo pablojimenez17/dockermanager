@@ -12,7 +12,7 @@ const AdBanner = () => {
     }, []);
 
     return (
-        <div className="w-full bg-[#030305] rounded-sm p-3 flex flex-col items-center justify-center min-h-[120px] border border-surface-border shadow-inner relative overflow-hidden group">
+        <div className="w-full bg-gray-100 dark:bg-slate-800 rounded p-2 flex flex-col items-center justify-center min-h-[100px] border border-gray-200 dark:border-slate-700 relative overflow-hidden group">
             {/* The actual ad container would be populated by the external script */}
             <ins className="adsbygoogle"
                  style={{ display: 'block', minHeight: '90px', width: '100%' }}
@@ -22,11 +22,11 @@ const AdBanner = () => {
                  data-full-width-responsive="true"></ins>
             
             {/* Fallback text when ads are blocked or loading */}
-            <span className="text-[9px] text-slate-600 absolute opacity-30 z-0 font-display tracking-widest uppercase">Telemetry System Offline</span>
+            <span className="text-[10px] text-gray-400 dark:text-slate-500 absolute opacity-50 z-0 font-medium">Advertisement</span>
             
             {/* Upsell to remove ads on hover */}
-            <NavLink to="/app/plans" className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] bg-brand-500/10 border border-brand-500/30 px-1.5 py-0.5 rounded-sm text-brand-400 hover:bg-brand-500 hover:text-white font-semibold z-10 font-display uppercase tracking-wider">
-                Remove
+            <NavLink to="/app/plans" className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 px-2 py-0.5 rounded text-gray-500 dark:text-slate-300 hover:text-brand-600 dark:hover:text-brand-400 font-medium z-10 shadow-sm">
+                Remove ads
             </NavLink>
         </div>
     );

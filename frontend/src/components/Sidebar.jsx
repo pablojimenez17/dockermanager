@@ -38,30 +38,30 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     const navGroups = [
         {
             title: 'Overview',
-            icon: <LayoutDashboard size={18} />,
+            icon: <LayoutDashboard size={18} strokeWidth={1.5} />,
             items: [
-                { name: 'Dashboard', path: '/app', icon: <LayoutDashboard size={18} /> },
+                { name: 'Dashboard', path: '/app', icon: <LayoutDashboard size={16} strokeWidth={1.5} /> },
             ]
         },
         {
             title: 'Deployments',
-            icon: <Rocket size={18} />,
+            icon: <Rocket size={18} strokeWidth={1.5} />,
             items: [
-                { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={18} /> },
-                { name: 'Deploy from Git', path: '/app/git-deploy', icon: <GitBranch size={18} /> },
-                { name: 'Templates', path: '/app/marketplace', icon: <Briefcase size={18} /> },
+                { name: 'Create Container', path: '/app/create', icon: <PlusSquare size={16} strokeWidth={1.5} /> },
+                { name: 'Deploy from Git', path: '/app/git-deploy', icon: <GitBranch size={16} strokeWidth={1.5} /> },
+                { name: 'Templates', path: '/app/marketplace', icon: <Briefcase size={16} strokeWidth={1.5} /> },
             ]
         },
         {
             title: 'Resources',
-            icon: <HardDrive size={18} />,
+            icon: <HardDrive size={18} strokeWidth={1.5} />,
             items: [
-                { name: 'View Containers', path: '/app/containers', icon: <Server size={20} /> },
-                { name: 'Volumes', path: '/app/volumes', icon: <HardDrive size={20} /> },
-                { name: 'Snapshots', path: '/app/snapshots', icon: <Camera size={20} /> },
-                { name: 'Networks', path: '/app/networks', icon: <Network size={20} /> },
-                { name: 'Secret Manager', path: '/app/secrets', icon: <Lock size={18} /> },
-                { name: 'Private Registries', path: '/app/registries', icon: <ShieldCheck size={18} /> },
+                { name: 'Instances', path: '/app/containers', icon: <Server size={16} strokeWidth={1.5} /> },
+                { name: 'Volumes', path: '/app/volumes', icon: <HardDrive size={16} strokeWidth={1.5} /> },
+                { name: 'Snapshots', path: '/app/snapshots', icon: <Camera size={16} strokeWidth={1.5} /> },
+                { name: 'Networks', path: '/app/networks', icon: <Network size={16} strokeWidth={1.5} /> },
+                { name: 'Secret Manager', path: '/app/secrets', icon: <Lock size={16} strokeWidth={1.5} /> },
+                { name: 'Private Registries', path: '/app/registries', icon: <ShieldCheck size={16} strokeWidth={1.5} /> },
             ]
         }
     ];
@@ -69,38 +69,35 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     if (role === 'admin') {
         navGroups.push({
             title: 'Platform',
-            icon: <ShieldAlert size={18} />,
+            icon: <ShieldAlert size={18} strokeWidth={1.5} />,
             items: [
-                { name: 'Administration', path: '/app/admin', icon: <ShieldAlert size={18} /> },
+                { name: 'Administration', path: '/app/admin', icon: <ShieldAlert size={16} strokeWidth={1.5} /> },
             ]
         });
     }
 
     const userGroup = {
         title: 'User',
-        icon: <Settings size={18} />,
+        icon: <Settings size={18} strokeWidth={1.5} />,
         items: [
-            { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={18} /> },
-            { name: 'Settings', path: '/app/settings', icon: <Settings size={18} /> },
+            { name: 'Billing & Plans', path: '/app/plans', icon: <CreditCard size={16} strokeWidth={1.5} /> },
+            { name: 'Settings', path: '/app/settings', icon: <Settings size={16} strokeWidth={1.5} /> },
         ]
     };
 
     if (shouldShowOrgSetup) {
-        // Insert org settings before regular settings
-        userGroup.items.splice(1, 0, { name: 'Org Settings', path: '/app/organization', icon: <Building2 size={18} /> });
+        userGroup.items.splice(1, 0, { name: 'Org Settings', path: '/app/organization', icon: <Building2 size={16} strokeWidth={1.5} /> });
     }
 
     navGroups.push(userGroup);
 
-    // Helper to determine if a group should be open by default based on current path
     const isGroupActive = (items) => {
         return items.some(item => location.pathname === item.path || (item.path !== '/app' && location.pathname.startsWith(item.path)));
     };
 
-    // State for open accordions
     const [openGroups, setOpenGroups] = useState(
         navGroups.reduce((acc, group, index) => {
-            acc[index] = isGroupActive(group.items) || index === 0; // Open if active or if it's the first group
+            acc[index] = isGroupActive(group.items) || index === 0;
             return acc;
         }, {})
     );
@@ -110,35 +107,35 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     };
 
     return (
-        <div className={`w-64 panel-glass border-r-0 metallic-edge flex flex-col h-full shadow-[4px_0_32px_rgba(0,0,0,0.5)] transition-transform duration-aero ease-in-out overflow-hidden z-40 fixed md:relative left-0 top-0 bottom-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-            <div className="p-6 flex items-center justify-between shrink-0 border-b border-surface-border/50">
-                <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 bg-brand-500/10 flex items-center justify-center border border-brand-500/30 text-brand-500 shadow-hud">
-                        <Aperture size={20} className="animate-[spin_10s_linear_infinite]" />
+        <div className={`w-64 bg-gray-50 dark:bg-slate-900 border-r border-gray-200 dark:border-slate-700 flex flex-col h-full transition-transform duration-200 ease-in-out z-40 fixed md:relative left-0 top-0 bottom-0 ${isOpen ? 'translate-x-0 shadow-xl' : '-translate-x-full md:translate-x-0'}`}>
+            <div className="h-14 flex items-center justify-between px-4 shrink-0 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+                <div className="flex items-center space-x-2">
+                    <div className="text-brand-600 dark:text-brand-500">
+                        <Aperture size={20} strokeWidth={2} />
                     </div>
-                    <span className="text-xl font-display font-bold text-white whitespace-nowrap tracking-wider uppercase">Orbit</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight">OrbitCloud</span>
                 </div>
                 {/* Mobile Close Button */}
                 <button
                     onClick={() => setIsOpen(false)}
-                    className="md:hidden p-2 rounded bg-surface border border-surface-border text-slate-400 hover:text-white active:scale-95 transition-aero"
+                    className="md:hidden p-1.5 rounded text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"
                 >
-                    <X size={20} />
+                    <X size={18} />
                 </button>
             </div>
 
             {shouldShowOrgSetup && (
-                <div className="px-4 mt-4">
+                <div className="px-4 mt-4 hidden md:block">
                     <OrgSwitcher />
                 </div>
             )}
 
-            <nav className="flex-1 px-3 space-y-2 mt-4 overflow-y-auto pb-4 custom-scrollbar">
+            <nav className="flex-1 px-2 space-y-1 mt-4 overflow-y-auto pb-4 custom-scrollbar">
                 {navGroups.map((group, index) => (
                     <div key={group.title} className="mb-2">
                         <button
                             onClick={() => toggleGroup(index)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-xs font-display font-semibold text-slate-500 hover:text-white transition-colors uppercase tracking-[0.1em] group"
+                            className="w-full flex items-center justify-between px-2 py-1.5 text-xs font-semibold text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white uppercase tracking-wider transition-colors group"
                         >
                             <div className="flex items-center space-x-2">
                                 {group.icon}
@@ -146,12 +143,13 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                             </div>
                             <ChevronDown
                                 size={14}
-                                className={`transform transition-transform duration-300 ${openGroups[index] ? 'rotate-180 text-brand-500' : ''}`}
+                                strokeWidth={1.5}
+                                className={`transform transition-transform duration-200 ${openGroups[index] ? 'rotate-180 text-gray-700 dark:text-slate-300' : ''}`}
                             />
                         </button>
 
-                        <div className={`overflow-hidden transition-all duration-aero ease-in-out ${openGroups[index] ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
-                            <div className="space-y-1 pl-2 border-l border-surface-border ml-4 py-1">
+                        <div className={`overflow-hidden transition-all duration-200 ease-in-out ${openGroups[index] ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                            <div className="space-y-0.5 ml-3 pl-2 border-l border-gray-200 dark:border-slate-700 py-1">
                                 {group.items.map((item) => (
                                     <NavLink
                                         key={item.name}
@@ -162,14 +160,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                                             if (window.innerWidth < 768) setIsOpen(false);
                                         }}
                                         className={({ isActive }) =>
-                                            `flex items-center space-x-3 px-3 py-2.5 transition-all duration-300 ease-out ${isActive
-                                                ? 'bg-brand-500/10 text-white border-l-[3px] border-brand-500 shadow-hud'
-                                                : 'text-slate-400 hover:bg-surface-hover hover:text-slate-200 border-l-[3px] border-transparent hover:border-surface-border'
+                                            `flex items-center space-x-3 px-3 py-2 transition-colors rounded-sm text-sm ${isActive
+                                                ? 'bg-blue-50 dark:bg-slate-800 text-brand-600 dark:text-brand-400 border-l-[3px] border-brand-600 dark:border-brand-500 font-medium'
+                                                : 'text-gray-600 dark:text-slate-400 hover:bg-gray-100 dark:hover:bg-slate-800 hover:text-gray-900 dark:hover:text-slate-200 border-l-[3px] border-transparent'
                                             }`
                                         }
                                     >
-                                        <div className={`${({isActive}) => isActive ? 'text-brand-400' : 'opacity-80'}`}>{item.icon}</div>
-                                        <span className="font-medium text-sm truncate tracking-wide">{item.name}</span>
+                                        <div className={`${({isActive}) => isActive ? 'text-brand-600' : 'opacity-80'}`}>{item.icon}</div>
+                                        <span className="truncate">{item.name}</span>
                                     </NavLink>
                                 ))}
                             </div>
@@ -184,27 +182,35 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 </div>
             )}
 
-            <div className="p-4 border-t border-surface-border space-y-2 shrink-0 bg-surface/30">
+            <div className="p-3 border-t border-gray-200 dark:border-slate-700 space-y-1 shrink-0 bg-white dark:bg-slate-800">
                 <button
                     onClick={() => setIsInvitesModalOpen(true)}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-400 hover:bg-surface-hover hover:text-white transition-all duration-300 relative group"
+                    className="flex items-center space-x-3 px-3 py-2 w-full text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white rounded transition-colors relative group text-sm"
                 >
-                    <Bell size={18} className="group-hover:text-brand-400 transition-colors" />
-                    <span className="font-medium text-sm tracking-wide">Notifications</span>
+                    <Bell size={16} strokeWidth={1.5} className="group-hover:text-brand-600 transition-colors" />
+                    <span>Notifications</span>
                     {unreadCount > 0 && (
-                        <span className="absolute right-4 bg-brand-600 border border-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-hud flex items-center justify-center animate-pulse">
+                        <span className="absolute right-3 bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded">
                             {unreadCount}
                         </span>
                     )}
                 </button>
                 
-                {/* Theme toggle removed as requested to stick to Dark mode/Cockpit feel, or keep it but force dark icons */}
+                {/* Theme Toggle Added Back */}
+                <button
+                    onClick={toggleTheme}
+                    className="flex items-center space-x-3 px-3 py-2 w-full text-gray-600 dark:text-slate-400 hover:bg-gray-50 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white rounded transition-colors text-sm group"
+                >
+                    {theme === 'dark' ? <Sun size={16} strokeWidth={1.5} className="group-hover:text-amber-500" /> : <Moon size={16} strokeWidth={1.5} className="group-hover:text-indigo-500" />}
+                    <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                </button>
+
                 <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-400 hover:bg-brand-900/40 hover:text-brand-400 hover:border-l-2 hover:border-brand-500 transition-all duration-300 group"
+                    className="flex items-center space-x-3 px-3 py-2 w-full text-gray-600 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-500/10 hover:text-red-600 dark:hover:text-red-400 rounded transition-colors group text-sm"
                 >
-                    <LogOut size={18} className="group-hover:text-brand-500 transition-colors" />
-                    <span className="font-medium text-sm tracking-wide">Disconnect</span>
+                    <LogOut size={16} strokeWidth={1.5} className="group-hover:text-red-500 transition-colors" />
+                    <span>Disconnect</span>
                 </button>
             </div>
 
@@ -214,4 +220,3 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
 };
 
 export default Sidebar;
-
