@@ -6,22 +6,41 @@ const AdBanner = () => {
     const pushed = useRef(false);
 
     useEffect(() => {
-        // Guard: only push once per mount, prevents StrictMode double-invoke error
-        if (pushed.current) return;
-        // Guard: only push if the ins element hasn't been filled yet
-        if (adRef.current && adRef.current.dataset.adsbygoogleStatus) return;
+        const el = adRef.current;
+        if (!el || pushed.current) return;
 
-        try {
-            (window.adsbygoogle = window.adsbygoogle || []).push({});
-            pushed.current = true;
-        } catch (e) {
-            console.error("AdSense error", e);
+        // AdSense needs a non-zero width to render. The sidebar might not
+        // be laid out yet when this effect first runs, so we observe until
+        // the element actually has width before calling push().
+        const tryPush = () => {
+            if (pushed.current) return;
+            if (el.dataset.adsbygoogleStatus) return; // already filled
+            if (el.offsetWidth === 0) return; // not visible yet
+
+            try {
+                (window.adsbygoogle = window.adsbygoogle || []).push({});
+                pushed.current = true;
+            } catch (e) {
+                // Silently ignore — ad blockers or duplicate push errors
+            }
+        };
+
+        // Try immediately in case layout is already done
+        tryPush();
+
+        // If it didn't work, observe for resize (sidebar expand, etc.)
+        if (!pushed.current) {
+            const observer = new ResizeObserver(() => {
+                tryPush();
+                if (pushed.current) observer.disconnect();
+            });
+            observer.observe(el);
+            return () => observer.disconnect();
         }
     }, []);
 
     return (
         <div className="w-full bg-gray-100 dark:bg-slate-800 rounded p-2 flex flex-col items-center justify-center min-h-[100px] border border-gray-200 dark:border-slate-700 relative overflow-hidden group">
-            {/* The actual ad container would be populated by the external script */}
             <ins className="adsbygoogle"
                  ref={adRef}
                  style={{ display: 'block', minHeight: '90px', width: '100%' }}
@@ -42,3 +61,4 @@ const AdBanner = () => {
 };
 
 export default AdBanner;
+
