@@ -37,7 +37,6 @@ const ViewContainers = () => {
 
     const { addToast } = useToast();
 
-    // We use a ref to hold the latest containers so socket closures can read it
     const containersRef = useRef([]);
     useEffect(() => { containersRef.current = containers; }, [containers]);
 
@@ -47,7 +46,6 @@ const ViewContainers = () => {
             const res = await axios.get('/api/containers');
             setContainers(res.data);
 
-            // Also fetch basic user profile for limits
             const userRes = await axios.get('/api/auth/me', {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
@@ -64,25 +62,17 @@ const ViewContainers = () => {
 
     useEffect(() => {
         fetchContainers();
-        const interval = setInterval(fetchContainers, 30000); // Poll every 30s
+        const interval = setInterval(fetchContainers, 30000);
 
-        // Setup Real-time Docker events socket
         const socket = io('', { withCredentials: true });
 
         socket.on('container:status_change', ({ dockerId, status }) => {
-            console.log('[React Socket] Received container event:', dockerId, status);
             const currentContainers = containersRef.current;
             const target = currentContainers.find(c => dockerId.includes(c.dockerId) || c.dockerId.includes(dockerId));
 
             if (target) {
                 if (status === 'die') {
-                    addToast(
-                        'Container Crashed',
-                        `Container ${target.name} stopped unexpectedly.`,
-                        'error',
-                        'View Crash Logs',
-                        () => fetchLogs(target._id, target.name)
-                    );
+                    addToast('Container Crashed', `Container ${target.name} stopped unexpectedly.`, 'error');
                 } else if (status === 'stop') {
                     addToast('Container Stopped', `${target.name} has been stopped.`, 'warning');
                 } else if (status === 'start' || status === 'unpause') {
@@ -113,18 +103,18 @@ const ViewContainers = () => {
 
             const endpoint = action === 'delete'
                 ? `/api/containers/${id}`
-                : `/api/containers/${id}/${action}`; // action 'stop'
+                : `/api/containers/${id}/${action}`; 
 
             const method = action === 'delete' ? 'delete' : 'post';
 
             await axios[method](endpoint, action === 'delete' ? {} : {});
 
             if (action === 'start') {
-                addToast('Container Started', `${cName} successfully started.`, 'success');
+                addToast('Engine Started', `${cName} is online.`, 'success');
             } else if (action === 'stop') {
-                addToast('Container Stopped', `${cName} successfully stopped.`, 'warning');
+                addToast('Engine Stopped', `${cName} successfully shut down.`, 'warning');
             } else if (action === 'delete') {
-                addToast('Container Deleted', `${cName} has been permanently deleted.`, 'error');
+                addToast('Instance Terminated', `${cName} has been permanently erased.`, 'error');
             }
 
             fetchContainers();
@@ -136,11 +126,11 @@ const ViewContainers = () => {
 
     const handleRedeploy = async (id, name, image) => {
         try {
-            addToast('Redeploy Started', `Pulling latest ${image} and spawning Green container for ${name}...`, 'info');
+            addToast('Redeploy Sequence Initiated', `Pulling latest ${image} and spawning replacement for ${name}...`, 'info');
 
             await axios.put(`/api/containers/${id}/redeploy`, {});
 
-            addToast('Zero-Downtime Success', `${name} is now running the latest version. Old container removed.`, 'success');
+            addToast('Zero-Downtime Success', `${name} is now running the latest version. Old instance decoupled.`, 'success');
             fetchContainers();
         } catch (err) {
             console.error(`Error redeploying container ${id}`, err);
@@ -151,7 +141,6 @@ const ViewContainers = () => {
     const openEditModal = (container) => {
         setEditingContainer(container);
         setEditDomain(container.domain || '');
-        // We try to guess the exposed port if it had one, or default to 80
         const guessedPort = container.ports && Object.keys(container.ports).length > 0
             ? Object.keys(container.ports)[0].split('/')[0]
             : '80';
@@ -162,7 +151,7 @@ const ViewContainers = () => {
     const submitEdit = async (e) => {
         e.preventDefault();
         try {
-            addToast('Updating Container', `Applying network settings for ${editingContainer.name}...`, 'info');
+            addToast('Updating Network Config', `Applying routing rules for ${editingContainer.name}...`, 'info');
             setEditModalOpen(false);
 
             await axios.put(`/api/containers/${editingContainer._id}/edit`, {
@@ -170,7 +159,7 @@ const ViewContainers = () => {
                 domainPort: editPort
             });
 
-            addToast('Update Successful', 'Container routing settings updated.', 'success');
+            addToast('Route Established', 'Container proxy settings updated.', 'success');
             fetchContainers();
         } catch (err) {
             console.error('Error editing container:', err);
@@ -192,7 +181,7 @@ const ViewContainers = () => {
     const submitSnapshot = async (e) => {
         e.preventDefault();
         try {
-            addToast('Creating Snapshot', `Committing image for ${snapshotContainer.name}. This may take a few seconds...`, 'info');
+            addToast('Committing Snapshot', `Creating image blueprint for ${snapshotContainer.name}. This may take a few seconds...`, 'info');
             setSnapshotModalOpen(false);
 
             await axios.post(`/api/containers/${snapshotContainer.dockerId}/snapshot`, {
@@ -201,7 +190,7 @@ const ViewContainers = () => {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
 
-            addToast('Snapshot Saved', `Successfully created image ${snapshotName}`, 'success');
+            addToast('Snapshot Saved', `Successfully stored image blueprint ${snapshotName}`, 'success');
         } catch (err) {
             console.error('Error creating snapshot:', err);
             addToast('Snapshot Failed', err.response?.data?.message || 'Could not commit image.', 'error');
@@ -209,7 +198,6 @@ const ViewContainers = () => {
     };
 
     const fetchLogs = async (id, name) => {
-        // Now opens the realtime WebSocket modal instead of the old static fetch
         setLiveLogsTerminal({ id, name });
     };
 
@@ -227,180 +215,149 @@ const ViewContainers = () => {
         }
     };
 
-    const renderLogLine = (line, index) => {
-        if (logSearchQuery && !line.toLowerCase().includes(logSearchQuery.toLowerCase())) {
-            return null;
-        }
-
-        let textColorClass = 'text-slate-800 dark:text-slate-300';
-        const lowerLine = line.toLowerCase();
-
-        if (lowerLine.includes('error') || lowerLine.includes('exception') || lowerLine.includes('fail')) {
-            textColorClass = 'text-red-600 dark:text-red-400 font-semibold bg-red-500/10';
-        } else if (lowerLine.includes('warn')) {
-            textColorClass = 'text-yellow-600 dark:text-yellow-400 font-semibold bg-yellow-500/10';
-        } else if (lowerLine.includes('info')) {
-            textColorClass = 'text-blue-600 dark:text-blue-400';
-        } else if (lowerLine.includes('debug')) {
-            textColorClass = 'text-slate-500 dark:text-slate-500';
-        }
-
-        return (
-            <div key={index} className={`px-2 py-0.5 rounded ${textColorClass} break-words`}>
-                {line}
-            </div>
-        );
-    };
-
     return (
-        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-7xl mx-auto">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 space-y-4 sm:space-y-0">
+        <div className="p-4 md:p-8 pb-20 text-slate-200 max-w-7xl mx-auto">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-10 space-y-4 sm:space-y-0 reveal">
                 <div>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">My Containers</h1>
-                    <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Manage and monitor your deployed instances.</p>
+                    <h1 className="text-3xl sm:text-5xl font-display font-bold tracking-tighter mb-3 uppercase text-white drop-shadow-md">Active <span className="text-brand-500">Fleet</span></h1>
+                    <p className="text-slate-400 text-base sm:text-lg uppercase tracking-widest font-semibold">Monitor and command your deployed instances.</p>
                 </div>
                 <div className="flex w-full sm:w-auto space-x-3">
-
                     <button
                         onClick={fetchContainers}
                         disabled={refreshing}
-                        className="bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 dark:bg-slate-800 dark:hover:bg-slate-700 dark:border-slate-700 dark:text-slate-300 p-3 rounded-xl transition-all"
+                        className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 p-3 rounded-sm shadow-inner transition-aero"
                     >
-                        <RefreshCw size={24} className={refreshing ? 'animate-spin' : ''} />
+                        <RefreshCw size={24} className={refreshing ? 'animate-spin text-brand-500' : ''} />
                     </button>
                 </div>
-
             </div>
 
             {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-2xl flex items-center mb-8">
+                <div className="bg-rose-500/10 border border-rose-500/50 text-rose-500 p-4 rounded-sm flex items-center mb-8 shadow-[0_0_15px_rgba(244,63,94,0.1)]">
                     <AlertTriangle className="mr-3" />
-                    {error}
+                    <span className="font-display text-sm tracking-wider uppercase">{error}</span>
                 </div>
             )}
 
             {loading ? (
-                <div className="flex justify-center py-20">
-                    <RefreshCw size={48} className="animate-spin text-brand-500" />
+                <div className="flex justify-center py-20 reveal">
+                    <RefreshCw size={48} className="animate-[spin_2s_linear_infinite] text-brand-500/50" />
                 </div>
             ) : containers.length === 0 ? (
-                <div className="text-center py-20 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl">
-                    <Server size={64} className="mx-auto text-slate-400 dark:text-slate-600 mb-6" />
-                    <h3 className="text-2xl font-bold mb-2 text-slate-900 dark:text-white">No containers found</h3>
-                    <p className="text-slate-600 dark:text-slate-400">You haven't deployed any containers yet.</p>
+                <div className="text-center py-20 panel-glass rounded-sm border-dashed border-surface-border reveal">
+                    <Server size={64} className="mx-auto text-slate-600 mb-6 stroke-[1px]" />
+                    <h3 className="text-2xl font-display font-bold mb-2 text-white uppercase tracking-wider">No instances online</h3>
+                    <p className="text-slate-500 tracking-wide">You haven't initiated any deployments yet.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 reveal" style={{ animationDelay: '0.1s' }}>
                     {containers.map(container => (
-                        <div key={container._id} className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-lg hover:shadow-xl hover:-translate-y-1 hover:border-brand-400/50 dark:hover:border-brand-500/50 transition-all duration-300">
+                        <div key={container._id} className="panel-glass rounded-sm p-6 group hover:border-brand-500/30 hover:shadow-hud transition-aero duration-500">
                             <div className="flex justify-between items-start mb-6">
                                 <div className="flex items-center space-x-4 flex-1 min-w-0 pr-4">
-                                    <div className={`p-4 rounded-2xl shrink-0 ${container.state === 'running' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400'
+                                    <div className={`p-4 rounded-sm shrink-0 border shadow-inner transition-colors duration-500 ${container.state === 'running' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]' : 'bg-rose-500/10 text-rose-400 border-rose-500/30 shadow-[0_0_10px_rgba(244,63,94,0.2)]'
                                         }`}>
-                                        {container.state === 'running' ? <Activity size={28} /> : <Square size={28} />}
+                                        {container.state === 'running' ? <Activity size={24} /> : <Square size={24} />}
                                     </div>
                                     <div className="min-w-0 flex-1">
-                                        <h3 className="text-xl font-bold text-slate-900 dark:text-white truncate" title={container.name}>{container.name}</h3>
-                                        <p className="text-slate-500 dark:text-slate-400 font-mono text-sm mt-1 truncate" title={container.image}>{container.image}</p>
+                                        <h3 className="text-xl font-display font-bold text-white truncate uppercase tracking-widest" title={container.name}>{container.name}</h3>
+                                        <p className="text-brand-400/80 font-mono text-xs mt-2 truncate tracking-widest" title={container.image}>{container.image}</p>
                                     </div>
                                 </div>
-                                <div className="flex items-center space-x-3 shrink-0">
+                                <div className="flex items-center space-x-2 shrink-0">
                                     <button
                                         onClick={() => openSnapshotModal(container)}
-                                        className="p-2 text-slate-400 hover:text-indigo-500 bg-slate-50 hover:bg-indigo-50 dark:bg-slate-800 dark:hover:bg-indigo-500/10 rounded-xl transition-all"
-                                        title="Snapshot / Backup to Image"
+                                        className="p-2 text-slate-400 hover:text-indigo-400 bg-surface border border-surface-border hover:border-indigo-500/50 rounded-sm transition-aero shadow-inner"
+                                        title="Snapshot Blueprint"
                                     >
-                                        <Camera size={20} />
+                                        <Camera size={18} />
                                     </button>
                                     <button
                                         onClick={() => openEditModal(container)}
-                                        className="p-2 text-slate-400 hover:text-brand-500 bg-slate-50 hover:bg-brand-50 dark:bg-slate-800 dark:hover:bg-brand-500/10 rounded-xl transition-all"
-                                        title="Settings / Expose to Internet"
+                                        className="p-2 text-slate-400 hover:text-brand-400 bg-surface border border-surface-border hover:border-brand-500/50 rounded-sm transition-aero shadow-inner"
+                                        title="Network Routing"
                                     >
-                                        <Settings size={20} />
+                                        <Settings size={18} />
                                     </button>
-                                    <div className={`px-4 py-1.5 rounded-full text-sm font-semibold border ${container.state === 'running' ? 'bg-emerald-50 border-emerald-200 text-emerald-600 dark:bg-emerald-900/30 dark:border-emerald-500/50 dark:text-emerald-400' : 'bg-rose-50 border-rose-200 text-rose-600 dark:bg-rose-900/30 dark:border-rose-500/50 dark:text-rose-400'
-                                        }`}>
-                                        {container.state ? container.state.toUpperCase() : 'UNKNOWN'}
-                                    </div>
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4 mb-6">
-                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-                                    <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Ports Exposed</p>
-                                    <p className="font-mono text-sm text-slate-800 dark:text-slate-300">
+                                <div className="bg-surface/50 rounded-sm p-4 border border-surface-border shadow-inner">
+                                    <p className="text-[10px] text-slate-500 mb-2 font-display uppercase tracking-[0.2em]">Exposed Ports</p>
+                                    <p className="font-mono text-sm text-slate-300">
                                         {container.ports && Object.keys(container.ports).length > 0
                                             ? Object.keys(container.ports).join(', ')
-                                            : 'None'}
+                                            : 'NO_ROUTES_MAPPED'}
                                     </p>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
-                                    <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Docker ID</p>
-                                    <p className="font-mono text-sm truncate text-slate-800 dark:text-slate-300" title={container.dockerId}>
-                                        {container.dockerId.substring(0, 12)}...
+                                <div className="bg-surface/50 rounded-sm p-4 border border-surface-border shadow-inner">
+                                    <p className="text-[10px] text-slate-500 mb-2 font-display uppercase tracking-[0.2em]">Instance ID</p>
+                                    <p className="font-mono text-sm truncate text-slate-300" title={container.dockerId}>
+                                        {container.dockerId.substring(0, 12)}
                                     </p>
                                 </div>
                             </div>
 
                             {/* Expandable Details Section */}
                             {expandedContainers[container._id] && (
-                                <div className="mt-4 mb-6 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700/50 rounded-2xl p-5 shadow-[inset_0_2px_10px_rgba(0,0,0,0.02)] transition-all animate-in fade-in slide-in-from-top-4 duration-300">
-                                    <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 border-b border-slate-200 dark:border-slate-700/50 pb-2">Advanced Instance Details</h4>
+                                <div className="mt-4 mb-6 bg-surface border border-surface-border rounded-sm p-5 shadow-inner transition-aero">
+                                    <h4 className="text-xs font-display font-bold text-white mb-6 border-b border-surface-border pb-3 uppercase tracking-widest text-brand-400">Diagnostic Telemetry</h4>
 
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div>
-                                            <p className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2"><Network size={14} className="mr-1.5" /> Networking</p>
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-600 dark:text-slate-400">Internal IP / v4:</span>
-                                                    <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300">
-                                                        {containerStats[container._id]?.ipv4Address || container.ipv4Address || 'N/A'}
+                                            <p className="flex items-center text-[10px] font-display text-slate-500 uppercase tracking-[0.2em] mb-4"><Network size={14} className="mr-2" /> Route Vector</p>
+                                            <div className="space-y-4">
+                                                <div className="flex justify-between items-center text-sm border-b border-surface-border/50 pb-2">
+                                                    <span className="text-slate-400 text-xs uppercase tracking-widest">Internal IP</span>
+                                                    <span className="font-mono text-brand-300">
+                                                        {containerStats[container._id]?.ipv4Address || container.ipv4Address || 'OFFLINE'}
                                                     </span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-sm">
-                                                    <span className="text-slate-600 dark:text-slate-400">Network Mode:</span>
-                                                    <span className="font-mono bg-white dark:bg-slate-800 px-2 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-300">
-                                                        {containerStats[container._id]?.networkMode || container.networkMode || 'bridge'}
+                                                <div className="flex justify-between items-center text-sm border-b border-surface-border/50 pb-2">
+                                                    <span className="text-slate-400 text-xs uppercase tracking-widest">Topology</span>
+                                                    <span className="font-mono text-brand-300">
+                                                        {containerStats[container._id]?.networkMode || container.networkMode || 'isolated'}
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         <div>
-                                            <p className="flex items-center text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2"><HardDrive size={14} className="mr-1.5" /> Hardware Usage</p>
+                                            <p className="flex items-center text-[10px] font-display text-slate-500 uppercase tracking-[0.2em] mb-4"><HardDrive size={14} className="mr-2" /> Hardware Allocation</p>
                                             {container.state === 'running' ? (
                                                 containerStats[container._id] ? (
-                                                    <div className="space-y-3">
+                                                    <div className="space-y-4">
                                                         <div>
-                                                            <div className="flex justify-between items-center text-xs mb-1">
-                                                                <span className="text-slate-600 dark:text-slate-400">CPU</span>
-                                                                <span className="font-semibold text-indigo-600 dark:text-indigo-400">{containerStats[container._id].cpuPercent}%</span>
+                                                            <div className="flex justify-between items-center text-[10px] uppercase tracking-widest mb-2 font-display">
+                                                                <span className="text-slate-400">Core Threads</span>
+                                                                <span className="font-bold text-indigo-400">{containerStats[container._id].cpuPercent}%</span>
                                                             </div>
-                                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                                                                <div className="bg-indigo-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${Math.min(containerStats[container._id].cpuPercent, 100)}%` }}></div>
+                                                            <div className="w-full bg-[#030305] border border-surface-border rounded-sm h-1.5 overflow-hidden">
+                                                                <div className="bg-indigo-500 h-1.5 transition-all duration-1000 shadow-[0_0_8px_rgba(99,102,241,0.8)]" style={{ width: `${Math.min(containerStats[container._id].cpuPercent, 100)}%` }}></div>
                                                             </div>
                                                         </div>
                                                         <div>
-                                                            <div className="flex justify-between items-center text-xs mb-1">
-                                                                <span className="text-slate-600 dark:text-slate-400">Memory</span>
-                                                                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                                                            <div className="flex justify-between items-center text-[10px] uppercase tracking-widest mb-2 font-display">
+                                                                <span className="text-slate-400">Memory Matrix</span>
+                                                                <span className="font-bold text-emerald-400">
                                                                     {(containerStats[container._id].memUsage / 1024 / 1024).toFixed(1)} MB / {(containerStats[container._id].memLimit / 1024 / 1024).toFixed(0)} MB
                                                                 </span>
                                                             </div>
-                                                            <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 overflow-hidden">
-                                                                <div className="bg-emerald-500 h-1.5 rounded-full transition-all duration-1000" style={{ width: `${containerStats[container._id].memPercent}%` }}></div>
+                                                            <div className="w-full bg-[#030305] border border-surface-border rounded-sm h-1.5 overflow-hidden">
+                                                                <div className="bg-emerald-500 h-1.5 transition-all duration-1000 shadow-[0_0_8px_rgba(16,185,129,0.8)]" style={{ width: `${containerStats[container._id].memPercent}%` }}></div>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div className="text-sm text-slate-500 flex items-center h-full">
-                                                        <RefreshCw className="animate-spin mr-2" size={14} /> Loading metrics...
+                                                    <div className="text-[10px] uppercase tracking-widest font-display text-brand-500 flex items-center h-full">
+                                                        <RefreshCw className="animate-spin mr-2" size={14} /> Synchronizing Data...
                                                     </div>
                                                 )
                                             ) : (
-                                                <div className="text-sm text-slate-400 dark:text-slate-500 h-full flex items-center italic">
-                                                    Container is not running.
+                                                <div className="text-[10px] uppercase tracking-widest font-display text-rose-500/80 h-full flex items-center">
+                                                    Engine Offline
                                                 </div>
                                             )}
                                         </div>
@@ -408,125 +365,52 @@ const ViewContainers = () => {
                                 </div>
                             )}
 
-                            <div className="flex flex-wrap gap-3 pt-6 border-t border-slate-200 dark:border-slate-700/50">
+                            <div className="flex flex-wrap gap-3 pt-6 border-t border-surface-border">
                                 <button
                                     onClick={() => toggleExpand(container)}
-                                    className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-400 dark:border-slate-700 rounded-xl transition-colors shrink-0"
-                                    title="View Details"
+                                    className="p-2.5 bg-surface hover:bg-surface-hover text-slate-400 border border-surface-border rounded-sm transition-aero shrink-0"
+                                    title="Diagnostics"
                                 >
-                                    {expandedContainers[container._id] ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                    {expandedContainers[container._id] ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                                 </button>
 
                                 {container.state === 'running' ? (
                                     <>
                                         <button
                                             onClick={() => handleAction(container._id, 'stop')}
-                                            className="group relative flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            className="flex-1 min-w-[100px] bg-amber-500/10 hover:bg-amber-500/20 text-amber-500 border border-amber-500/30 hover:border-amber-500 py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2"
                                         >
-                                            <Square size={16} /> <span>Stop</span>
-
-                                            {/* Custom Hover Tooltip */}
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[240px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                                    <div className="flex items-start mb-1 text-amber-400">
-                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                        <span className="font-bold">Pause Container</span>
-                                                    </div>
-                                                    <p className="text-slate-300 leading-relaxed font-normal">
-                                                        Gracefully stop the container without deleting its data. You can start it again later.
-                                                    </p>
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                                </div>
-                                            </div>
+                                            <Square size={14} /> <span>Halt</span>
                                         </button>
 
                                         <button
                                             onClick={() => setRedeployConfirm({ id: container._id, name: container.name, image: container.image })}
-                                            className="group relative flex-1 min-w-[100px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 border border-indigo-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            className="flex-1 min-w-[100px] bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:border-indigo-500 py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2"
                                         >
-                                            <RefreshCw size={16} /> <span>Redeploy</span>
-
-                                            {/* Custom Hover Tooltip */}
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[280px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                                    <div className="flex items-start mb-1 text-indigo-400">
-                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                        <span className="font-bold">Zero-Downtime Update</span>
-                                                    </div>
-                                                    <p className="text-slate-300 leading-relaxed font-normal mb-1.5">
-                                                        Downloads the latest app version and turns it on. Traefik seamlessly switches users to the new version without a single second of downtime, then deletes the old one.
-                                                    </p>
-                                                    <p className="text-indigo-300/80 text-[11px] leading-relaxed font-medium">
-                                                        💡 <span className="text-white">Best for:</span> Web Servers (Nginx, React) & APIs (Node, Python). <span className="text-rose-300">Do NOT use on Database containers.</span>
-                                                    </p>
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                                </div>
-                                            </div>
+                                            <RefreshCw size={14} /> <span>Cycle</span>
                                         </button>
 
                                         <button
                                             onClick={() => setActiveTerminal({ id: container.dockerId, name: container.name })}
-                                            className="group relative flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                            className="flex-1 min-w-[100px] bg-brand-500/10 hover:bg-brand-500/20 text-brand-400 border border-brand-500/30 hover:border-brand-500 hover:shadow-hud py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2"
                                         >
-                                            <MonitorPlay size={16} /> <span>Console</span>
-
-                                            {/* Custom Hover Tooltip */}
-                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[240px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                                <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                                    <div className="flex items-start mb-1 text-brand-400">
-                                                        <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                        <span className="font-bold">Terminal Access</span>
-                                                    </div>
-                                                    <p className="text-slate-300 leading-relaxed font-normal">
-                                                        Open an interactive SSH/Bash console inside the container to run commands directly.
-                                                    </p>
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                                </div>
-                                            </div>
+                                            <MonitorPlay size={14} /> <span>Link</span>
                                         </button>
                                     </>
                                 ) : (
                                     <button
                                         onClick={() => handleAction(container._id, 'start')}
-                                        className="group relative flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        className="flex-1 min-w-[100px] bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 hover:border-emerald-500 py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2 shadow-[0_0_10px_rgba(16,185,129,0.1)] hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]"
                                     >
-                                        <Play size={16} /> <span>Start</span>
-
-                                        {/* Custom Hover Tooltip */}
-                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[200px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                            <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                                <div className="flex items-start mb-1 text-emerald-400">
-                                                    <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                    <span className="font-bold">Boot Container</span>
-                                                </div>
-                                                <p className="text-slate-300 leading-relaxed font-normal">
-                                                    Turn on this stopped container.
-                                                </p>
-                                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                            </div>
-                                        </div>
+                                        <Play size={14} /> <span>Ignite</span>
                                     </button>
                                 )}
 
                                 <button
                                     onClick={() => fetchLogs(container._id, container.name)}
-                                    className="group relative flex-1 min-w-[100px] bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-white dark:border-transparent py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                    className="flex-1 min-w-[100px] bg-surface hover:bg-surface-hover text-slate-300 hover:text-white border border-surface-border hover:border-slate-500 py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2 shadow-inner"
                                 >
-                                    <Terminal size={16} /> <span>Logs</span>
-
-                                    {/* Custom Hover Tooltip */}
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[220px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                        <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                            <div className="flex items-start mb-1 text-slate-300">
-                                                <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                <span className="font-bold text-white">View Console Logs</span>
-                                            </div>
-                                            <p className="text-slate-400 leading-relaxed font-normal">
-                                                View historical runtime logs and error outputs for this container.
-                                            </p>
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                        </div>
-                                    </div>
+                                    <Terminal size={14} /> <span>Logs</span>
                                 </button>
 
                                 <button
@@ -535,23 +419,9 @@ const ViewContainers = () => {
                                             handleAction(container._id, 'delete');
                                         }
                                     }}
-                                    className="group relative flex-[2] min-w-[150px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                    className="flex-[2] min-w-[120px] bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 border border-rose-500/30 hover:border-rose-500 py-2 rounded-sm font-display text-[10px] font-bold uppercase tracking-[0.2em] transition-aero flex items-center justify-center space-x-2"
                                 >
-                                    <Trash2 size={16} /> <span>Remove</span>
-
-                                    {/* Custom Hover Tooltip */}
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 w-[260px] opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none">
-                                        <div className="bg-slate-900/95 dark:bg-black/95 backdrop-blur-md text-white text-xs rounded-xl p-3 shadow-2xl border border-slate-700/50 block text-left">
-                                            <div className="flex items-start mb-1 text-rose-400">
-                                                <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
-                                                <span className="font-bold tracking-wide">Danger Zone</span>
-                                            </div>
-                                            <p className="text-slate-300 leading-relaxed font-normal">
-                                                Permanently delete this container and its data. Unsaved files not in a Volume will be lost forever.
-                                            </p>
-                                            <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px border-4 border-transparent border-t-slate-900/95 dark:border-t-black/95"></div>
-                                        </div>
-                                    </div>
+                                    <Trash2 size={14} /> <span>Destroy</span>
                                 </button>
                             </div>
                         </div>
@@ -579,64 +449,58 @@ const ViewContainers = () => {
 
             {/* Edit / Settings Modal */}
             {editModalOpen && editingContainer && (
-                <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-5 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white flex items-center">
-                                <Settings className="mr-2 text-brand-500" /> Settings: {editingContainer.name}
+                <div className="fixed inset-0 bg-[#050508]/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+                    <div className="panel-glass w-full max-w-lg rounded-sm shadow-hud overflow-hidden animate-in fade-in zoom-in-95 duration-300">
+                        <div className="p-6 border-b border-surface-border flex justify-between items-center bg-surface/80">
+                            <h3 className="text-sm font-display font-bold text-white flex items-center uppercase tracking-widest">
+                                <Globe className="mr-3 text-brand-500" size={18} /> Network Uplink
                             </h3>
-                            <button onClick={() => setEditModalOpen(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-white p-1">
-                                <Square size={20} className="stroke-[2.5px]" />
+                            <button onClick={() => setEditModalOpen(false)} className="text-slate-500 hover:text-white transition-colors">
+                                <Square size={16} className="stroke-[2px]" />
                             </button>
                         </div>
 
-                        <form onSubmit={submitEdit} className="p-6">
-                            <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
-                                <Globe size={18} className="mr-2 text-purple-500" /> Expose to Internet
-                            </h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-5 leading-relaxed">
-                                Add a custom Traefik domain to connect this container to the public web safely.
-                                <br /> <strong className="text-amber-500">Note:</strong> Applying these settings will restart the container instantly to apply network changes.
+                        <form onSubmit={submitEdit} className="p-8">
+                            <p className="text-xs text-slate-400 mb-8 leading-relaxed font-mono">
+                                Establish a secure routing protocol to the public internet via internal Traefik gateways.
                             </p>
 
-                            <div className="space-y-4">
+                            <div className="space-y-6">
                                 <div>
-                                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                        Custom Domain URL
+                                    <label className="block text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-2">
+                                        Ingress Domain
                                     </label>
                                     <input
                                         type="text"
                                         value={editDomain}
                                         onChange={(e) => setEditDomain(e.target.value)}
-                                        placeholder="e.g., app.mydomain.com"
-                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm"
+                                        placeholder="e.g. app.orbitcloud.app"
+                                        className="w-full px-4 py-3 bg-[#030305] border border-surface-border rounded-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none text-white transition-aero text-sm font-mono shadow-inner"
                                     />
-                                    <p className="text-[10px] text-slate-500 mt-1">Leave empty to remove internet access.</p>
                                 </div>
                                 {editDomain.trim() !== '' && (
-                                    <div className="animate-fade-in">
-                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                                            Internal Container Port
+                                    <div className="animate-in fade-in">
+                                        <label className="block text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-2">
+                                            Target Port (Internal)
                                         </label>
                                         <input
                                             type="number"
                                             value={editPort}
                                             onChange={(e) => setEditPort(e.target.value)}
                                             required={editDomain.trim() !== ''}
-                                            placeholder="e.g., 80 or 3000"
-                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm"
+                                            placeholder="e.g. 80"
+                                            className="w-full px-4 py-3 bg-[#030305] border border-surface-border rounded-sm focus:border-brand-500 focus:ring-1 focus:ring-brand-500 outline-none text-white transition-aero text-sm font-mono shadow-inner"
                                         />
-                                        <p className="text-[10px] text-slate-500 mt-1">The port your app listens on inside the container.</p>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="mt-8 flex justify-end space-x-3 pt-4 border-t border-slate-100 dark:border-slate-700/50">
-                                <button type="button" onClick={() => setEditModalOpen(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors">
-                                    Cancel
+                            <div className="mt-10 flex justify-end space-x-4 pt-6 border-t border-surface-border">
+                                <button type="button" onClick={() => setEditModalOpen(false)} className="px-6 py-2 bg-surface hover:bg-surface-hover text-slate-400 border border-surface-border rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero">
+                                    Abort
                                 </button>
-                                <button type="submit" className="px-5 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-xl font-bold transition-transform active:scale-95 shadow-lg shadow-brand-500/25">
-                                    Save & Apply
+                                <button type="submit" className="px-6 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero shadow-[0_0_15px_rgba(220,38,38,0.3)]">
+                                    Establish Link
                                 </button>
                             </div>
                         </form>
@@ -646,31 +510,30 @@ const ViewContainers = () => {
 
             {/* Redeploy Confirmation Modal */}
             {redeployConfirm && (
-                <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in zoom-in-95 duration-200">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center">
-                            <AlertTriangle className="mr-3 text-amber-500" size={24} />
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                Confirm Redeployment
+                <div className="fixed inset-0 bg-[#050508]/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="panel-glass w-full max-w-md rounded-sm shadow-hud overflow-hidden border border-amber-500/30">
+                        <div className="p-6 border-b border-surface-border flex items-center bg-surface/80">
+                            <AlertTriangle className="mr-3 text-amber-500" size={20} />
+                            <h3 className="text-sm font-display font-bold text-white uppercase tracking-widest">
+                                Confirm Cycle
                             </h3>
                         </div>
-                        <div className="p-6 text-slate-600 dark:text-slate-300 space-y-4 text-sm leading-relaxed">
-                            <p>
-                                You are about to initiate a Zero-Downtime update for <strong className="text-slate-900 dark:text-white">{redeployConfirm.name}</strong> using the latest version of <code className="bg-slate-100 dark:bg-slate-900 px-1.5 py-0.5 rounded font-mono text-xs">{redeployConfirm.image}</code>.
+                        <div className="p-6 text-slate-300 space-y-4 text-sm leading-relaxed">
+                            <p className="font-mono text-xs text-slate-400">
+                                Executing Zero-Downtime update protocol for <strong className="text-white">{redeployConfirm.name}</strong>.
                             </p>
-                            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/30 p-4 rounded-xl text-amber-800 dark:text-amber-400">
-                                <h4 className="font-bold mb-2 text-amber-900 dark:text-amber-300">⚠️ Important Considerations:</h4>
-                                <ul className="list-disc pl-5 space-y-2">
-                                    <li><strong>Zero-Downtime:</strong> A Green container will boot up. Traffic switches instantly once it is healthy.</li>
-                                    <li><strong>Ephemeral Data Loss:</strong> Data stored directly inside the container filesystem (not mapped to a persistent <strong>Volume</strong>) will be permanently destroyed.</li>
-                                    <li><strong>Databases:</strong> Do not redeploy databases (MySQL, Postgres) via this method without strictly mapped volumes, or you will lose your records.</li>
+                            <div className="bg-amber-500/10 border border-amber-500/20 p-5 rounded-sm text-amber-400 shadow-inner">
+                                <h4 className="font-display text-[10px] font-bold mb-3 uppercase tracking-widest text-amber-500">Critical Warning</h4>
+                                <ul className="list-disc pl-5 space-y-2 text-xs font-mono text-amber-200/70">
+                                    <li>Data strictly inside the local container filesystem will be incinerated.</li>
+                                    <li>Do NOT cycle Database images (MySQL, Mongo) without persistent volumes mapped.</li>
                                 </ul>
                             </div>
                         </div>
-                        <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 mt-2 flex justify-end space-x-3">
+                        <div className="p-6 bg-surface/50 border-t border-surface-border flex justify-end space-x-4">
                             <button
                                 onClick={() => setRedeployConfirm(null)}
-                                className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors">
+                                className="px-6 py-2 bg-surface hover:bg-surface-hover text-slate-400 border border-surface-border rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero">
                                 Cancel
                             </button>
                             <button
@@ -678,8 +541,8 @@ const ViewContainers = () => {
                                     handleRedeploy(redeployConfirm.id, redeployConfirm.name, redeployConfirm.image);
                                     setRedeployConfirm(null);
                                 }}
-                                className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform active:scale-95 flex items-center">
-                                <RefreshCw size={18} className="mr-2" /> Yes, Redeploy Now
+                                className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero shadow-[0_0_15px_rgba(79,70,229,0.3)]">
+                                Authorize
                             </button>
                         </div>
                     </div>
@@ -688,49 +551,45 @@ const ViewContainers = () => {
 
             {/* Snapshot Modal */}
             {snapshotModalOpen && snapshotContainer && (
-                <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex items-center">
-                            <Camera className="mr-3 text-indigo-500" size={24} />
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white">
-                                Create Snapshot
+                <div className="fixed inset-0 bg-[#050508]/80 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+                    <div className="panel-glass w-full max-w-md rounded-sm shadow-hud overflow-hidden border border-indigo-500/30">
+                        <div className="p-6 border-b border-surface-border flex items-center bg-surface/80">
+                            <Camera className="mr-3 text-indigo-400" size={20} />
+                            <h3 className="text-sm font-display font-bold text-white uppercase tracking-widest">
+                                Blueprint Capture
                             </h3>
                         </div>
 
-                        <form onSubmit={submitSnapshot} className="p-6">
-                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-5 leading-relaxed">
-                                Creating a snapshot saves the current state of <strong className="text-slate-900 dark:text-white">{snapshotContainer.name}</strong> as a reusable Docker Image.
+                        <form onSubmit={submitSnapshot} className="p-8">
+                            <p className="font-mono text-xs text-slate-400 mb-6 leading-relaxed">
+                                Creating an immutable Docker Image backup for <strong className="text-white">{snapshotContainer.name}</strong>.
                             </p>
 
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
-                                Snapshot Tag Name <span className="text-red-500">*</span>
+                            <label className="block text-[10px] font-display font-bold text-slate-500 uppercase tracking-widest mb-2">
+                                Output Tag Name <span className="text-brand-500">*</span>
                             </label>
                             <input
                                 type="text"
                                 required
                                 value={snapshotName}
                                 onChange={(e) => setSnapshotName(e.target.value)}
-                                placeholder="e.g. my-app-backup:v1"
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-slate-900 dark:text-white transition-shadow text-sm font-mono"
+                                className="w-full px-4 py-3 bg-[#030305] border border-surface-border rounded-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none text-white transition-aero text-sm font-mono shadow-inner mb-4"
                             />
-                            <p className="text-[11px] text-slate-500 mt-2">
-                                Stored locally in your Docker Engine. You can deploy this exact image later exactly as it is now.
-                            </p>
 
-                            <div className="mt-8 pt-4 border-t border-slate-100 dark:border-slate-700/50 flex justify-end space-x-3">
+                            <div className="mt-8 pt-6 border-t border-surface-border flex justify-end space-x-4">
                                 <button
                                     type="button"
                                     onClick={() => setSnapshotModalOpen(false)}
-                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white rounded-xl font-medium transition-colors"
+                                    className="px-6 py-2 bg-surface hover:bg-surface-hover text-slate-400 border border-surface-border rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={!snapshotName}
-                                    className="px-5 py-2.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-xl font-bold shadow-lg shadow-indigo-500/30 transition-transform active:scale-95 flex items-center"
+                                    className="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-sm font-display text-[10px] font-bold uppercase tracking-widest transition-aero shadow-[0_0_15px_rgba(79,70,229,0.3)]"
                                 >
-                                    Save Image
+                                    Compile
                                 </button>
                             </div>
                         </form>

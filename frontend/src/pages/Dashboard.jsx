@@ -57,10 +57,9 @@ const Dashboard = () => {
         fetchSummary();
         const interval = setInterval(fetchSummary, 30000);
 
-        // Setup Real-time Docker events socket
         const socket = io('');
         socket.on('container:status_change', () => {
-            fetchSummary(); // Just refetch numbers when any container changes state globally
+            fetchSummary();
         });
 
         return () => {
@@ -70,163 +69,174 @@ const Dashboard = () => {
     }, [activeOrg]);
 
     return (
-        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white transition-colors duration-200">
-            <div className="mb-10">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Welcome back, {name}</h1>
-                <p className="text-slate-600 dark:text-slate-300 text-base sm:text-lg">Here's what's happening with your deployments today.</p>
+        <div className="p-4 md:p-8 pb-20 text-slate-200">
+            <div className="mb-14 reveal">
+                <h1 className="text-3xl sm:text-5xl font-display font-bold tracking-tighter mb-3 uppercase text-white drop-shadow-md">Telemetry <span className="text-brand-500">Overview</span></h1>
+                <p className="text-slate-400 text-base sm:text-lg uppercase tracking-widest font-semibold">Welcome back, {name} // System Status Online</p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
-                <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border border-white/80 dark:border-white/10 p-6 rounded-[2rem] shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] ring-1 ring-slate-900/5 dark:ring-white/5 relative overflow-hidden group hover:-translate-y-1 hover:border-brand-400 dark:hover:border-slate-500 hover:shadow-2xl transition-all duration-300">
-                    <div className="absolute top-0 right-0 p-6 opacity-20 text-slate-400 group-hover:scale-110 transition-transform duration-500">
-                        <Server size={64} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12 reveal" style={{ animationDelay: '0.1s' }}>
+                <div className="panel-glass p-8 rounded-sm relative overflow-hidden group hover:border-brand-500/50 hover:shadow-hud transition-aero duration-500">
+                    <div className="absolute -top-4 -right-4 p-6 opacity-5 text-slate-100 group-hover:scale-110 group-hover:opacity-10 transition-aero duration-700">
+                        <Server size={120} strokeWidth={1} />
                     </div>
-                    <div className="relative z-10">
-                        <h3 className="text-slate-700 dark:text-slate-300 font-medium mb-1 drop-shadow-sm">Total Containers</h3>
-                        <div className="text-5xl font-bold flex items-center space-x-3 text-slate-900 dark:text-white drop-shadow-md">
-                            <span>{loading ? '-' : stats.total}</span>
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                        <h3 className="text-slate-500 font-display text-xs uppercase tracking-[0.2em] mb-4">Total Fleet</h3>
+                        <div className="text-6xl font-display font-bold text-white group-hover:text-brand-100 transition-colors">
+                            {loading ? '-' : stats.total}
                         </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 h-1 bg-surface-border w-full">
+                        <div className="h-full bg-slate-500 w-full"></div>
                     </div>
                 </div>
 
-                <div className="bg-emerald-50/60 dark:bg-emerald-900/20 backdrop-blur-xl border border-emerald-200/80 dark:border-emerald-500/10 p-6 rounded-[2rem] shadow-[0_8px_32px_rgba(16,185,129,0.08)] dark:shadow-[0_8px_32px_rgba(16,185,129,0.1)] ring-1 ring-emerald-900/5 dark:ring-emerald-500/5 relative overflow-hidden group hover:-translate-y-1 hover:border-emerald-400 dark:hover:border-emerald-500 hover:shadow-2xl transition-all duration-300">
-                    <div className="absolute top-0 right-0 p-6 opacity-20 text-emerald-500 dark:text-emerald-400 group-hover:scale-110 transition-transform duration-500">
-                        <Activity size={64} />
+                <div className="panel-glass p-8 rounded-sm relative overflow-hidden group hover:border-emerald-500/50 hover:shadow-[0_0_15px_rgba(16,185,129,0.1)] transition-aero duration-500">
+                    <div className="absolute -top-4 -right-4 p-6 opacity-5 text-emerald-100 group-hover:scale-110 group-hover:opacity-10 transition-aero duration-700">
+                        <Activity size={120} strokeWidth={1} />
                     </div>
-                    <div className="relative z-10">
-                        <h3 className="text-emerald-800 dark:text-emerald-300 font-medium mb-1 drop-shadow-sm">Running</h3>
-                        <div className="text-5xl font-bold text-emerald-600 dark:text-emerald-400 flex items-center space-x-3 drop-shadow-md">
-                            <span>{loading ? '-' : stats.running}</span>
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                        <h3 className="text-emerald-500/70 font-display text-xs uppercase tracking-[0.2em] mb-4">Active Engines</h3>
+                        <div className="text-6xl font-display font-bold text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                            {loading ? '-' : stats.running}
                         </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 h-1 bg-surface-border w-full">
+                        <div className="h-full bg-emerald-500" style={{ width: stats.total > 0 ? `${(stats.running/stats.total)*100}%` : '0%' }}></div>
                     </div>
                 </div>
 
-                <div className="bg-rose-50/60 dark:bg-rose-900/20 backdrop-blur-xl border border-rose-200/80 dark:border-rose-500/10 p-6 rounded-[2rem] shadow-[0_8px_32px_rgba(244,63,94,0.08)] dark:shadow-[0_8px_32px_rgba(244,63,94,0.1)] ring-1 ring-rose-900/5 dark:ring-rose-500/5 relative overflow-hidden group hover:-translate-y-1 hover:border-rose-400 dark:hover:border-rose-500 hover:shadow-2xl transition-all duration-300">
-                    <div className="absolute top-0 right-0 p-6 opacity-20 text-rose-500 dark:text-rose-400 group-hover:scale-110 transition-transform duration-500">
-                        <Cpu size={64} />
+                <div className="panel-glass p-8 rounded-sm relative overflow-hidden group hover:border-rose-500/50 hover:shadow-[0_0_15px_rgba(244,63,94,0.1)] transition-aero duration-500">
+                    <div className="absolute -top-4 -right-4 p-6 opacity-5 text-rose-100 group-hover:scale-110 group-hover:opacity-10 transition-aero duration-700">
+                        <Cpu size={120} strokeWidth={1} />
                     </div>
-                    <div className="relative z-10">
-                        <h3 className="text-rose-800 dark:text-rose-300 font-medium mb-1 drop-shadow-sm">Stopped / Error</h3>
-                        <div className="text-5xl font-bold text-rose-600 dark:text-rose-400 flex items-center space-x-3 drop-shadow-md">
-                            <span>{loading ? '-' : stats.stopped}</span>
+                    <div className="relative z-10 flex flex-col h-full justify-between">
+                        <h3 className="text-rose-500/70 font-display text-xs uppercase tracking-[0.2em] mb-4">Offline / Faults</h3>
+                        <div className="text-6xl font-display font-bold text-rose-500 group-hover:text-rose-400 transition-colors">
+                            {loading ? '-' : stats.stopped}
                         </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 h-1 bg-surface-border w-full">
+                        <div className="h-full bg-rose-500" style={{ width: stats.total > 0 ? `${(stats.stopped/stats.total)*100}%` : '0%' }}></div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border border-white/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5 rounded-[2rem] p-6 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)]">
-                <div className="flex items-center space-x-4 mb-6">
-                    <div className="p-3 bg-brand-500 text-white rounded-[1rem] shadow-lg shadow-brand-500/30 hidden sm:block">
-                        <Navigation size={24} />
+            <div className="panel-glass rounded-sm p-8 md:p-10 mb-12 reveal" style={{ animationDelay: '0.2s' }}>
+                <div className="flex items-center space-x-4 mb-8 border-b border-surface-border pb-4">
+                    <div className="p-2 bg-brand-500/20 text-brand-500 rounded-sm border border-brand-500/30">
+                        <Navigation size={20} />
                     </div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white drop-shadow-sm">Quick Actions</h2>
+                    <h2 className="text-xl font-display font-bold text-white uppercase tracking-widest">Command Center</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Link to="/app/create" className="p-6 bg-white/60 dark:bg-white/5 border border-white dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-0 rounded-3xl hover:bg-white/90 dark:hover:bg-white/10 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-500/20 hover:border-brand-300 dark:hover:border-brand-500 transition-all duration-300 group flex items-center justify-between">
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <Link to="/app/create" className="p-6 bg-surface/50 border border-surface-border rounded-sm hover:bg-brand-500/5 hover:-translate-y-1 hover:shadow-hud hover:border-brand-500/50 transition-aero duration-300 group flex items-center justify-between">
                         <div>
-                            <h4 className="font-semibold text-lg text-slate-900 dark:text-white mb-1 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">Start a New Container</h4>
-                            <p className="text-sm text-slate-700 dark:text-slate-300">Launch a predefined template or custom image</p>
+                            <h4 className="font-display font-bold text-lg text-white mb-2 group-hover:text-brand-400 transition-colors uppercase tracking-wide">Ignite Engine</h4>
+                            <p className="text-sm text-slate-400 tracking-wide">Deploy new container instances</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-white/80 dark:bg-slate-800 border border-white/50 dark:border-slate-600 flex items-center justify-center group-hover:bg-brand-500 group-hover:text-white group-hover:border-brand-500 transition-all text-slate-500 dark:text-slate-400 drop-shadow-md">
-                            <span className="text-2xl">+</span>
+                        <div className="w-12 h-12 bg-surface border border-surface-border flex items-center justify-center group-hover:bg-brand-500 group-hover:border-brand-400 transition-aero text-slate-400 group-hover:text-white shadow-inner">
+                            <span className="text-2xl font-light">+</span>
                         </div>
                     </Link>
 
-                    <Link to="/app/containers" className="p-6 bg-white/60 dark:bg-white/5 border border-white dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-0 rounded-3xl hover:bg-white/90 dark:hover:bg-white/10 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-500/20 hover:border-brand-300 dark:hover:border-brand-500 transition-all duration-300 group flex items-center justify-between">
+                    <Link to="/app/containers" className="p-6 bg-surface/50 border border-surface-border rounded-sm hover:bg-brand-500/5 hover:-translate-y-1 hover:shadow-hud hover:border-brand-500/50 transition-aero duration-300 group flex items-center justify-between">
                         <div>
-                            <h4 className="font-semibold text-lg text-slate-900 dark:text-white mb-1 group-hover:text-brand-600 dark:group-hover:text-brand-400 transition-colors">Manage Instances</h4>
-                            <p className="text-sm text-slate-700 dark:text-slate-300">View logs, stop, or remove your deployment</p>
+                            <h4 className="font-display font-bold text-lg text-white mb-2 group-hover:text-brand-400 transition-colors uppercase tracking-wide">Fleet Control</h4>
+                            <p className="text-sm text-slate-400 tracking-wide">Monitor and command active deployments</p>
                         </div>
-                        <div className="w-12 h-12 rounded-full bg-white/80 dark:bg-slate-800 border border-white/50 dark:border-slate-600 flex items-center justify-center group-hover:bg-brand-500 group-hover:text-white group-hover:border-brand-500 transition-all text-slate-500 dark:text-slate-400 drop-shadow-md">
-                            <ArrowRight size={22} />
+                        <div className="w-12 h-12 bg-surface border border-surface-border flex items-center justify-center group-hover:bg-brand-500 group-hover:border-brand-400 transition-aero text-slate-400 group-hover:text-white shadow-inner">
+                            <ArrowRight size={20} />
                         </div>
                     </Link>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-8 reveal" style={{ animationDelay: '0.3s' }}>
                 {/* Visual Overview Donut Chart */}
-                <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border border-white/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5 rounded-[2rem] p-6 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] col-span-1 flex flex-col items-center group hover:border-brand-300 dark:hover:border-slate-500 transition-colors duration-300">
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-6 w-full text-left drop-shadow-sm">Fleet Status</h2>
-                    <div className="w-full h-48 relative">
+                <div className="panel-glass rounded-sm p-8 flex flex-col items-center group hover:border-surface-border transition-aero">
+                    <h2 className="text-sm font-display text-slate-400 mb-6 w-full text-left uppercase tracking-[0.2em]">Distribution Matrix</h2>
+                    <div className="w-full h-56 relative mt-4">
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
                                     data={[
-                                        { name: 'Running', value: stats.running, fill: '#34d399' },
-                                        { name: 'Stopped/Error', value: stats.stopped, fill: '#fb7185' }
+                                        { name: 'Active', value: stats.running, fill: '#10b981' },
+                                        { name: 'Inactive', value: stats.stopped, fill: '#f43f5e' }
                                     ].filter(item => item.value > 0).length > 0
                                         ? [
-                                            { name: 'Running', value: stats.running, fill: '#34d399' },
-                                            { name: 'Stopped/Error', value: stats.stopped, fill: '#fb7185' }
+                                            { name: 'Active', value: stats.running, fill: '#10b981' },
+                                            { name: 'Inactive', value: stats.stopped, fill: '#f43f5e' }
                                         ].filter(item => item.value > 0)
-                                        : [{ name: 'No Containers', value: 1, fill: '#94a3b8' }]} // Default state
-                                    innerRadius={60}
-                                    outerRadius={80}
-                                    paddingAngle={0}
+                                        : [{ name: 'Standby', value: 1, fill: '#1f242d' }]}
+                                    innerRadius={70}
+                                    outerRadius={90}
+                                    paddingAngle={2}
                                     dataKey="value"
-                                    stroke="none"
+                                    stroke="rgba(255,255,255,0.05)"
+                                    strokeWidth={1}
                                 >
                                     {
                                         [
-                                            { name: 'Running', value: stats.running, fill: '#34d399' },
-                                            { name: 'Stopped/Error', value: stats.stopped, fill: '#fb7185' }
+                                            { name: 'Active', value: stats.running, fill: '#10b981' },
+                                            { name: 'Inactive', value: stats.stopped, fill: '#f43f5e' }
                                         ].filter(item => item.value > 0).length > 0
                                             ? [
-                                                { name: 'Running', value: stats.running, fill: '#34d399' },
-                                                { name: 'Stopped/Error', value: stats.stopped, fill: '#fb7185' }
+                                                { name: 'Active', value: stats.running, fill: '#10b981' },
+                                                { name: 'Inactive', value: stats.stopped, fill: '#f43f5e' }
                                             ].filter(item => item.value > 0).map((entry, index) => (
                                                 <Cell key={`cell-${index}`} fill={entry.fill} />
                                             ))
-                                            : <Cell fill="#94a3b8" />
+                                            : <Cell fill="#1f242d" />
                                     }
                                 </Pie>
                                 <RechartsTooltip
                                     wrapperStyle={{ zIndex: 100 }}
-                                    contentStyle={{ borderRadius: '16px', border: '1px solid rgba(255,255,255,0.4)', background: 'rgba(255, 255, 255, 0.8)', backdropFilter: 'blur(12px)', color: '#0f172a', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)' }}
-                                    itemStyle={{ color: '#0f172a', fontWeight: 'bold' }}
+                                    contentStyle={{ borderRadius: '4px', border: '1px solid #1f242d', background: 'rgba(5, 5, 8, 0.95)', color: '#fff', boxShadow: '0 0 15px rgba(220, 38, 38, 0.1)' }}
+                                    itemStyle={{ color: '#fff', fontFamily: 'Michroma', fontSize: '12px' }}
                                 />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none z-0">
-                            <span className="text-4xl font-extrabold text-slate-900 dark:text-white drop-shadow-sm group-hover:scale-105 transition-transform">{stats.total}</span>
-                            <span className="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-widest font-bold mt-1">Total</span>
+                            <span className="text-3xl font-display font-bold text-white group-hover:text-brand-400 transition-colors">{stats.total}</span>
+                            <span className="text-[10px] text-slate-500 uppercase tracking-widest mt-1">Total</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Resource Sliders */}
-                <div className="bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border border-white/80 dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-white/5 rounded-[2rem] p-6 md:p-8 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.2)] col-span-1 lg:col-span-2 group hover:border-indigo-300 dark:hover:border-slate-500 transition-colors duration-300">
-                    <div className="flex items-center space-x-4 mb-6">
-                        <div className="p-3 bg-indigo-500 text-white rounded-[1rem] shadow-lg shadow-indigo-500/30 hidden sm:block">
-                            <Activity size={24} />
+                <div className="panel-glass rounded-sm p-8 col-span-1 lg:col-span-2 group">
+                    <div className="flex items-center space-x-4 mb-8 border-b border-surface-border pb-4">
+                        <div className="p-2 bg-slate-800 text-slate-300 rounded-sm border border-slate-700">
+                            <Activity size={20} />
                         </div>
-                        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white drop-shadow-sm">Active Resource Usage</h2>
+                        <h2 className="text-xl font-display font-bold text-white uppercase tracking-widest">Hardware Telemetry</h2>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="bg-white/60 dark:bg-white/5 border border-white dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-0 p-6 rounded-[1.5rem] hover:bg-white/90 dark:hover:bg-white/10 hover:shadow-xl hover:-translate-y-1 hover:border-indigo-400 hover:shadow-indigo-500/10 transition-all duration-300">
-                            <div className="flex justify-between items-center mb-4">
-                                <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center"><Cpu className="mr-2 text-indigo-500 dark:text-indigo-400" size={18} /> CPU Usage</h4>
-                                <span className="text-lg font-bold text-indigo-600 dark:text-indigo-400 transition-transform scale-110">{metrics.cpu}%</span>
+                        <div className="bg-surface/30 border border-surface-border p-6 rounded-sm hover:border-slate-700 transition-aero duration-300 shadow-inner">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-display text-xs text-slate-400 flex items-center uppercase tracking-[0.1em]"><Cpu className="mr-2 text-slate-500" size={16} /> Core Usage</h4>
+                                <span className="text-2xl font-display font-bold text-white">{metrics.cpu}%</span>
                             </div>
-                            <div className="w-full bg-slate-200/50 dark:bg-slate-800/80 rounded-full h-4 mb-2 overflow-hidden shadow-inner backdrop-blur-sm border border-slate-900/5 dark:border-white/5">
-                                <div className="bg-gradient-to-r from-indigo-500 to-purple-500 h-4 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(99,102,241,0.5)]" style={{ width: `${Math.min(metrics.cpu, 100)}%` }}></div>
+                            <div className="w-full bg-[#030305] h-2 mb-3 overflow-hidden border border-surface-border relative">
+                                <div className="absolute top-0 bottom-0 left-0 bg-brand-500 transition-all duration-1000 shadow-[0_0_10px_rgba(220,38,38,0.8)]" style={{ width: `${Math.min(metrics.cpu, 100)}%` }}></div>
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 text-right font-medium">Aggregated over instances</p>
+                            <p className="text-[10px] text-slate-600 text-right uppercase tracking-wider">Aggregated Load</p>
                         </div>
 
-                        <div className="bg-white/60 dark:bg-white/5 border border-white dark:border-white/10 ring-1 ring-slate-900/5 dark:ring-0 p-6 rounded-[1.5rem] hover:bg-white/90 dark:hover:bg-white/10 hover:shadow-xl hover:-translate-y-1 hover:border-emerald-400 hover:shadow-emerald-500/10 transition-all duration-300">
-                            <div className="flex justify-between items-center mb-4">
-                                <h4 className="font-semibold text-slate-800 dark:text-slate-200 flex items-center"><Server className="mr-2 text-emerald-500 dark:text-emerald-400" size={18} /> Memory Usage</h4>
-                                <span className="text-lg font-bold text-emerald-600 dark:text-emerald-400 transition-transform scale-110">
-                                    {metrics.mem > 0 ? (metrics.mem / 1024 / 1024).toFixed(0) : 0} MB
+                        <div className="bg-surface/30 border border-surface-border p-6 rounded-sm hover:border-slate-700 transition-aero duration-300 shadow-inner">
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-display text-xs text-slate-400 flex items-center uppercase tracking-[0.1em]"><Server className="mr-2 text-slate-500" size={16} /> RAM Capacity</h4>
+                                <span className="text-2xl font-display font-bold text-white">
+                                    {metrics.mem > 0 ? (metrics.mem / 1024 / 1024).toFixed(0) : 0} <span className="text-sm text-slate-500">MB</span>
                                 </span>
                             </div>
-                            <div className="w-full bg-slate-200/50 dark:bg-slate-800/80 rounded-full h-4 mb-2 overflow-hidden shadow-inner backdrop-blur-sm border border-slate-900/5 dark:border-white/5">
-                                <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-4 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(52,211,153,0.5)]" style={{ width: `${metrics.memLimit > 0 ? Math.min((metrics.mem / metrics.memLimit) * 100, 100) : 0}%` }}></div>
+                            <div className="w-full bg-[#030305] h-2 mb-3 overflow-hidden border border-surface-border relative">
+                                <div className="absolute top-0 bottom-0 left-0 bg-brand-500 transition-all duration-1000 shadow-[0_0_10px_rgba(220,38,38,0.8)]" style={{ width: `${metrics.memLimit > 0 ? Math.min((metrics.mem / metrics.memLimit) * 100, 100) : 0}%` }}></div>
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 text-right font-medium">Of system limits</p>
+                            <p className="text-[10px] text-slate-600 text-right uppercase tracking-wider">Allocated Limits</p>
                         </div>
                     </div>
                 </div>

@@ -11,17 +11,16 @@ const Layout = () => {
     const { userPlan } = useOrg();
     const planType = userPlan || 'free';
 
-    // Dynamically update document title based on the active route
     useEffect(() => {
         const routeTitles = {
             '/app': 'Dashboard',
-            '/app/deploy': 'Create Container',
-            '/app/github': 'Deploy from Git',
+            '/app/create': 'Create Container',
+            '/app/git-deploy': 'Deploy from Git',
             '/app/containers': 'My Containers',
-            '/app/templates': 'Templates',
+            '/app/marketplace': 'Templates',
             '/app/snapshots': 'Snapshots',
             '/app/networks': 'Networks',
-            '/app/buckets': 'Buckets',
+            '/app/volumes': 'Volumes',
             '/app/secrets': 'Secret Manager',
             '/app/registries': 'Private Registries',
             '/app/settings': 'Platform Settings',
@@ -29,29 +28,29 @@ const Layout = () => {
             '/app/plans': 'Billing & Plans'
         };
 
-        const currentPath = location.pathname.split('/').slice(0, 3).join('/'); // Match base routes handling IDs
-        const pageTitle = routeTitles[currentPath] || 'App';
-        document.title = `${pageTitle} | Orbit`;
+        const currentPath = location.pathname.split('/').slice(0, 3).join('/');
+        const pageTitle = routeTitles[currentPath] || 'Orbit';
+        document.title = `${pageTitle} | OrbitCloud`;
     }, [location]);
 
     return (
-        <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0b1120] text-slate-900 dark:text-white transition-colors duration-300 relative w-full font-sans">
-            {/* Subtle Ambient Background Gradients for Glassmorphism */}
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-brand-500/30 dark:bg-brand-500/20 blur-[140px] pointer-events-none z-0"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-500/30 dark:bg-indigo-500/20 blur-[120px] pointer-events-none z-0"></div>
+        <div className="flex h-screen overflow-hidden bg-[#050508] text-slate-200 transition-colors duration-300 relative w-full font-sans selection:bg-brand-500/30">
+            {/* Aero Ambient Background Gradients (Engine Glow) */}
+            <div className="absolute top-[-15%] left-[-10%] w-[60%] h-[60%] rounded-full bg-brand-600/10 blur-[150px] pointer-events-none z-0 mix-blend-screen animate-pulse-slow"></div>
+            <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-surface-border/50 blur-[120px] pointer-events-none z-0"></div>
 
             <Sidebar isOpen={isMobileMenuOpen} setIsOpen={setIsMobileMenuOpen} />
 
-            <main className="flex-1 flex flex-col h-screen overflow-y-auto overflow-x-hidden relative z-10">
+            <main className="flex-1 flex flex-col h-screen overflow-y-auto overflow-x-hidden relative z-10 custom-scrollbar">
                 {/* Mobile Header with Hamburger Menu */}
-                <div className="md:hidden flex items-center p-4 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-b border-white/80 dark:border-white/10 sticky top-0 z-30">
+                <div className="md:hidden flex items-center p-4 panel-glass metallic-edge-bottom sticky top-0 z-30">
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
-                        className="p-2 mr-4 rounded-xl bg-white/80 dark:bg-slate-800 border border-white/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-500 transition-colors shadow-sm"
+                        className="p-2 mr-4 rounded bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white transition-aero shadow-hud"
                     >
                         <Menu size={24} />
                     </button>
-                    <span className="font-bold text-lg tracking-wide text-brand-600 dark:text-brand-400">Orbit</span>
+                    <span className="font-display font-bold text-lg tracking-wide text-white uppercase">Orbit</span>
                 </div>
 
                 {/* Mobile Ad Banner Strip */}
@@ -61,7 +60,7 @@ const Layout = () => {
                     </div>
                 )}
 
-                <div className="container mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
+                <div className="container mx-auto max-w-7xl p-4 md:p-8 lg:p-12 xl:p-16">
                     <Outlet />
                 </div>
             </main>
@@ -69,7 +68,7 @@ const Layout = () => {
             {/* Mobile Overlay */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 md:hidden transition-opacity"
+                    className="fixed inset-0 bg-[#050508]/80 backdrop-blur-md z-30 md:hidden transition-opacity duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                 ></div>
             )}

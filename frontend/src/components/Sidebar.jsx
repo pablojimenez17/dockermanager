@@ -110,48 +110,48 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
     };
 
     return (
-        <div className={`w-64 bg-white/50 dark:bg-slate-900/40 backdrop-blur-2xl h-full flex flex-col border-r border-white/80 dark:border-white/10 shadow-[4px_0_32px_rgba(0,0,0,0.08)] dark:shadow-[4px_0_32px_rgba(0,0,0,0.2)] transition-transform duration-300 overflow-hidden z-40 fixed md:relative left-0 top-0 bottom-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
-            <div className="p-6 flex items-center justify-between shrink-0">
+        <div className={`w-64 panel-glass border-r-0 metallic-edge flex flex-col h-full shadow-[4px_0_32px_rgba(0,0,0,0.5)] transition-transform duration-aero ease-in-out overflow-hidden z-40 fixed md:relative left-0 top-0 bottom-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}`}>
+            <div className="p-6 flex items-center justify-between shrink-0 border-b border-surface-border/50">
                 <div className="flex items-center space-x-3">
-                    <div className="w-8 h-8 rounded-lg bg-brand-500/10 flex items-center justify-center border border-brand-500/20 text-brand-500 dark:text-brand-400">
+                    <div className="w-8 h-8 bg-brand-500/10 flex items-center justify-center border border-brand-500/30 text-brand-500 shadow-hud">
                         <Aperture size={20} className="animate-[spin_10s_linear_infinite]" />
                     </div>
-                    <span className="text-xl font-bold text-slate-800 dark:text-white whitespace-nowrap tracking-wide">Orbit</span>
+                    <span className="text-xl font-display font-bold text-white whitespace-nowrap tracking-wider uppercase">Orbit</span>
                 </div>
                 {/* Mobile Close Button */}
                 <button
                     onClick={() => setIsOpen(false)}
-                    className="md:hidden p-2 rounded-lg bg-slate-200/50 dark:bg-slate-800/50 text-slate-500 hover:text-slate-800 dark:hover:text-white active:scale-95 transition-all"
+                    className="md:hidden p-2 rounded bg-surface border border-surface-border text-slate-400 hover:text-white active:scale-95 transition-aero"
                 >
                     <X size={20} />
                 </button>
             </div>
 
             {shouldShowOrgSetup && (
-                <div className="px-4 mt-2">
+                <div className="px-4 mt-4">
                     <OrgSwitcher />
                 </div>
             )}
 
-            <nav className="flex-1 px-3 space-y-1 mt-2 overflow-y-auto pb-4 custom-scrollbar">
+            <nav className="flex-1 px-3 space-y-2 mt-4 overflow-y-auto pb-4 custom-scrollbar">
                 {navGroups.map((group, index) => (
                     <div key={group.title} className="mb-2">
                         <button
                             onClick={() => toggleGroup(index)}
-                            className="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors uppercase tracking-wider group"
+                            className="w-full flex items-center justify-between px-3 py-2 text-xs font-display font-semibold text-slate-500 hover:text-white transition-colors uppercase tracking-[0.1em] group"
                         >
                             <div className="flex items-center space-x-2">
                                 {group.icon}
                                 <span>{group.title}</span>
                             </div>
                             <ChevronDown
-                                size={16}
-                                className={`transform transition-transform duration-200 ${openGroups[index] ? 'rotate-180' : ''}`}
+                                size={14}
+                                className={`transform transition-transform duration-300 ${openGroups[index] ? 'rotate-180 text-brand-500' : ''}`}
                             />
                         </button>
 
-                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${openGroups[index] ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                            <div className="space-y-1 pl-2 border-l border-slate-200 dark:border-slate-700 ml-4 py-1">
+                        <div className={`overflow-hidden transition-all duration-aero ease-in-out ${openGroups[index] ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0'}`}>
+                            <div className="space-y-1 pl-2 border-l border-surface-border ml-4 py-1">
                                 {group.items.map((item) => (
                                     <NavLink
                                         key={item.name}
@@ -162,14 +162,14 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                                             if (window.innerWidth < 768) setIsOpen(false);
                                         }}
                                         className={({ isActive }) =>
-                                            `flex items-center space-x-3 px-3 py-2.5 rounded-r-xl transition-all duration-200 ${isActive
-                                                ? 'bg-slate-100 text-brand-700 border-l-4 border-brand-600 dark:bg-brand-500/20 dark:text-brand-300 dark:border-brand-400 font-semibold'
-                                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent dark:text-slate-400 dark:hover:bg-slate-700/30 dark:hover:text-slate-200'
+                                            `flex items-center space-x-3 px-3 py-2.5 transition-all duration-300 ease-out ${isActive
+                                                ? 'bg-brand-500/10 text-white border-l-[3px] border-brand-500 shadow-hud'
+                                                : 'text-slate-400 hover:bg-surface-hover hover:text-slate-200 border-l-[3px] border-transparent hover:border-surface-border'
                                             }`
                                         }
                                     >
-                                        <div className="opacity-80">{item.icon}</div>
-                                        <span className="font-medium text-sm truncate">{item.name}</span>
+                                        <div className={`${({isActive}) => isActive ? 'text-brand-400' : 'opacity-80'}`}>{item.icon}</div>
+                                        <span className="font-medium text-sm truncate tracking-wide">{item.name}</span>
                                     </NavLink>
                                 ))}
                             </div>
@@ -179,37 +179,32 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
             </nav>
 
             {planType === 'free' && (
-                <div className="px-4 shrink-0 mb-2">
+                <div className="px-4 shrink-0 mb-4">
                     <AdBanner />
                 </div>
             )}
 
-            <div className="p-4 border-t border-slate-200 dark:border-slate-700 space-y-2 shrink-0 border-b">
+            <div className="p-4 border-t border-surface-border space-y-2 shrink-0 bg-surface/30">
                 <button
                     onClick={() => setIsInvitesModalOpen(true)}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200 relative"
+                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-400 hover:bg-surface-hover hover:text-white transition-all duration-300 relative group"
                 >
-                    <Bell size={20} />
-                    <span className="font-medium">Notifications</span>
+                    <Bell size={18} className="group-hover:text-brand-400 transition-colors" />
+                    <span className="font-medium text-sm tracking-wide">Notifications</span>
                     {unreadCount > 0 && (
-                        <span className="absolute right-4 bg-brand-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex items-center justify-center animate-pulse">
+                        <span className="absolute right-4 bg-brand-600 border border-brand-500 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-hud flex items-center justify-center animate-pulse">
                             {unreadCount}
                         </span>
                     )}
                 </button>
-                <button
-                    onClick={toggleTheme}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-slate-100 hover:text-slate-900 dark:hover:bg-slate-700/50 dark:hover:text-slate-200 rounded-xl transition-all duration-200"
-                >
-                    {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
-                    <span className="font-medium">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-                </button>
+                
+                {/* Theme toggle removed as requested to stick to Dark mode/Cockpit feel, or keep it but force dark icons */}
                 <button
                     onClick={handleLogout}
-                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-600 dark:text-slate-400 hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-500/10 dark:hover:text-red-400 rounded-xl transition-all duration-200"
+                    className="flex items-center space-x-3 px-4 py-3 w-full text-slate-400 hover:bg-brand-900/40 hover:text-brand-400 hover:border-l-2 hover:border-brand-500 transition-all duration-300 group"
                 >
-                    <LogOut size={20} />
-                    <span className="font-medium">Logout</span>
+                    <LogOut size={18} className="group-hover:text-brand-500 transition-colors" />
+                    <span className="font-medium text-sm tracking-wide">Disconnect</span>
                 </button>
             </div>
 
