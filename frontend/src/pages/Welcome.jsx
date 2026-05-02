@@ -14,13 +14,6 @@ const AnimatedBackground = () => {
     // Removed expensive framer-motion loops and huge blurs to improve scroll performance
     return (
         <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10 bg-slate-50 dark:bg-slate-950">
-            <div
-                className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]"
-                style={{
-                    backgroundImage: `linear-gradient(to right, #808080 1px, transparent 1px), linear-gradient(to bottom, #808080 1px, transparent 1px)`,
-                    backgroundSize: '80px 80px',
-                }}
-            />
             <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-brand-500/10 blur-[80px]" />
             <div className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-indigo-500/10 blur-[80px]" />
         </div>

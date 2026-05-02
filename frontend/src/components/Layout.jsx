@@ -49,17 +49,7 @@ const Layout = () => {
                             <Menu size={20} />
                         </button>
                         
-                        {/* Breadcrumbs */}
-                        <div className="hidden md:flex items-center text-sm">
-                            <span className="text-gray-500 dark:text-slate-400 font-medium hover:text-brand-600 dark:hover:text-brand-400 cursor-pointer">OrbitCloud</span>
-                            <ChevronRight size={16} className="text-gray-400 dark:text-slate-500 mx-1" />
-                            <span className="text-gray-500 dark:text-slate-400 font-medium">
-                                {activeOrg ? activeOrg.name : 'Personal Account'}
-                            </span>
-                            <ChevronRight size={16} className="text-gray-400 dark:text-slate-500 mx-1" />
-                            <span className="text-gray-900 dark:text-white font-semibold">{pageTitle}</span>
-                        </div>
-                        <div className="md:hidden text-sm font-semibold text-gray-900 dark:text-white">
+                        <div className="md:hidden text-sm font-semibold text-gray-900 dark:text-white ml-2">
                             {pageTitle}
                         </div>
                     </div>
@@ -69,18 +59,16 @@ const Layout = () => {
                         <div className="hidden sm:flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded px-3 py-1.5 text-sm font-medium">
                             <Building size={14} className="text-gray-400 dark:text-slate-500 mr-2" />
                             <span className="text-gray-700 dark:text-slate-300 truncate max-w-[150px]">
-                                {activeOrg ? activeOrg.name : 'Personal Context'}
+                                {activeOrg ? activeOrg.name : 'Personal Workspace'}
                             </span>
                         </div>
                     </div>
                 </header>
 
                 {/* Mobile Ad Banner Strip */}
-                {planType === 'free' && (
-                    <div className="md:hidden px-4 pt-4 shrink-0">
-                        <AdBanner />
-                    </div>
-                )}
+                <div className="md:hidden px-4 pt-4 shrink-0">
+                    <AdBanner />
+                </div>
 
                 <div className="p-4 md:p-6 lg:p-8 w-full max-w-7xl mx-auto">
                     <Outlet />

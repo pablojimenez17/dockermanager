@@ -176,11 +176,9 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
                 ))}
             </nav>
 
-            {planType === 'free' && (
-                <div className="px-4 shrink-0 mb-4">
-                    <AdBanner />
-                </div>
-            )}
+            <div className="px-4 shrink-0 mb-4">
+                <AdBanner />
+            </div>
 
             <div className="p-3 border-t border-gray-200 dark:border-slate-700 space-y-1 shrink-0 bg-white dark:bg-slate-800">
                 <button
