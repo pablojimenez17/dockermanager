@@ -174,7 +174,7 @@ const OrganizationDashboard = () => {
 
         return (
             <div className="flex flex-col items-center justify-center p-12 text-center h-[60vh]">
-                <div className="w-20 h-20 bg-brand-500/10 rounded-2xl flex items-center justify-center mb-6 border border-brand-500/20 shadow-sm">
+                <div className="w-20 h-20 bg-brand-500/10 rounded-sm flex items-center justify-center mb-6 border border-brand-500/20 shadow-sm">
                     <Building2 className="text-brand-500" size={40} />
                 </div>
                 <h2 className="text-2xl font-bold mb-3 text-slate-900 dark:text-white">No Active Organization</h2>
@@ -191,7 +191,7 @@ const OrganizationDashboard = () => {
                     <div className="flex items-center gap-4">
                         <button
                             onClick={() => setIsCreateOrgModalOpen(true)}
-                            className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-xl flex items-center gap-2 font-bold shadow-md shadow-brand-500/20 transition-all hover:scale-105 active:scale-95"
+                            className="bg-brand-600 hover:bg-brand-700 text-white px-6 py-3 rounded-sm flex items-center gap-2 font-bold shadow-sm active:scale-95"
                         >
                             <Plus size={20} /> Create Organization
                         </button>
@@ -200,7 +200,7 @@ const OrganizationDashboard = () => {
 
                 {canCreateOrgs && isCreateOrgModalOpen && (
                     <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-fade-in">
+                        <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm w-full max-w-md overflow-hidden shadow-md animate-fade-in">
                             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-slate-50 dark:bg-slate-800/50">
                                 <h3 className="font-bold flex items-center gap-2 text-lg text-slate-800 dark:text-slate-200">
                                     <Building2 size={20} className="text-brand-500" /> New Organization
@@ -215,12 +215,12 @@ const OrganizationDashboard = () => {
                                         type="text"
                                         value={orgData.name}
                                         onChange={e => setOrgData({ ...orgData, name: e.target.value })}
-                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 outline-none focus:ring-2 ring-brand-500 transition-all placeholder-slate-400"
+                                        className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-3 outline-none focus:ring-2 ring-brand-500 transition-all placeholder-slate-400"
                                         placeholder="e.g. Acme Corp"
                                     />
                                 </div>
                                 <div className="pt-2">
-                                    <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-all shadow-md shadow-brand-500/20 active:scale-95">
+                                    <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-sm font-bold hover:bg-brand-700 transition-all shadow-md shadow-brand-500/20 active:scale-95">
                                         Create Organization
                                     </button>
                                 </div>
@@ -256,13 +256,13 @@ const OrganizationDashboard = () => {
                         {/* Only Owner or specific Admins can invite/manage roles realistically, simplifying for now */}
                         <button
                             onClick={openCreateRoleModal}
-                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-colors"
+                            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 px-4 py-2 rounded-sm flex items-center gap-2 font-medium transition-colors"
                         >
                             <Shield size={18} /> New Role
                         </button>
                         <button
                             onClick={() => setIsInviteModalOpen(true)}
-                            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-xl flex items-center gap-2 font-medium transition-colors shadow-sm shadow-brand-500/20"
+                            className="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-sm flex items-center gap-2 font-medium transition-colors shadow-sm shadow-brand-500/20"
                         >
                             <Mail size={18} /> Invite Member
                         </button>
@@ -273,13 +273,13 @@ const OrganizationDashboard = () => {
             <div className={`grid grid-cols-1 ${isOwner ? 'lg:grid-cols-2' : ''} gap-8`}>
                 {/* Members List - Only Visible to Owners */}
                 {isOwner && (
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-sm">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm">
                         <h3 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-3">
                             <Users className="text-brand-500" /> Team Members ({members.length})
                         </h3>
                         <div className="space-y-3">
                             {members.map(m => (
-                                <div key={m._id} className="flex items-center justify-between p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
+                                <div key={m._id} className="flex items-center justify-between p-3 rounded-sm hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-700">
                                     <div className="flex items-center gap-3">
                                         <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold">
                                             {m.userId?.name?.substring(0, 1).toUpperCase()}
@@ -306,13 +306,13 @@ const OrganizationDashboard = () => {
                 )}
 
                 {/* Roles List */}
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-sm">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm">
                     <h3 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-3">
                         <Shield className="text-purple-500" /> {isOwner ? 'Roles & Permissions' : 'My Role & Permissions'}
                     </h3>
                     <div className="space-y-4">
                         {roles.filter(r => isOwner || r._id === membership?.roleId?._id).map(r => (
-                            <div key={r._id} className="border border-slate-200 dark:border-slate-700 rounded-xl p-4">
+                            <div key={r._id} className="border border-slate-200 dark:border-slate-700 rounded-sm p-4">
                                 <div className="flex items-center justify-between mb-3">
                                     <h4 className="font-semibold text-slate-900 dark:text-white flex items-center gap-2">
                                         {r.name}
@@ -346,7 +346,7 @@ const OrganizationDashboard = () => {
 
                 {/* Pending Invites (Full width) - Only Visible to Owners */}
                 {isOwner && invites.length > 0 && (
-                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-sm">
+                    <div className="lg:col-span-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm">
                         <h3 className="text-lg font-bold flex items-center gap-2 mb-6 text-slate-800 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-3">
                             <Mail className="text-amber-500" /> Pending Invitations
                         </h3>
@@ -387,7 +387,7 @@ const OrganizationDashboard = () => {
             {/* Modals placed here (simplified for brevity) */}
             {isInviteModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-md overflow-hidden">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm w-full max-w-md overflow-hidden">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between">
                             <h3 className="font-bold text-lg">Invite Team Member</h3>
                             <button onClick={() => setIsInviteModalOpen(false)}>✕</button>
@@ -395,18 +395,18 @@ const OrganizationDashboard = () => {
                         <form onSubmit={handleInviteUser} className="p-6 space-y-4">
                             <div>
                                 <label className="block text-sm font-medium mb-1">Email Address</label>
-                                <input required type="email" value={inviteData.email} onChange={e => setInviteData({ ...inviteData, email: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 outline-none focus:ring-2 ring-brand-500" placeholder="colleague@company.com" />
+                                <input required type="email" value={inviteData.email} onChange={e => setInviteData({ ...inviteData, email: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-2.5 outline-none focus:ring-2 ring-brand-500" placeholder="colleague@company.com" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium mb-1">Assign Role</label>
-                                <select required value={inviteData.roleId} onChange={e => setInviteData({ ...inviteData, roleId: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 outline-none focus:ring-2 ring-brand-500">
+                                <select required value={inviteData.roleId} onChange={e => setInviteData({ ...inviteData, roleId: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-2.5 outline-none focus:ring-2 ring-brand-500">
                                     <option value="" disabled>Select a role</option>
                                     {roles.filter(r => r.name !== 'Owner').map(r => (
                                         <option key={r._id} value={r._id}>{r.name}</option>
                                     ))}
                                 </select>
                             </div>
-                            <button type="submit" className="w-full bg-brand-600 text-white py-2.5 rounded-lg font-bold hover:bg-brand-700 transition-colors mt-4">
+                            <button type="submit" className="w-full bg-brand-600 text-white py-2.5 rounded-sm font-bold hover:bg-brand-700 transition-colors mt-4">
                                 Send Invite Link
                             </button>
                         </form>
@@ -416,7 +416,7 @@ const OrganizationDashboard = () => {
 
             {isCreateRoleModalOpen && (
                 <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
+                    <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm w-full max-w-lg overflow-hidden max-h-[90vh] flex flex-col">
                         <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between shrink-0">
                             <h3 className="font-bold text-lg flex items-center gap-2"><Shield size={20} className="text-purple-500" /> {isEditingRole ? 'Edit Custom Role' : 'Create Custom Role'}</h3>
                             <button onClick={closeRoleModal}>✕</button>
@@ -424,14 +424,14 @@ const OrganizationDashboard = () => {
                         <form onSubmit={handleCreateRole} className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
                             <div>
                                 <label className="block text-sm font-bold mb-1">Role Name</label>
-                                <input required type="text" value={roleData.name} onChange={e => setRoleData({ ...roleData, name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg p-2.5 outline-none focus:ring-2 ring-brand-500 font-medium" placeholder="e.g. DevOps Engineer" />
+                                <input required type="text" value={roleData.name} onChange={e => setRoleData({ ...roleData, name: e.target.value })} className="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-2.5 outline-none focus:ring-2 ring-brand-500 font-medium" placeholder="e.g. DevOps Engineer" />
                             </div>
 
                             <div>
                                 <label className="block text-sm font-bold mb-3 border-b border-slate-100 dark:border-slate-700 pb-2">Permissions Overview</label>
                                 <div className="space-y-3">
                                     {Object.keys(roleData.permissions).map(perm => (
-                                        <label key={perm} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
+                                        <label key={perm} className="flex items-center justify-between p-3 rounded-sm border border-slate-100 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors">
                                             <span className="font-mono text-sm text-slate-700 dark:text-slate-300">{perm}</span>
                                             <div className="relative inline-block w-12 h-6 rounded-full transition-colors duration-200 ease-in-out">
                                                 <input
@@ -448,7 +448,7 @@ const OrganizationDashboard = () => {
                                 </div>
                             </div>
 
-                            <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-xl font-bold hover:bg-brand-700 transition-colors mt-4">
+                            <button type="submit" className="w-full bg-brand-600 text-white py-3 rounded-sm font-bold hover:bg-brand-700 transition-colors mt-4">
                                 {isEditingRole ? 'Update Role' : 'Save Role'}
                             </button>
                         </form>

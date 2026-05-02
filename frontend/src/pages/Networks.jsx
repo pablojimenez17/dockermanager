@@ -85,7 +85,7 @@ const Networks = () => {
                 </div>
                 <button
                     onClick={() => setShowCreateModal(true)}
-                    className="flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-xl font-medium transition-all duration-200 shadow-lg shadow-brand-500/30 hover:scale-105 active:scale-95"
+                    className="flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-5 py-2.5 rounded-sm font-medium transition-all duration-200 shadow-sm shadow-brand-500/30 active:scale-95"
                 >
                     <Plus size={20} />
                     <span>Create Network</span>
@@ -99,10 +99,10 @@ const Networks = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
                     {networks.length === 0 ? (
-                        <div className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                        <div className="col-span-1 md:col-span-2 xl:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-sm border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
                             <div className="w-24 h-24 mb-6 relative">
-                                <div className="absolute inset-0 bg-brand-500/20 blur-2xl rounded-full"></div>
-                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-3xl flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
+                                {/* Removed blur orb */}
+                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-sm flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
                                     <Network size={40} className="text-brand-500 drop-shadow-sm" />
                                 </div>
                             </div>
@@ -118,10 +118,10 @@ const Networks = () => {
                             const gateway = ipamConfig.Gateway || 'Auto-assigned';
 
                             return (
-                                <div key={net.Id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-slate-400 dark:hover:border-slate-500 transition-colors flex flex-col group h-full">
+                                <div key={net.Id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm hover:border-slate-400 dark:hover:border-slate-500 transition-colors flex flex-col group h-full">
                                     <div className="flex justify-between items-start mb-6">
                                         <div className="flex items-center space-x-4 w-full">
-                                            <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
+                                            <div className="p-4 rounded-sm bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
                                                 <Network size={28} />
                                             </div>
                                             <div className="flex-1 min-w-0">
@@ -139,13 +139,13 @@ const Networks = () => {
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-4 mb-6 mt-auto">
-                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-sm p-4 border border-slate-200 dark:border-slate-700/50">
                                             <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Subnet</p>
                                             <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all">
                                                 {subnet}
                                             </p>
                                         </div>
-                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50">
+                                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-sm p-4 border border-slate-200 dark:border-slate-700/50">
                                             <p className="text-xs text-slate-600 dark:text-slate-500 mb-1 uppercase tracking-wider font-semibold">Gateway</p>
                                             <p className="font-mono text-sm text-slate-800 dark:text-slate-300 break-all" title={gateway}>
                                                 {gateway}
@@ -157,14 +157,14 @@ const Networks = () => {
                                         <div className="flex items-center space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto">
                                             <button
                                                 onClick={() => handleDeleteNetwork(net.Id, net.Name)}
-                                                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-rose-600 dark:text-rose-400 border border-rose-500/20 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                                className="w-full bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 text-rose-600 dark:text-rose-400 border border-rose-500/20 py-2.5 rounded-sm font-medium transition-colors flex items-center justify-center space-x-2"
                                             >
                                                 <Trash2 size={16} /> <span>Remove Network</span>
                                             </button>
                                         </div>
                                     ) : (
                                         <div className="pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto opacity-50">
-                                            <button disabled className="w-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 py-2.5 rounded-xl font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
+                                            <button disabled className="w-full bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700 py-2.5 rounded-sm font-medium flex items-center justify-center space-x-2 cursor-not-allowed">
                                                 <Trash2 size={16} /> <span>Protected</span>
                                             </button>
                                         </div>
@@ -179,7 +179,7 @@ const Networks = () => {
             {/* Create Network Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md m-auto border border-slate-200 dark:border-slate-700 overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="bg-white dark:bg-slate-800 rounded-sm shadow-md w-full max-w-md m-auto border border-slate-200 dark:border-slate-700 overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-slate-800 dark:text-white flex items-center space-x-2">
                                 <Network className="text-brand-500" />
@@ -202,7 +202,7 @@ const Networks = () => {
                                         value={formData.name}
                                         onChange={handleChange}
                                         placeholder="e.g., custom_bridge_net"
-                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none"
+                                        className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none"
                                     />
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -216,7 +216,7 @@ const Networks = () => {
                                             value={formData.subnet}
                                             onChange={handleChange}
                                             placeholder="10.0.0.0/16"
-                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none font-mono text-sm"
+                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none font-mono text-sm"
                                         />
                                     </div>
                                     <div>
@@ -229,11 +229,11 @@ const Networks = () => {
                                             value={formData.gateway}
                                             onChange={handleChange}
                                             placeholder="10.0.0.1"
-                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none font-mono text-sm"
+                                            className="w-full px-4 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-brand-500 focus:border-brand-500 text-slate-900 dark:text-white transition-all outline-none font-mono text-sm"
                                         />
                                     </div>
                                 </div>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 bg-brand-50 dark:bg-brand-500/10 p-3 rounded-lg border border-brand-100 dark:border-brand-500/20">
+                                <p className="text-xs text-slate-500 dark:text-slate-400 bg-brand-50 dark:bg-brand-500/10 p-3 rounded-sm border border-brand-100 dark:border-brand-500/20">
                                     <strong className="text-brand-600 dark:text-brand-400">Tip:</strong> Custom networks isolate your containers. You can connect new containers to this network during creation.
                                 </p>
                             </div>
@@ -241,14 +241,14 @@ const Networks = () => {
                                 <button
                                     type="button"
                                     onClick={() => setShowCreateModal(false)}
-                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium transition-colors"
+                                    className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-sm font-medium transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <button
                                     type="submit"
                                     disabled={!formData.name}
-                                    className="px-5 py-2.5 bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand-500/20 hover:shadow-lg hover:shadow-brand-500/40"
+                                    className="px-5 py-2.5 bg-brand-500 text-white rounded-sm font-medium hover:bg-brand-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md shadow-brand-500/20 hover:shadow-sm hover:shadow-brand-500/40"
                                 >
                                     Create Network
                                 </button>

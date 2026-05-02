@@ -14,8 +14,6 @@ const AnimatedBackground = () => {
     // Removed expensive framer-motion loops and huge blurs to improve scroll performance
     return (
         <div className="pointer-events-none fixed inset-0 overflow-hidden -z-10 bg-slate-50 dark:bg-slate-950">
-            <div className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-brand-500/10 blur-[80px]" />
-            <div className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-indigo-500/10 blur-[80px]" />
         </div>
     );
 };
@@ -67,7 +65,7 @@ const TerminalDemo = () => {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut" }}
-            className="relative lg:col-span-3 rounded-2xl overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-xl shadow-brand-500/5 dark:shadow-black/20 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md group"
+            className="relative lg:col-span-3 rounded-sm overflow-hidden border border-slate-200/50 dark:border-slate-700/50 shadow-sm shadow-brand-500/5 dark:shadow-black/20 bg-white/50 dark:bg-slate-900/50 backdrop-blur-md group"
         >
             <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-white/10 dark:from-slate-800/40 dark:to-slate-900/10 pointer-events-none" />
             <div className="relative flex items-center gap-2 px-4 py-3 bg-slate-100/80 dark:bg-slate-800/80 border-b border-slate-200/50 dark:border-slate-700/50">
@@ -169,7 +167,7 @@ const Welcome = () => {
             >
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-3 group">
-                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center text-white shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+                        <div className="w-8 h-8 rounded-sm bg-brand-600 hover:bg-brand-700 flex items-center justify-center text-white shadow-sm shadow-brand-500/20 group-hover:scale-105 transition-transform">
                             <Aperture size={18} className="animate-[spin_15s_linear_infinite]" />
                         </div>
                         <span className="text-lg font-black tracking-wide text-slate-900 dark:text-white">Orbit</span>
@@ -189,10 +187,7 @@ const Welcome = () => {
                         <Link to="/login" className="hidden sm:block text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-brand-500 transition-colors">
                             Log in
                         </Link>
-                        <Link
-                            to="/register"
-                            className="text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-brand-500 dark:hover:bg-brand-400 px-5 py-2 rounded-full font-bold transition-all shadow-md"
-                        >
+                            className="text-sm bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:bg-brand-500 dark:hover:bg-brand-400 px-5 py-2 rounded-sm font-bold transition-all shadow-md"
                             Get Started
                         </Link>
                     </div>
@@ -210,7 +205,7 @@ const Welcome = () => {
 
                         <motion.h1 variants={fadeInUp} className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tight mb-8 leading-[1.1]">
                             Manage Infrastructure <br className="hidden md:block" />
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-500 via-indigo-500 to-violet-500">
+                            <span className="text-brand-500">
                                 Without Friction.
                             </span>
                         </motion.h1>
@@ -223,7 +218,7 @@ const Welcome = () => {
                         <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link
                                 to="/register"
-                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-full transition-all shadow-lg shadow-brand-500/30 hover:scale-105 flex items-center justify-center gap-2"
+                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-600 text-white font-bold rounded-sm transition-all shadow-sm shadow-brand-500/30 flex items-center justify-center gap-2"
                             >
                                 Start Building <ArrowRight size={18} />
                             </Link>
@@ -303,9 +298,9 @@ const Welcome = () => {
                             <motion.div
                                 key={i}
                                 variants={scaleIn}
-                                className="group p-8 rounded-3xl bg-white/60 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 shadow-sm hover:shadow-xl transition-all duration-300"
+                                className="group p-8 rounded-sm bg-white/60 dark:bg-slate-800/40 border border-slate-200/50 dark:border-slate-700/50 backdrop-blur-sm hover:bg-white dark:hover:bg-slate-800 shadow-sm hover:shadow-sm transition-all duration-300"
                             >
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mb-6 bg-gradient-to-br ${feature.color} text-white shadow-lg shadow-black/10 group-hover:scale-110 transition-transform duration-300`}>
+                                <div className={`w-14 h-14 rounded-sm flex items-center justify-center mb-6 bg-gradient-to-br ${feature.color} text-white shadow-sm shadow-black/10 group-hover:scale-110 transition-transform duration-300`}>
                                     <feature.icon size={26} strokeWidth={2.5} />
                                 </div>
                                 <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-3">{feature.title}</h3>
@@ -343,7 +338,7 @@ const Welcome = () => {
                             {
                                 title: 'Modern Web Apps',
                                 tech: 'React, Node.js, Redis',
-                                bg: 'bg-gradient-to-br from-brand-500/10 to-indigo-500/10',
+                                bg: 'bg-brand-900/20',
                                 stats: [
                                     { label: 'Avg Build Time', value: '4.2s' },
                                     { label: 'Deployments', value: '1,200+' }
@@ -352,7 +347,7 @@ const Welcome = () => {
                             {
                                 title: 'Data Pipelines',
                                 tech: 'Python, Postgres, Airflow',
-                                bg: 'bg-gradient-to-br from-emerald-500/10 to-teal-500/10',
+                                bg: 'bg-brand-900/20',
                                 stats: [
                                     { label: 'Uptime', value: '99.9%' },
                                     { label: 'Logs Processed', value: '50M+' }
@@ -363,7 +358,7 @@ const Welcome = () => {
                                 initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }}
                                 variants={fadeInUp}
                                 key={i}
-                                className={`relative h-auto md:h-64 rounded-3xl p-8 border border-slate-200 dark:border-slate-800 ${item.bg} overflow-hidden group`}
+                                className={`relative h-auto md:h-64 rounded-sm p-8 border border-slate-200 dark:border-slate-800 ${item.bg} overflow-hidden group`}
                             >
                                 <div className="relative z-10 h-full flex flex-col justify-between gap-6">
                                     <div className="inline-flex px-4 py-1.5 rounded-full bg-white/80 dark:bg-slate-900/80 backdrop-blur-md text-slate-900 dark:text-white text-sm font-bold shadow-sm w-fit">
@@ -381,7 +376,7 @@ const Welcome = () => {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="absolute -bottom-10 -right-10 w-48 h-48 bg-white/10 dark:bg-slate-800/20 rounded-full blur-2xl group-hover:scale-125 transition-transform duration-700" />
+                                {/* Removed hover blur orb for sober design */}
                             </motion.div>
                         ))}
                     </div>
@@ -390,18 +385,7 @@ const Welcome = () => {
 
             {/* ── Testimonials / Social Proof ── */}
             <section className="relative py-24 px-6 overflow-hidden">
-                <motion.div
-                    initial={{ y: 50, opacity: 0 }}
-                    whileInView={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 1 }}
-                    className="absolute top-1/2 left-0 w-64 h-64 bg-brand-500/20 blur-[100px] rounded-full pointer-events-none mix-blend-screen"
-                />
-                <motion.div
-                    initial={{ y: -50, opacity: 0 }}
-                    whileInView={{ y: 0, opacity: 1 }}
-                    transition={{ duration: 1, delay: 0.2 }}
-                    className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-500/20 blur-[120px] rounded-full pointer-events-none mix-blend-screen"
-                />
+                {/* Orbs removed for industrial design */}
 
                 <div className="max-w-7xl mx-auto relative z-10">
                     <motion.div
@@ -443,7 +427,7 @@ const Welcome = () => {
                             <motion.div
                                 key={i}
                                 variants={scaleIn}
-                                className="relative p-8 rounded-3xl bg-white/70 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-xl hover:-translate-y-2 transition-transform duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] group overflow-hidden"
+                                className="relative p-8 rounded-sm bg-white/70 dark:bg-slate-900/60 border border-slate-200/50 dark:border-slate-800/50 backdrop-blur-xl hover:-translate-y-2 transition-transform duration-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgb(0,0,0,0.1)] group overflow-hidden"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-white/5 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                                 <Quote className="absolute -top-4 -right-2 text-slate-100 dark:text-slate-800/50 w-32 h-32 -z-10 rotate-12 transition-transform duration-500 group-hover:rotate-0 group-hover:scale-110" />
@@ -474,7 +458,7 @@ const Welcome = () => {
                     <p className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto">Start for free, scale when you're ready.</p>
                 </div>
 
-                <div className="overflow-x-auto rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                <div className="overflow-x-auto rounded-sm border border-slate-200 dark:border-slate-800 shadow-sm">
                     <table className="w-full min-w-[800px] border-collapse bg-white dark:bg-slate-900/40">
                         {/* Header row */}
                         <thead>
@@ -484,7 +468,7 @@ const Welcome = () => {
                                 </th>
                                 {plans.map((p, i) => (
                                     <th key={i} className={`px-6 py-6 text-center border-b border-slate-200 dark:border-slate-700 ${p.highlighted
-                                        ? 'bg-gradient-to-b from-brand-500 to-brand-600 text-white'
+                                        ? 'bg-brand-600 hover:bg-brand-700 text-white'
                                         : 'bg-slate-50 dark:bg-slate-800/80'
                                         }`}>
                                         {p.tag && (
@@ -554,7 +538,7 @@ const Welcome = () => {
                                     <td key={i} className={`px-6 py-5 text-center ${p.highlighted ? 'bg-brand-600/10 dark:bg-brand-500/10' : 'bg-slate-50 dark:bg-slate-800/80'} ${i === plans.length - 1 ? 'rounded-br-3xl' : ''}`}>
                                         <Link
                                             to="/register"
-                                            className={`inline-flex items-center justify-center w-full py-2.5 rounded-xl text-sm font-semibold transition-all ${p.highlighted ? 'bg-brand-500 hover:bg-brand-400 text-white shadow-lg shadow-brand-500/20' : 'bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'}`}
+                                            className={`inline-flex items-center justify-center w-full py-2.5 rounded-sm text-sm font-semibold transition-all ${p.highlighted ? 'bg-brand-500 hover:bg-brand-400 text-white shadow-sm shadow-brand-500/20' : 'bg-white dark:bg-slate-700 hover:bg-slate-100 dark:hover:bg-slate-600 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600'}`}
                                         >
                                             {p.cta}
                                         </Link>
@@ -570,8 +554,7 @@ const Welcome = () => {
             <section className="relative py-20 px-6 overflow-hidden">
                 <motion.div
                     initial="hidden" whileInView="visible" viewport={{ once: true }}
-                    variants={scaleIn}
-                    className="max-w-5xl mx-auto rounded-[3rem] bg-slate-900 border border-slate-800 p-10 md:p-20 text-center relative shadow-2xl"
+                    className="max-w-5xl mx-auto rounded-sm bg-slate-900 border border-slate-800 p-10 md:p-20 text-center relative shadow-md"
                 >
                     {/* Background effects */}
                     <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4IiBoZWlnaHQ9IjgiPgo8cmVjdCB3aWR0aD0iOCIgaGVpZ2h0PSI4IiBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDIiLz4KPC9zdmc+')] opacity-20" />
@@ -584,16 +567,15 @@ const Welcome = () => {
                             Join thousands of developers using Orbit to push code faster and scale effortlessly.
                         </p>
 
-                        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link
                                 to="/register"
-                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-400 text-white font-bold rounded-full transition-all shadow-[0_0_30px_rgba(14,165,233,0.3)] hover:scale-105 flex items-center justify-center gap-2"
+                                className="w-full sm:w-auto px-8 py-4 bg-brand-500 hover:bg-brand-400 text-white font-bold rounded-sm transition-all shadow-sm flex items-center justify-center gap-2"
                             >
                                 Get Started for Free <ArrowRight size={18} />
                             </Link>
                             <a
                                 href="mailto:hello@orbit.dev"
-                                className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-full transition-all border border-slate-700 flex items-center justify-center gap-2"
+                                className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-sm transition-all border border-slate-700 flex items-center justify-center gap-2"
                             >
                                 <Mail size={18} /> Contact Sales
                             </a>

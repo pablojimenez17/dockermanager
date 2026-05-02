@@ -652,7 +652,7 @@ const Marketplace = () => {
                                                 volumeName: '',
                                                 isPredefined: false
                                             }])}
-                                            className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded-lg font-medium flex items-center transition-colors text-slate-700 dark:text-slate-300"
+                                            className="text-xs bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 px-3 py-1.5 rounded-sm font-medium flex items-center transition-colors text-slate-700 dark:text-slate-300"
                                         >
                                             <Plus size={14} className="mr-1" /> Add Mount
                                         </button>
@@ -734,7 +734,7 @@ const Marketplace = () => {
                                                                 updated[idx].volumeName = e.target.value;
                                                                 setVolumeMounts(updated);
                                                             }}
-                                                            className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                            className="w-full bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-sm px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
                                                         >
                                                             <option value="">-- No Persistence --</option>
                                                             {availableVolumes.map(av => (
@@ -771,7 +771,7 @@ const Marketplace = () => {
                                     type="submit"
                                     form="deployForm"
                                     disabled={deploying}
-                                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-sm font-bold shadow-lg shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
+                                    className="px-6 py-2.5 bg-brand-500 hover:bg-brand-600 text-white rounded-sm font-bold shadow-sm shadow-brand-500/30 transition-transform active:scale-95 disabled:opacity-50 disabled:pointer-events-none flex items-center"
                                 >
                                     {deploying ? (
                                         <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div> Deploying Stack...</>

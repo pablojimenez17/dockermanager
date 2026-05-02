@@ -62,7 +62,7 @@ const Snapshots = () => {
     if (userPlan === 'free') {
         return (
             <div className="p-4 md:p-8 text-slate-900 dark:text-white max-w-7xl mx-auto flex flex-col items-center justify-center min-h-[60vh]">
-                <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 p-10 rounded-3xl max-w-2xl text-center shadow-lg shadow-indigo-500/5">
+                <div className="bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 p-10 rounded-sm max-w-2xl text-center shadow-sm shadow-indigo-500/5">
                     <Camera className="mx-auto h-20 w-20 text-indigo-400 dark:text-indigo-500 mb-6" strokeWidth={1.5} />
                     <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-4">Container Snapshots</h2>
                     <p className="text-lg text-slate-600 dark:text-slate-300 mb-8 leading-relaxed">
@@ -70,7 +70,7 @@ const Snapshots = () => {
                     </p>
                     <a
                         href="/app/plans"
-                        className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-xl transition-transform active:scale-95 shadow-xl shadow-indigo-500/30"
+                        className="inline-flex items-center justify-center px-8 py-4 text-lg font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-sm transition-transform active:scale-95 shadow-sm shadow-indigo-500/30"
                     >
                         Upgrade Plan
                     </a>
@@ -94,7 +94,7 @@ const Snapshots = () => {
                 <button
                     onClick={fetchData}
                     disabled={loading}
-                    className="p-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white hover:bg-indigo-50 border border-slate-200 dark:bg-slate-800 dark:hover:bg-indigo-500/10 dark:border-slate-700 rounded-xl transition-colors disabled:opacity-50"
+                    className="p-3 text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 bg-white hover:bg-indigo-50 border border-slate-200 dark:bg-slate-800 dark:hover:bg-indigo-500/10 dark:border-slate-700 rounded-sm transition-colors disabled:opacity-50"
                     title="Refresh Gallery"
                 >
                     <RefreshCw size={24} className={loading ? 'animate-spin' : ''} />
@@ -108,24 +108,24 @@ const Snapshots = () => {
             ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     {snapshots.length === 0 ? (
-                        <div className="col-span-1 lg:col-span-2 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                        <div className="col-span-1 lg:col-span-2 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-sm border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
                             <div className="w-24 h-24 mb-6 relative">
-                                <div className="absolute inset-0 bg-indigo-500/20 blur-2xl rounded-full"></div>
-                                <div className="relative w-full h-full bg-indigo-50 dark:bg-indigo-500/10 rounded-3xl flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shadow-inner">
+                                {/* Removed blur orb */}
+                                <div className="relative w-full h-full bg-indigo-50 dark:bg-indigo-500/10 rounded-sm flex items-center justify-center border border-indigo-100 dark:border-indigo-500/20 shadow-inner">
                                     <Camera size={40} className="text-indigo-500 drop-shadow-sm" />
                                 </div>
                             </div>
                             <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-3">Your gallery is empty</h3>
                             <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-sm text-lg">Save your container's exact current state. Create a snapshot to easily clone or deploy it later.</p>
-                            <Link to="/app/containers" className="bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white px-8 py-3.5 rounded-xl shadow-lg hover:shadow-brand-500/25 transition-all duration-300 font-bold hover:-translate-y-0.5 inline-flex items-center">
+                            <Link to="/app/containers" className="bg-brand-600 hover:bg-brand-700 hover:from-brand-500 hover:to-indigo-500 text-white px-8 py-3.5 rounded-sm shadow-sm hover:shadow-brand-500/25 transition-all duration-300 font-bold hover:-translate-y-0.5 inline-flex items-center">
                                 Go to My Containers
                             </Link>
                         </div>
                     ) : (
                         snapshots.map(snap => (
-                            <div key={snap._id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors flex flex-col group">
+                            <div key={snap._id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors flex flex-col group">
                                 <div className="flex items-start space-x-4 mb-4">
-                                    <div className="p-4 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
+                                    <div className="p-4 rounded-sm bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 shrink-0">
                                         <Camera size={28} />
                                     </div>
                                     <div className="flex-1 min-w-0 pt-1">
@@ -138,7 +138,7 @@ const Snapshots = () => {
                                     </div>
                                 </div>
 
-                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-xl p-4 border border-slate-200 dark:border-slate-700/50 mb-6 grid grid-cols-2 gap-4">
+                                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-sm p-4 border border-slate-200 dark:border-slate-700/50 mb-6 grid grid-cols-2 gap-4">
                                     <div>
                                         <p className="text-[10px] text-slate-500 uppercase tracking-wider font-bold mb-1">Image ID Hash</p>
                                         <p className="text-xs font-mono truncate text-slate-700 dark:text-slate-300" title={snap.imageId}>
@@ -157,7 +157,7 @@ const Snapshots = () => {
                                     <span className="text-xs text-slate-400">Can be deployed from the Templates screen</span>
                                     <button
                                         onClick={() => handleDelete(snap._id, snap.snapshotName)}
-                                        className="p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 rounded-xl transition-colors shrink-0 outline-none"
+                                        className="p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 rounded-sm transition-colors shrink-0 outline-none"
                                         title="Delete Snapshot Image"
                                     >
                                         <Trash2 size={20} />

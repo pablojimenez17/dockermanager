@@ -64,13 +64,13 @@ const InviteAccept = () => {
     if (error) {
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-[#0b1120] flex items-center justify-center p-4">
-                <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-3xl p-8 shadow-xl text-center border border-slate-200 dark:border-slate-700">
+                <div className="max-w-md w-full bg-white dark:bg-slate-800 rounded-sm p-8 shadow-sm text-center border border-slate-200 dark:border-slate-700">
                     <div className="w-16 h-16 mx-auto bg-rose-100 dark:bg-rose-900/30 text-rose-500 rounded-full flex items-center justify-center mb-6">
                         <XCircle size={32} />
                     </div>
                     <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Invitation Error</h2>
                     <p className="text-slate-600 dark:text-slate-400 mb-8">{error}</p>
-                    <button onClick={() => navigate('/')} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                    <button onClick={() => navigate('/')} className="w-full bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-200 font-bold py-3 rounded-sm hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
                         Go Home
                     </button>
                 </div>
@@ -82,14 +82,14 @@ const InviteAccept = () => {
         <div className="min-h-screen bg-slate-50 dark:bg-[#0b1120] flex items-center justify-center p-4 relative overflow-hidden">
             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-brand-500/20 blur-[120px] pointer-events-none z-0"></div>
 
-            <div className="max-w-md w-full bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-slate-200 dark:border-slate-700/50 relative z-10 text-center transform hover:scale-[1.02] transition-transform duration-300">
-                <div className="w-20 h-20 mx-auto bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 rounded-2xl flex items-center justify-center mb-6 shadow-inner border border-brand-200 dark:border-brand-500/30">
+            <div className="max-w-md w-full bg-white dark:bg-slate-800/80 backdrop-blur-xl rounded-sm p-8 shadow-md border border-slate-200 dark:border-slate-700/50 relative z-10 text-center transform hover:scale-[1.02] transition-transform duration-300">
+                <div className="w-20 h-20 mx-auto bg-brand-50 dark:bg-brand-900/20 text-brand-600 dark:text-brand-400 rounded-sm flex items-center justify-center mb-6 shadow-inner border border-brand-200 dark:border-brand-500/30">
                     <Building2 size={40} />
                 </div>
 
                 <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-2 tracking-tight">You've Been Invited!</h1>
 
-                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-2xl p-6 my-8 border border-slate-100 dark:border-slate-700">
+                <div className="bg-slate-50 dark:bg-slate-900/50 rounded-sm p-6 my-8 border border-slate-100 dark:border-slate-700">
                     <p className="text-slate-600 dark:text-slate-400 mb-4 font-medium">
                         You have been invited to join:
                     </p>
@@ -105,7 +105,7 @@ const InviteAccept = () => {
                 <div className="space-y-3">
                     <button
                         onClick={handleAccept}
-                        className="w-full bg-gradient-to-r from-brand-600 to-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-1 transition-all flex items-center justify-center"
+                        className="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold py-4 rounded-sm shadow-sm shadow-brand-500/30 hover:shadow-brand-500/50 hover:-translate-y-1 transition-all flex items-center justify-center"
                     >
                         <CheckCircle2 size={20} className="mr-2" />
                         Accept Invitation
@@ -113,7 +113,7 @@ const InviteAccept = () => {
 
                     <button
                         onClick={() => navigate('/')}
-                        className="w-full bg-transparent text-slate-500 dark:text-slate-400 font-medium py-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                        className="w-full bg-transparent text-slate-500 dark:text-slate-400 font-medium py-3 rounded-sm hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
                     >
                         Decline & Go Home
                     </button>

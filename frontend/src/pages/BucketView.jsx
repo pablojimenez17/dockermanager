@@ -94,12 +94,12 @@ const BucketView = ({ bucketName, onClose }) => {
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}></div>
 
             {/* Modal Drawer -> Slides in from right/bottom */}
-            <div className="relative w-full md:w-[600px] lg:w-[800px] bg-white dark:bg-slate-900 shadow-2xl ml-auto h-full flex flex-col border-l border-slate-200 dark:border-slate-700">
+            <div className="relative w-full md:w-[600px] lg:w-[800px] bg-white dark:bg-slate-900 shadow-md ml-auto h-full flex flex-col border-l border-slate-200 dark:border-slate-700">
 
                 {/* Header */}
                 <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900 shrink-0">
                     <div className="flex items-center space-x-3 truncate pr-4">
-                        <div className="p-2.5 rounded-xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 shrink-0">
+                        <div className="p-2.5 rounded-sm bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 shrink-0">
                             <HardDrive size={24} />
                         </div>
                         <div className="truncate">
@@ -113,7 +113,7 @@ const BucketView = ({ bucketName, onClose }) => {
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors shrink-0"
+                        className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-sm transition-colors shrink-0"
                     >
                         <X size={24} />
                     </button>
@@ -130,7 +130,7 @@ const BucketView = ({ bucketName, onClose }) => {
                         <button
                             onClick={fetchObjects}
                             disabled={loading || uploading}
-                            className="p-2 text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 bg-slate-100 hover:bg-brand-50 dark:bg-slate-800 dark:hover:bg-brand-500/10 rounded-lg transition-colors disabled:opacity-50"
+                            className="p-2 text-slate-500 hover:text-brand-600 dark:hover:text-brand-400 bg-slate-100 hover:bg-brand-50 dark:bg-slate-800 dark:hover:bg-brand-500/10 rounded-sm transition-colors disabled:opacity-50"
                             title="Refresh"
                         >
                             <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
@@ -145,7 +145,7 @@ const BucketView = ({ bucketName, onClose }) => {
                         <button
                             onClick={() => fileInputRef.current?.click()}
                             disabled={uploading}
-                            className="flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-lg font-medium transition-colors shadow-sm shadow-brand-500/30 disabled:opacity-70"
+                            className="flex items-center space-x-2 bg-brand-500 hover:bg-brand-600 text-white px-4 py-2 rounded-sm font-medium transition-colors shadow-sm shadow-brand-500/30 disabled:opacity-70"
                         >
                             {uploading ? (
                                 <div className="animate-spin h-5 w-5 border-2 border-white/30 border-t-white rounded-full"></div>
@@ -170,7 +170,7 @@ const BucketView = ({ bucketName, onClose }) => {
                             <p className="text-slate-500 dark:text-slate-400 mt-2">Upload your first file to get started.</p>
                         </div>
                     ) : (
-                        <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+                        <div className="bg-white dark:bg-slate-800 rounded-sm border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
                             <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
                                 <thead className="bg-slate-50 dark:bg-slate-800/80">
                                     <tr>
@@ -204,7 +204,7 @@ const BucketView = ({ bucketName, onClose }) => {
                                                     <a
                                                         href={`/api/buckets/${bucketName}/objects/${encodeURIComponent(obj.name)}/download`} // Mock route for now, typically handled via presigned URLs
                                                         target="_blank" rel="noopener noreferrer"
-                                                        className="p-1.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors cursor-pointer"
+                                                        className="p-1.5 text-slate-400 hover:text-brand-600 dark:hover:text-brand-400 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-sm transition-colors cursor-pointer"
                                                         title="Download API to be implemented"
                                                         onClick={(e) => { e.preventDefault(); addToast('Direct download requires presigned URL setup (coming next)', 'info') }}
                                                     >
@@ -212,7 +212,7 @@ const BucketView = ({ bucketName, onClose }) => {
                                                     </a>
                                                     <button
                                                         onClick={() => handleDeleteObject(obj.name)}
-                                                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+                                                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-sm transition-colors"
                                                         title="Delete File"
                                                     >
                                                         <Trash2 size={18} />

@@ -92,7 +92,7 @@ const Volumes = () => {
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-5xl mx-auto space-y-8">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <div className="inline-flex items-center justify-center p-3 bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-2xl mb-4">
+                    <div className="inline-flex items-center justify-center p-3 bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-sm mb-4">
                         <HardDrive size={32} />
                     </div>
                     <h1 className="text-3xl font-extrabold tracking-tight">Volumes (Disks)</h1>
@@ -101,14 +101,14 @@ const Volumes = () => {
                 <button
                     onClick={fetchVolumes}
                     disabled={loading}
-                    className="flex justify-center items-center px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    className="flex justify-center items-center px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                 >
                     <RefreshCw size={18} className={`mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
                 </button>
             </div>
 
             {/* Quotas Visualization */}
-            <div className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6">
+            <div className="panel p-6">
                 <h4 className="text-sm font-bold flex items-center mb-4">
                     <ShieldAlert size={18} className="mr-2 text-brand-500" /> Storage Quotas
                 </h4>
@@ -139,7 +139,7 @@ const Volumes = () => {
             </div>
 
             {error && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+                <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-sm flex items-start space-x-3">
                     <AlertCircle size={20} className="shrink-0 mt-0.5" />
                     <span>{error}</span>
                 </div>
@@ -148,7 +148,7 @@ const Volumes = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
 
                 {/* Create Volume */}
-                <div className="lg:col-span-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-3xl p-6 shadow-sm h-fit">
+                <div className="lg:col-span-1 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-sm p-6 shadow-sm h-fit">
                     <h3 className="font-bold text-lg mb-4">Create New Disk</h3>
                     <form onSubmit={handleCreate} className="space-y-4">
                         <div>
@@ -159,13 +159,16 @@ const Volumes = () => {
                                 value={newVolumeName}
                                 onChange={(e) => setNewVolumeName(e.target.value)}
                                 placeholder="E.g. database-storage"
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-sm"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm focus:ring-1 focus:ring-brand-500 outline-none text-sm"
                             />
                         </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Crear un volumen puede tardar unos segundos. Por favor ten paciencia.
+                        </p>
                         <button
                             type="submit"
                             disabled={actionLoading || isExceedingCount || isExceedingSpace}
-                            className={`w-full py-3 rounded-xl shadow-lg font-bold text-white transition-all flex items-center justify-center ${actionLoading || isExceedingCount || isExceedingSpace ? 'bg-slate-600 opacity-70 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                            className={`w-full py-2.5 rounded-sm font-bold text-white transition-all flex items-center justify-center ${actionLoading || isExceedingCount || isExceedingSpace ? 'bg-slate-600 opacity-70 cursor-not-allowed' : 'btn-primary'
                                 }`}
                         >
                             <Plus size={18} className="mr-2" />
@@ -181,13 +184,13 @@ const Volumes = () => {
                     {loading && volumes.length === 0 ? (
                         <div className="text-center text-slate-500 py-10 opacity-70 animate-pulse">Loading persistent disks...</div>
                     ) : volumes.length === 0 ? (
-                        <div className="text-center py-12 border border-dashed border-slate-300 dark:border-slate-700 rounded-3xl text-slate-500">
+                        <div className="text-center py-12 border border-dashed border-slate-300 dark:border-slate-700 rounded-sm text-slate-500">
                             <HardDrive size={40} className="mx-auto mb-3 opacity-20" />
                             <p>You haven't created any persistent volumes.</p>
                         </div>
                     ) : (
                         volumes.map((vol) => (
-                            <div key={vol._id} className="flex flex-col sm:flex-row items-center justify-between p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-sm hover:shadow-md transition-shadow">
+                            <div key={vol._id} className="flex flex-col sm:flex-row items-center justify-between p-5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm shadow-sm transition-shadow">
                                 <div className="flex items-center w-full mb-4 sm:mb-0">
                                     <div className="bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 p-3 rounded-full mr-4 shrink-0">
                                         <HardDrive size={24} />
@@ -203,7 +206,7 @@ const Volumes = () => {
                                     <button
                                         onClick={() => handleDelete(vol._id)}
                                         disabled={actionLoading}
-                                        className="p-2 border border-slate-200 dark:border-slate-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
+                                        className="p-2 border border-slate-200 dark:border-slate-700 text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-sm transition-colors"
                                         title="Delete Volume"
                                     >
                                         <Trash2 size={18} />

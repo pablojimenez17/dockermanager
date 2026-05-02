@@ -92,7 +92,7 @@ const Settings = () => {
                 <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Manage your account preferences and application layout.</p>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-8 shadow-sm">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4">
                     <User className="text-brand-500 dark:text-brand-400" />
                     <span>Profile Management</span>
@@ -100,7 +100,7 @@ const Settings = () => {
 
                 <form onSubmit={handleSave} className="space-y-6">
                     {saved && (
-                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-4 px-4 rounded-sm flex items-start space-x-3">
                             <Save size={20} className="shrink-0 mt-0.5" />
                             <span>Settings saved successfully.</span>
                         </div>
@@ -113,21 +113,21 @@ const Settings = () => {
                                 type="text"
                                 disabled
                                 value={name}
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 cursor-not-allowed mb-4"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 cursor-not-allowed mb-4"
                             />
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
                             <input
                                 type="email"
                                 disabled
                                 value={email}
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 cursor-not-allowed"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 cursor-not-allowed"
                             />
                             <p className="text-xs text-slate-500 mt-2">Credentials cannot be changed after registration.</p>
                         </div>
 
                         <div>
                             <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Role</label>
-                            <div className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-400 flex items-center space-x-2">
+                            <div className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-600 dark:text-slate-400 flex items-center space-x-2">
                                 {role === 'admin' ? (
                                     <>
                                         <Shield size={16} className="text-purple-600 dark:text-purple-400" />
@@ -149,7 +149,7 @@ const Settings = () => {
                         <span>Preferences</span>
                     </h3>
 
-                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl">
+                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm">
                         <div>
                             <h4 className="font-semibold text-slate-900 dark:text-white">Receive Alert Notifications</h4>
                             <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when a container crashes or exits unexpectedly.</p>
@@ -165,7 +165,7 @@ const Settings = () => {
                         <span>Subscription Management</span>
                     </h3>
 
-                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-6">
                         {planData ? (
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                 <div className="space-y-1">
@@ -188,7 +188,7 @@ const Settings = () => {
                                         type="button"
                                         disabled={cancelling}
                                         onClick={startCancelProcess}
-                                        className="shrink-0 flex items-center justify-center space-x-2 py-2.5 px-6 rounded-xl text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95"
+                                        className="shrink-0 flex items-center justify-center space-x-2 py-2.5 px-6 rounded-sm text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95"
                                     >
                                         <CalendarX2 size={18} />
                                         <span>{cancelling ? 'Cancelling...' : 'Cancel Plan'}</span>
@@ -203,7 +203,7 @@ const Settings = () => {
                     <div className="pt-6">
                         <button
                             type="submit"
-                            className="flex justify-center items-center space-x-2 py-3 px-8 rounded-xl shadow-lg text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 transition-all hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]"
+                            className="flex justify-center items-center space-x-2 py-3 px-8 rounded-sm shadow-sm text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 transition-all hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]"
                         >
                             <span>Save Changes</span>
                         </button>
@@ -212,7 +212,7 @@ const Settings = () => {
             </div>
             {isCancelModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in border border-slate-200 dark:border-slate-700">
+                    <div className="bg-white dark:bg-slate-800 rounded-sm w-full max-w-lg shadow-md overflow-hidden animate-fade-in border border-slate-200 dark:border-slate-700">
                         <div className="p-8">
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
                                 <AlertCircle size={32} />
@@ -224,7 +224,7 @@ const Settings = () => {
                                     <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
                                         If you cancel your <strong className="capitalize">{planData?.planType}</strong> plan, at the end of the current billing cycle your account will be forcefully downgraded to the <strong>Hobby</strong> tier.
                                     </p>
-                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 rounded-xl p-4 text-left mt-4 mb-2">
+                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 rounded-sm p-4 text-left mt-4 mb-2">
                                         <h4 className="font-bold text-red-800 dark:text-red-400 mb-2 flex items-center gap-2">
                                             <AlertCircle size={16} /> You will lose access to:
                                         </h4>
@@ -241,13 +241,13 @@ const Settings = () => {
                                     <div className="flex gap-3 pt-4">
                                         <button 
                                             onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                         >
                                             Keep My Plan
                                         </button>
                                         <button 
                                             onClick={() => setCancelStep(2)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors"
                                         >
                                             Continue Cancellation
                                         </button>
@@ -260,7 +260,7 @@ const Settings = () => {
                                     
                                     <div className="space-y-3 mt-4 text-left max-h-48 overflow-y-auto px-2 custom-scrollbar">
                                         {['Too expensive', 'Missing features', 'Don\'t use it enough', 'Switching to a competitor', 'Other / Prefer not to say'].map(reason => (
-                                            <label key={reason} className={`flex items-center p-3.5 rounded-xl border cursor-pointer transition-colors ${cancelReason === reason ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                            <label key={reason} className={`flex items-center p-3.5 rounded-sm border cursor-pointer transition-colors ${cancelReason === reason ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                 <input type="radio" className="mr-3 w-4 h-4 text-brand-600" name="cancelReason" checked={cancelReason === reason} onChange={() => setCancelReason(reason)} />
                                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{reason}</span>
                                             </label>
@@ -270,14 +270,14 @@ const Settings = () => {
                                     <div className="flex gap-3 pt-4">
                                         <button 
                                             onClick={() => setCancelStep(1)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                         >
                                             Go Back
                                         </button>
                                         <button 
                                             onClick={() => setCancelStep(3)}
                                             disabled={!cancelReason}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             Next Step
                                         </button>
@@ -292,13 +292,13 @@ const Settings = () => {
                                     <div className="flex gap-3 pt-6">
                                         <button 
                                             onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/30"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-sm shadow-brand-500/30"
                                         >
                                             I'll Stay
                                         </button>
                                         <button 
                                             onClick={goToFinalStep}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                         >
                                             No, Continue
                                         </button>
@@ -316,19 +316,19 @@ const Settings = () => {
                                         value={cancelConfirmText}
                                         onChange={(e) => setCancelConfirmText(e.target.value)}
                                         onPaste={(e) => { e.preventDefault(); addToast('Warning', 'Copy-pasting is not allowed for this confirmation', 'error') }}
-                                        className="w-full mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl p-3 text-center tracking-wide font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-red-500"
+                                        className="w-full mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm p-3 text-center tracking-wide font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-red-500"
                                     />
                                     <div className="flex gap-3 pt-6">
                                         <button 
                                             onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
                                         >
                                             Change Mind, Keep Plan
                                         </button>
                                         <button 
                                             onClick={executeCancelPlan}
                                             disabled={cancelConfirmText !== 'I AGREE TO CANCEL' || cancelling || countdown > 0}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-red-500/30"
+                                            className="flex-1 py-3 px-4 rounded-sm bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-red-500/30"
                                         >
                                             {cancelling ? 'Scheduling...' : countdown > 0 ? `Wait ${countdown}s...` : 'Confirm Cancellation'}
                                         </button>

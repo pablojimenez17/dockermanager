@@ -115,7 +115,7 @@ const Register = () => {
             <div className="absolute top-6 right-6">
                 <button
                     onClick={toggleTheme}
-                    className="p-2.5 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 transition-colors"
+                    className="p-2.5 rounded-sm bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 shadow-sm border border-slate-200 dark:border-slate-700 transition-colors"
                     title="Toggle Theme"
                 >
                     {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
@@ -123,7 +123,7 @@ const Register = () => {
             </div>
             <div className="sm:mx-auto sm:w-full sm:max-w-md">
                 <Link to="/" className="flex justify-center items-center space-x-3 mb-8">
-                    <div className="w-12 h-12 bg-brand-50 border-brand-200 dark:bg-brand-500/10 rounded-xl flex items-center justify-center border dark:border-brand-500/20 shadow-[0_0_15px_rgba(14,165,233,0.1)] dark:shadow-[0_0_15px_rgba(14,165,233,0.2)]">
+                    <div className="w-12 h-12 bg-brand-50 border-brand-200 dark:bg-brand-500/10 rounded-sm flex items-center justify-center border dark:border-brand-500/20 shadow-sm">
                         <Server className="text-brand-500 dark:text-brand-400" size={28} />
                     </div>
                 </Link>
@@ -139,16 +139,16 @@ const Register = () => {
             </div>
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-                <div className="bg-white dark:bg-slate-800/50 py-8 px-4 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 sm:rounded-3xl sm:px-10 border border-slate-200 dark:border-slate-700 backdrop-blur-xl">
+                <div className="bg-white dark:bg-slate-800/50 py-8 px-4 shadow-md shadow-slate-200/50 dark:shadow-black/50 sm:rounded-sm sm:px-10 border border-slate-200 dark:border-slate-700 backdrop-blur-xl">
                     {step === 'register' ? (
                         <form className="space-y-6" onSubmit={handleRegister}>
                             {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-xl text-center">
+                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-sm text-center">
                                     {error}
                                 </div>
                             )}
                             {success && (
-                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-xl text-center">
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-sm text-center">
                                     {success}
                                 </div>
                             )}
@@ -163,7 +163,7 @@ const Register = () => {
                                         required
                                         value={name}
                                         onChange={(e) => setName(e.target.value)}
-                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
                                         placeholder="Jane Doe"
                                     />
                                 </div>
@@ -179,7 +179,7 @@ const Register = () => {
                                         required
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        className="appearance-none block w-full px-4 py-3 border border-slate-300 dark:border-slate-600 rounded-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
                                         placeholder="you@example.com"
                                     />
                                 </div>
@@ -195,7 +195,7 @@ const Register = () => {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="appearance-none block w-full px-4 py-3 pr-11 border border-slate-300 dark:border-slate-600 rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
+                                        className="appearance-none block w-full px-4 py-3 pr-11 border border-slate-300 dark:border-slate-600 rounded-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-shadow"
                                         placeholder="••••••••"
                                     />
                                     <button
@@ -219,7 +219,7 @@ const Register = () => {
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className={`appearance-none block w-full px-4 py-3 pr-11 border rounded-xl shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
+                                        className={`appearance-none block w-full px-4 py-3 pr-11 border rounded-sm shadow-sm placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:border-transparent bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white sm:text-sm transition-all ${
                                             confirmPassword && password !== confirmPassword
                                                 ? 'border-red-400 dark:border-red-500 focus:ring-red-500'
                                                 : confirmPassword && password === confirmPassword
@@ -253,7 +253,7 @@ const Register = () => {
                                 <button
                                     type="submit"
                                     disabled={loading || !validatePasswordStrength(password).isValid || password !== confirmPassword}
-                                    className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
+                                    className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-sm shadow-sm text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-brand-500"
                                 >
                                     {loading ? (
                                         <>
@@ -274,12 +274,12 @@ const Register = () => {
                     ) : (
                         <form onSubmit={handleVerify} className="space-y-6">
                             {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-xl text-center">
+                                <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-sm text-center">
                                     {error}
                                 </div>
                             )}
                             {success && (
-                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-xl text-center">
+                                <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-sm text-center">
                                     {success}
                                 </div>
                             )}
@@ -294,7 +294,7 @@ const Register = () => {
                                     maxLength={6}
                                     value={verificationCode}
                                     onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full px-4 py-3 rounded-xl
+                                    className="w-full px-4 py-3 rounded-sm
                                                bg-white dark:bg-slate-900
                                                border border-slate-300 dark:border-slate-600
                                                text-slate-900 dark:text-white
@@ -309,7 +309,7 @@ const Register = () => {
                             <button
                                 type="submit"
                                 disabled={loading || verificationCode.length !== 6}
-                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-xl shadow-lg text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-sm shadow-sm text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {loading ? (
                                     <>

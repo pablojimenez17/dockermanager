@@ -231,7 +231,7 @@ const CreateContainer = () => {
                                                 <Globe size={16} className="mr-2 text-brand-500" /> Expose to Internet
                                                 <div className="relative group/tooltip ml-2 flex items-center">
                                                     <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-xl leading-relaxed">
+                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
                                                         Permite acceso desde fuera de tu red aislando el puerto y generando certificado HTTPS automático a través del Proxy Inverso.
                                                     </div>
                                                 </div>
@@ -285,7 +285,7 @@ const CreateContainer = () => {
                                                         Network Mode
                                                         <div className="relative group/tooltip ml-2 flex items-center">
                                                             <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
-                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-xl leading-relaxed">
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
                                                                 La VPC te aísla de otros usuarios protegiendo el tráfico interno. "Isolated" significa que el contenedor no tendrá ningún acceso a red.
                                                             </div>
                                                         </div>

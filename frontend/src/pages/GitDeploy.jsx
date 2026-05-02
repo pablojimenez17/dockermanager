@@ -94,23 +94,23 @@ const GitDeploy = () => {
                     Your code has been built and deployed globally. To enable <b>Zero-Downtime Auto-Deployments</b> every time you push to this repository, configure a Webhook in your GitHub Repository Settings using the details below.
                 </p>
 
-                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 text-left space-y-4 mb-8">
+                <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-sm p-6 text-left space-y-4 mb-8">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Payload URL</label>
-                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-brand-600 dark:text-brand-400 break-all select-all">
+                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-sm font-mono text-sm text-brand-600 dark:text-brand-400 break-all select-all">
                             {webhookData.url}
                         </code>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Secret (HMAC SHA-256)</label>
-                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm text-purple-600 dark:text-purple-400 break-all select-all">
+                        <code className="block w-full p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-sm font-mono text-sm text-purple-600 dark:text-purple-400 break-all select-all">
                             {webhookData.secret}
                         </code>
                         <p className="text-xs text-amber-500 mt-2 font-medium">⚠️ Copy this secret now. It is encrypted in our database and will never be shown again.</p>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Content Type</label>
-                        <code className="block w-full p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl font-mono text-sm dark:text-slate-300">
+                        <code className="block w-full p-3 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-sm font-mono text-sm dark:text-slate-300">
                             application/json
                         </code>
                     </div>
@@ -118,7 +118,7 @@ const GitDeploy = () => {
 
                 <button
                     onClick={() => navigate('/app/containers')}
-                    className="bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-xl font-bold w-full transition-colors shadow-lg shadow-brand-500/30"
+                    className="bg-brand-500 hover:bg-brand-600 text-white px-8 py-4 rounded-sm font-bold w-full transition-colors shadow-sm shadow-brand-500/30"
                 >
                     I have saved the Webhook, take me to my Container
                 </button>
@@ -129,7 +129,7 @@ const GitDeploy = () => {
     return (
         <div className="p-4 sm:p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">
             <div className="mb-10 text-center">
-                <div className="inline-flex items-center justify-center p-4 bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-2xl mb-4">
+                <div className="inline-flex items-center justify-center p-4 bg-brand-100 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 rounded-sm mb-4">
                     <GitBranch size={40} />
                 </div>
                 <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Deploy from Git</h1>
@@ -137,7 +137,7 @@ const GitDeploy = () => {
             </div>
 
             {/* Quotas Visualization */}
-            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-2xl p-6 shadow-sm mb-8">
+            <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-sm p-6 shadow-sm mb-8">
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
                     <ShieldAlert size={18} className="mr-2 text-brand-500" /> Current Plan Quotas
                 </h4>
@@ -167,9 +167,9 @@ const GitDeploy = () => {
                 </div>
             </div>
 
-            <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">
+            <form onSubmit={handleSubmit} className="space-y-6 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-8 shadow-sm">
                 {error && (
-                    <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+                    <div className="bg-red-500/10 border border-red-500/50 text-red-500 text-sm py-4 px-4 rounded-sm flex items-start space-x-3">
                         <AlertCircle size={20} className="shrink-0 mt-0.5" />
                         <span>{error}</span>
                     </div>
@@ -185,7 +185,7 @@ const GitDeploy = () => {
                             value={form.name}
                             onChange={handleChange}
                             placeholder="e.g. my-awesome-app"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         />
                     </div>
                     <div>
@@ -197,7 +197,7 @@ const GitDeploy = () => {
                             value={form.gitUrl}
                             onChange={handleChange}
                             placeholder="https://github.com/user/repo.git"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         />
                     </div>
                 </div>
@@ -211,12 +211,12 @@ const GitDeploy = () => {
                             value={form.branch}
                             onChange={handleChange}
                             placeholder="main"
-                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none"
+                            className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm focus:ring-2 focus:ring-brand-500 outline-none"
                         />
                     </div>
                 </div>
 
-                <div className="p-6 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-500/20 rounded-2xl space-y-4">
+                <div className="p-6 bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-500/20 rounded-sm space-y-4">
                     <h4 className="font-bold flex items-center text-purple-900 dark:text-purple-300">
                         <Globe className="mr-2" size={20} /> Domain Routing (Traefik)
                     </h4>
@@ -232,7 +232,7 @@ const GitDeploy = () => {
                                 value={form.domain}
                                 onChange={handleChange}
                                 placeholder="api.myapp.com"
-                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-500/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-500/30 rounded-sm focus:ring-2 focus:ring-purple-500 outline-none text-sm"
                             />
                         </div>
                         <div>
@@ -243,7 +243,7 @@ const GitDeploy = () => {
                                 value={form.domainPort}
                                 onChange={handleChange}
                                 placeholder="e.g. 3000"
-                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-500/30 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none text-sm"
+                                className="w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-purple-200 dark:border-purple-500/30 rounded-sm focus:ring-2 focus:ring-purple-500 outline-none text-sm"
                             />
                         </div>
                     </div>
@@ -259,7 +259,7 @@ const GitDeploy = () => {
                                     placeholder="KEY"
                                     value={env.key}
                                     onChange={(e) => updateEnvVar(eIdx, 'key', e.target.value)}
-                                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-mono text-sm outline-none"
+                                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm font-mono text-sm outline-none"
                                 />
                                 <span className="text-slate-400 font-bold">=</span>
                                 <input
@@ -267,7 +267,7 @@ const GitDeploy = () => {
                                     placeholder="VALUE"
                                     value={env.value}
                                     onChange={(e) => updateEnvVar(eIdx, 'value', e.target.value)}
-                                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl font-mono text-sm outline-none"
+                                    className="flex-1 px-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm font-mono text-sm outline-none"
                                 />
                                 <button
                                     type="button"
@@ -292,7 +292,7 @@ const GitDeploy = () => {
                     <button
                         type="submit"
                         disabled={loading || isExceedingLimits}
-                        className={`w-full flex justify-center items-center py-4 rounded-xl shadow-lg font-bold text-white transition-all ${loading || isExceedingLimits ? 'bg-slate-600 opacity-70 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
+                        className={`w-full flex justify-center items-center py-4 rounded-sm shadow-sm font-bold text-white transition-all ${loading || isExceedingLimits ? 'bg-slate-600 opacity-70 cursor-not-allowed' : 'bg-brand-500 hover:bg-brand-600'
                             }`}
                     >
                         {loading ? (

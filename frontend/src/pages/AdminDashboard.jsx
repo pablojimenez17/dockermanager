@@ -149,7 +149,7 @@ const AdminDashboard = () => {
 
     if (error) return (
         <div className="p-8 text-slate-900 dark:text-white max-w-4xl mx-auto">
-            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-500 p-6 rounded-2xl flex items-center mb-8">
+            <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/50 text-red-600 dark:text-red-500 p-6 rounded-sm flex items-center mb-8">
                 <ShieldAlert className="mr-3" size={32} />
                 <div>
                     <h2 className="text-xl font-bold">Access Denied</h2>
@@ -170,7 +170,7 @@ const AdminDashboard = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-3xl shadow-lg relative overflow-hidden group col-span-1">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 p-6 rounded-sm shadow-sm relative overflow-hidden group col-span-1">
                     <div className="absolute top-0 right-0 p-6 opacity-10 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-500">
                         <Users size={64} />
                     </div>
@@ -182,7 +182,7 @@ const AdminDashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-lg col-span-2 overflow-x-auto">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm col-span-2 overflow-x-auto">
                     <h3 className="font-bold mb-4 border-b border-slate-200 dark:border-slate-700 pb-2">Registered Users</h3>
                     <table className="w-full text-left text-sm">
                         <thead>
@@ -210,12 +210,12 @@ const AdminDashboard = () => {
             </div>
 
             {/* Audit Logs Section */}
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl mb-12">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-4 md:p-8 shadow-sm mb-12">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-900 dark:text-white">
                     <FileText className="text-brand-500 dark:text-brand-400" />
                     <span>System Audit Logs</span>
                 </h3>
-                <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-xl">
+                <div className="overflow-x-auto max-h-[400px] overflow-y-auto rounded-sm">
                     <table className="w-full text-left text-sm whitespace-nowrap min-w-[700px]">
                         <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10 shadow-sm border-b border-slate-200 dark:border-slate-700">
                             <tr className="text-slate-500 dark:text-slate-400">
@@ -265,7 +265,7 @@ const AdminDashboard = () => {
             </div>
 
             {/* Backup Section */}
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl mb-12">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-4 md:p-8 shadow-sm mb-12">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 border-b border-slate-200 dark:border-slate-700 pb-4 gap-4">
                     <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
                         <DatabaseBackup className="text-emerald-500" />
@@ -277,7 +277,7 @@ const AdminDashboard = () => {
                             id="admin-refresh-backups"
                             onClick={fetchBackupList}
                             disabled={backupLoading}
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm disabled:opacity-50"
+                            className="flex items-center gap-2 px-4 py-2 rounded-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm disabled:opacity-50"
                         >
                             <RefreshCw size={14} className={backupLoading ? 'animate-spin' : ''} />
                             Refresh
@@ -286,7 +286,7 @@ const AdminDashboard = () => {
                             id="admin-run-backup"
                             onClick={handleRunBackup}
                             disabled={backupRunning}
-                            className="flex items-center gap-2 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
+                            className="flex items-center gap-2 px-5 py-2 rounded-sm bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {backupRunning ? (
                                 <><RefreshCw size={14} className="animate-spin" /> Running...</>
@@ -305,7 +305,7 @@ const AdminDashboard = () => {
                         <p className="text-slate-400">No backups found in MinIO yet. Run your first backup.</p>
                     </div>
                 ) : (
-                    <div className="overflow-x-auto rounded-xl">
+                    <div className="overflow-x-auto rounded-sm">
                         <table className="w-full text-left text-sm">
                             <thead className="bg-slate-50 dark:bg-slate-900/50">
                                 <tr className="text-slate-500 dark:text-slate-400">
@@ -340,7 +340,7 @@ const AdminDashboard = () => {
                                         <td className="p-3">
                                             <button
                                                 onClick={() => handleDeleteBackup(b.bucket, b.filename)}
-                                                className="p-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors border border-rose-500/20"
+                                                className="p-1.5 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-sm transition-colors border border-rose-500/20"
                                                 title="Eliminar backup"
                                             >
                                                 <Trash2 size={13} />
@@ -354,7 +354,7 @@ const AdminDashboard = () => {
                 )}
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-4 md:p-8 shadow-xl">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-4 md:p-8 shadow-sm">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4 text-slate-900 dark:text-white">
                     <Server className="text-brand-500 dark:text-brand-400" />
                     <span>Global Container Instances ({containers.length})</span>
@@ -386,7 +386,7 @@ const AdminDashboard = () => {
                                         {c.state === 'running' && (
                                             <button
                                                 onClick={() => setActiveTerminal({ id: c.dockerId, name: c.name })}
-                                                className="p-2 bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 rounded-lg transition-colors border border-brand-500/20"
+                                                className="p-2 bg-brand-500/10 text-brand-400 hover:bg-brand-500/20 rounded-sm transition-colors border border-brand-500/20"
                                                 title="Open Terminal"
                                             >
                                                 <MonitorPlay size={16} />
@@ -394,7 +394,7 @@ const AdminDashboard = () => {
                                         )}
                                         <button
                                             onClick={() => handleForceDelete(c._id)}
-                                            className="p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-lg transition-colors border border-rose-500/20"
+                                            className="p-2 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 rounded-sm transition-colors border border-rose-500/20"
                                             title="Force Delete Container"
                                         >
                                             <Trash2 size={16} />
@@ -424,7 +424,7 @@ const AdminDashboard = () => {
             {/* Logs Modal */}
             {selectedLogs && (
                 <div className="fixed inset-0 bg-slate-900/20 dark:bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-8">
-                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col h-[80vh]">
+                    <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 w-full max-w-4xl rounded-sm shadow-md overflow-hidden flex flex-col h-[80vh]">
                         <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                             <h3 className="font-bold flex items-center text-lg text-slate-900 dark:text-white"><Terminal className="mr-2 text-brand-500 dark:text-brand-400" /> Logs: {selectedLogs.name}</h3>
                             <button onClick={() => setSelectedLogs(null)} className="text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">

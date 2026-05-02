@@ -89,7 +89,7 @@ const Buckets = () => {
                     </p>
                 </div>
                 <div className="flex w-full sm:w-auto space-x-3 items-center">
-                    <div className="text-sm font-semibold bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-300">
+                    <div className="text-sm font-semibold bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-sm text-slate-600 dark:text-slate-300">
                         {buckets.length} / {userLimits.maxBuckets >= 999 ? '∞' : userLimits.maxBuckets} Buckets
                     </div>
                     <button
@@ -100,7 +100,7 @@ const Buckets = () => {
                             }
                             setShowCreateModal(true);
                         }}
-                        className={`flex items-center space-x-2 px-5 py-2.5 rounded-xl font-medium transition-all duration-200 ${buckets.length >= userLimits.maxBuckets ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500' : 'bg-brand-500 hover:bg-brand-600 text-white shadow-lg shadow-brand-500/30 hover:scale-105 active:scale-95'}`}
+                        className={`flex items-center space-x-2 px-5 py-2.5 rounded-sm font-medium transition-all duration-200 ${buckets.length >= userLimits.maxBuckets ? 'bg-slate-300 text-slate-500 cursor-not-allowed dark:bg-slate-700 dark:text-slate-500' : 'bg-brand-500 hover:bg-brand-600 text-white shadow-sm shadow-brand-500/30 active:scale-95'}`}
                     >
                         <Plus size={20} />
                         <span>Create Bucket</span>
@@ -115,10 +115,10 @@ const Buckets = () => {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {buckets.length === 0 ? (
-                        <div className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
+                        <div className="col-span-1 md:col-span-2 lg:col-span-3 flex flex-col items-center justify-center py-24 px-4 bg-white/60 dark:bg-slate-800/40 backdrop-blur-xl rounded-sm border border-slate-200/50 dark:border-slate-700/50 shadow-sm mt-4 text-center">
                             <div className="w-24 h-24 mb-6 relative">
-                                <div className="absolute inset-0 bg-brand-500/20 blur-2xl rounded-full"></div>
-                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-3xl flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
+                                {/* Removed blur orb */}
+                                <div className="relative w-full h-full bg-brand-50 dark:bg-brand-500/10 rounded-sm flex items-center justify-center border border-brand-100 dark:border-brand-500/20 shadow-inner">
                                     <Database size={40} className="text-brand-500 drop-shadow-sm" />
                                 </div>
                             </div>
@@ -127,9 +127,9 @@ const Buckets = () => {
                         </div>
                     ) : (
                         buckets.map(bucket => (
-                            <div key={bucket.name} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl p-6 shadow-lg hover:border-brand-400 transition-colors flex flex-col group h-full">
+                            <div key={bucket.name} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm hover:border-brand-400 transition-colors flex flex-col group h-full">
                                 <div className="flex items-start space-x-4 mb-6">
-                                    <div className="p-4 rounded-2xl bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 shrink-0">
+                                    <div className="p-4 rounded-sm bg-brand-50 text-brand-600 dark:bg-brand-500/10 dark:text-brand-400 shrink-0">
                                         <Database size={28} />
                                     </div>
                                     <div className="flex-1 min-w-0 pt-1">
@@ -144,13 +144,13 @@ const Buckets = () => {
                                 <div className="flex items-center space-x-3 pt-6 border-t border-slate-200 dark:border-slate-700/50 mt-auto">
                                     <button
                                         onClick={() => setSelectedBucket(bucket.name)}
-                                        className="flex-1 bg-brand-50 hover:bg-brand-100 dark:bg-brand-500/10 dark:hover:bg-brand-500/20 text-brand-600 dark:text-brand-400 py-2.5 rounded-xl font-medium transition-colors flex items-center justify-center space-x-2"
+                                        className="flex-1 bg-brand-50 hover:bg-brand-100 dark:bg-brand-500/10 dark:hover:bg-brand-500/20 text-brand-600 dark:text-brand-400 py-2.5 rounded-sm font-medium transition-colors flex items-center justify-center space-x-2"
                                     >
                                         <span>Browse Objects</span> <ArrowRight size={16} />
                                     </button>
                                     <button
                                         onClick={() => handleDeleteBucket(bucket.name)}
-                                        className="p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 rounded-xl transition-colors"
+                                        className="p-2.5 bg-rose-50 hover:bg-rose-100 dark:bg-rose-500/10 dark:hover:bg-rose-500/20 text-rose-500 dark:text-rose-400 rounded-sm transition-colors"
                                         title="Delete Empty Bucket"
                                     >
                                         <Trash2 size={20} />
@@ -165,7 +165,7 @@ const Buckets = () => {
             {/* Create Modal */}
             {showCreateModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-                    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md m-auto border border-slate-200 dark:border-slate-700">
+                    <div className="bg-white dark:bg-slate-800 rounded-sm shadow-md w-full max-w-md m-auto border border-slate-200 dark:border-slate-700">
                         <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                             <h2 className="text-xl font-bold text-slate-800 dark:text-white">Create Bucket</h2>
                             <button onClick={() => setShowCreateModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
@@ -182,13 +182,13 @@ const Buckets = () => {
                                 value={newBucketName}
                                 onChange={(e) => setNewBucketName(e.target.value)}
                                 placeholder="e.g. static-assets"
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white"
+                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-brand-500 outline-none text-slate-900 dark:text-white"
                             />
                             <p className="text-xs text-slate-500 mt-2">Names must be lowercase and contain only hyphens and alphanumeric characters.</p>
 
                             <div className="mt-8 flex justify-end space-x-3">
-                                <button type="button" onClick={() => setShowCreateModal(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl font-medium">Cancel</button>
-                                <button type="submit" disabled={!newBucketName} className="px-5 py-2.5 bg-brand-500 text-white rounded-xl font-medium hover:bg-brand-600 disabled:opacity-50">Create Bucket</button>
+                                <button type="button" onClick={() => setShowCreateModal(false)} className="px-5 py-2.5 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-sm font-medium">Cancel</button>
+                                <button type="submit" disabled={!newBucketName} className="px-5 py-2.5 bg-brand-500 text-white rounded-sm font-medium hover:bg-brand-600 disabled:opacity-50">Create Bucket</button>
                             </div>
                         </form>
                     </div>

@@ -61,31 +61,11 @@ const Login = () => {
 
             {/* ── Left decorative panel (hidden on mobile) ── */}
             <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-white dark:bg-transparent border-r border-slate-200 dark:border-white/6">
-                {/* Background effects */}
-                <div className="absolute inset-0 dark:block hidden"
-                    style={{
-                        backgroundImage: `
-                            linear-gradient(to right, rgba(148,163,184,0.04) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(148,163,184,0.04) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '60px 60px',
-                    }}
-                />
-                <div className="absolute inset-0 block dark:hidden"
-                    style={{
-                        backgroundImage: `
-                            linear-gradient(to right, rgba(148,163,184,0.12) 1px, transparent 1px),
-                            linear-gradient(to bottom, rgba(148,163,184,0.12) 1px, transparent 1px)
-                        `,
-                        backgroundSize: '60px 60px',
-                    }}
-                />
-                <div className="absolute top-[-15%] left-[-10%] w-[70%] h-[70%] rounded-full bg-brand-500/10 blur-[120px] opacity-60 dark:opacity-100" />
-                <div className="absolute bottom-[-10%] right-[-5%] w-[50%] h-[50%] rounded-full bg-violet-500/8 blur-[100px] opacity-60 dark:opacity-100" />
+                {/* Background effects removed for sober design */}
 
                 {/* Logo */}
                 <div className="relative flex items-center gap-3 z-10">
-                    <div className="w-9 h-9 bg-brand-500/15 rounded-xl flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
+                    <div className="w-9 h-9 bg-brand-500/15 rounded-sm flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
                         <Aperture size={20} className="animate-[spin_15s_linear_infinite]" />
                     </div>
                     <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">Orbit</span>
@@ -103,7 +83,7 @@ const Login = () => {
                         </div>
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white leading-tight mb-4">
                             Your containers,<br />
-                            <span className="bg-gradient-to-r from-brand-500 to-violet-500 dark:from-brand-400 dark:to-violet-400 bg-clip-text text-transparent">
+                            <span className="text-brand-500">
                                 under control.
                             </span>
                         </h1>
@@ -140,7 +120,7 @@ const Login = () => {
                 <div className="absolute top-6 right-6 flex items-center gap-2">
                     <button
                         onClick={toggleTheme}
-                        className="p-2 rounded-lg bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/8"
+                        className="p-2 rounded-sm bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/8"
                         title="Toggle Theme"
                     >
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
@@ -149,7 +129,7 @@ const Login = () => {
 
                 {/* Mobile logo */}
                 <div className="lg:hidden flex items-center gap-3 mb-10">
-                    <div className="w-9 h-9 bg-brand-500/15 rounded-xl flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
+                    <div className="w-9 h-9 bg-brand-500/15 rounded-sm flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
                         <Aperture size={20} className="animate-[spin_15s_linear_infinite]" />
                     </div>
                     <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">Orbit</span>
@@ -177,7 +157,7 @@ const Login = () => {
 
                     {/* Error */}
                     {error && (
-                        <div className="mb-5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 text-red-600 dark:text-red-400 text-sm py-3 px-4 rounded-xl">
+                        <div className="mb-5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 text-red-600 dark:text-red-400 text-sm py-3 px-4 rounded-sm">
                             {error}
                         </div>
                     )}
@@ -195,7 +175,7 @@ const Login = () => {
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-xl
+                                    className="w-full px-4 py-3 rounded-sm
                                                bg-white dark:bg-white/5
                                                border border-slate-200 dark:border-white/10
                                                text-slate-900 dark:text-white
@@ -225,7 +205,7 @@ const Login = () => {
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-4 py-3 pr-11 rounded-xl
+                                        className="w-full px-4 py-3 pr-11 rounded-sm
                                                    bg-white dark:bg-white/5
                                                    border border-slate-200 dark:border-white/10
                                                    text-slate-900 dark:text-white
@@ -251,9 +231,9 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-xl
+                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                            bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
-                                           shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30
+                                           shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
                                            transition-all disabled:opacity-60 disabled:cursor-not-allowed
                                            active:scale-[0.98]"
                             >
@@ -282,7 +262,7 @@ const Login = () => {
                                     maxLength={6}
                                     value={verificationCode}
                                     onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full px-4 py-3 rounded-xl
+                                    className="w-full px-4 py-3 rounded-sm
                                                bg-white dark:bg-white/5
                                                border border-slate-200 dark:border-white/10
                                                text-slate-900 dark:text-white
@@ -299,9 +279,9 @@ const Login = () => {
                             <button
                                 type="submit"
                                 disabled={loading || verificationCode.length !== 6}
-                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-xl
+                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                            bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
-                                           shadow-lg shadow-brand-500/20 hover:shadow-brand-500/30
+                                           shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
                                            transition-all disabled:opacity-60 disabled:cursor-not-allowed
                                            active:scale-[0.98]"
                             >
@@ -340,7 +320,7 @@ const Login = () => {
 
                     <Link
                         to="/"
-                        className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-xl
+                        className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                    bg-white dark:bg-white/4 hover:bg-slate-100 dark:hover:bg-white/8
                                    text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200
                                    border border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/15

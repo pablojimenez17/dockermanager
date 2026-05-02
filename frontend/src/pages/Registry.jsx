@@ -80,21 +80,21 @@ const Registries = () => {
     if (!isEnterprise) {
         return (
             <div className="p-4 md:p-8 pb-20 max-w-4xl mx-auto flex flex-col items-center justify-center min-h-[70vh] text-center">
-                <div className="w-24 h-24 bg-gradient-to-br from-amber-400 to-orange-500 rounded-3xl flex items-center justify-center mb-8 shadow-[0_0_40px_rgba(245,158,11,0.3)] border border-amber-300">
+                <div className="w-24 h-24 bg-brand-600 hover:bg-brand-700 rounded-sm flex items-center justify-center mb-8 shadow-sm border border-amber-300">
                     <Lock size={48} className="text-white" />
                 </div>
                 <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">Enterprise Exclusive Feature</h1>
                 <p className="text-lg text-slate-600 dark:text-slate-400 mb-8 max-w-2xl leading-relaxed">
                     Private Registries allow you to connect securely to your locked <b>DockerHub Pro, AWS ECR, or GitHub Container Registry</b> repositories. Upgrade to the Enterprise plan to unlock this military-grade encrypted vault.
                 </p>
-                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-3xl border border-slate-200 dark:border-slate-700 w-full max-w-lg mb-8 text-left">
+                <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-sm border border-slate-200 dark:border-slate-700 w-full max-w-lg mb-8 text-left">
                     <ul className="space-y-4">
                         <li className="flex items-center text-slate-700 dark:text-slate-300"><ShieldCheck className="text-green-500 mr-3 shrink-0" /> AES-256 Military Grade Encryption</li>
                         <li className="flex items-center text-slate-700 dark:text-slate-300"><Globe className="text-blue-500 mr-3 shrink-0" /> Support for all Docker v2 API Registries</li>
                         <li className="flex items-center text-slate-700 dark:text-slate-300"><Lock className="text-amber-500 mr-3 shrink-0" /> Pull private proprietary code securely</li>
                     </ul>
                 </div>
-                <Link to="/app/plans" className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 px-8 py-4 rounded-2xl font-bold text-lg transition-all shadow-xl flex items-center space-x-2">
+                <Link to="/app/plans" className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 px-8 py-4 rounded-sm font-bold text-lg transition-all shadow-sm flex items-center space-x-2">
                     <span>Upgrade to Enterprise</span>
                     <ArrowUpRight size={20} />
                 </Link>
@@ -108,11 +108,11 @@ const Registries = () => {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white flex items-center space-x-3">
-                        <div className="p-2.5 bg-amber-500/10 rounded-xl text-amber-500 border border-amber-500/20">
+                        <div className="p-2.5 bg-amber-500/10 rounded-sm text-amber-500 border border-amber-500/20">
                             <ShieldCheck size={28} />
                         </div>
                         <span>Private Registries</span>
-                        <span className="bg-gradient-to-r from-amber-400 to-orange-500 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider shadow-sm ml-2">Enterprise</span>
+                        <span className="bg-brand-600 hover:bg-brand-700 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-sm tracking-wider shadow-sm ml-2">Enterprise</span>
                     </h1>
                     <p className="text-slate-600 dark:text-slate-400 mt-2 max-w-2xl leading-relaxed">
                         Securely store authentication credentials for your private Docker registries (DockerHub, GHCR, AWS ECR). Passwords are encrypted with AES-256 and never readable via the API.
@@ -120,7 +120,7 @@ const Registries = () => {
                 </div>
                 <button
                     onClick={() => setShowForm(!showForm)}
-                    className="shrink-0 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 px-5 py-2.5 rounded-xl font-medium transition-all shadow-lg flex items-center justify-center space-x-2"
+                    className="shrink-0 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 px-5 py-2.5 rounded-sm font-medium transition-all shadow-sm flex items-center justify-center space-x-2"
                 >
                     <Plus size={20} />
                     <span>Add Registry</span>
@@ -128,8 +128,8 @@ const Registries = () => {
             </div>
 
             {showForm && (
-                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-6 shadow-xl animate-in fade-in slide-in-from-top-4">
-                    <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-500 mb-6 bg-amber-50 dark:bg-amber-500/10 p-4 rounded-xl border border-amber-200 dark:border-amber-500/20">
+                <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-6 shadow-sm animate-in fade-in slide-in-from-top-4">
+                    <div className="flex items-center space-x-3 text-amber-600 dark:text-amber-500 mb-6 bg-amber-50 dark:bg-amber-500/10 p-4 rounded-sm border border-amber-200 dark:border-amber-500/20">
                         <ShieldAlert size={24} className="shrink-0" />
                         <span className="text-sm font-medium">Your password or access token will be encrypted and hidden forever once saved. Ensure you have a backup of the token before saving.</span>
                     </div>
@@ -144,7 +144,7 @@ const Registries = () => {
                                     value={newRegistry.name}
                                     onChange={(e) => setNewRegistry({ ...newRegistry, name: e.target.value.replace(/[^A-Za-z0-9_]/g, '') })}
                                     placeholder="e.g. Github_Packages"
-                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
                                 />
                             </div>
                             <div>
@@ -159,7 +159,7 @@ const Registries = () => {
                                         value={newRegistry.url}
                                         onChange={(e) => setNewRegistry({ ...newRegistry, url: e.target.value })}
                                         placeholder="ghcr.io or index.docker.io/v1/"
-                                        className="pl-10 w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
+                                        className="pl-10 w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
                                     />
                                 </div>
                             </div>
@@ -171,7 +171,7 @@ const Registries = () => {
                                     value={newRegistry.username}
                                     onChange={(e) => setNewRegistry({ ...newRegistry, username: e.target.value })}
                                     placeholder="docker_user or AWS Access Key"
-                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
+                                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
                                 />
                             </div>
                             <div>
@@ -183,7 +183,7 @@ const Registries = () => {
                                         value={newRegistry.password}
                                         onChange={(e) => setNewRegistry({ ...newRegistry, password: e.target.value })}
                                         placeholder="Paste your secret token here"
-                                        className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
+                                        className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 dark:text-white transition-all font-mono"
                                     />
                                     <button
                                         type="button"
@@ -200,14 +200,14 @@ const Registries = () => {
                             <button
                                 type="button"
                                 onClick={() => setShowForm(false)}
-                                className="px-6 py-2.5 rounded-xl font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                className="px-6 py-2.5 rounded-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                             >
                                 Cancel
                             </button>
                             <button
                                 type="submit"
                                 disabled={submitting}
-                                className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 disabled:opacity-50 text-white px-8 py-2.5 rounded-xl font-bold transition-all shadow-md flex items-center space-x-2"
+                                className="bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 dark:text-slate-900 disabled:opacity-50 text-white px-8 py-2.5 rounded-sm font-bold transition-all shadow-md flex items-center space-x-2"
                             >
                                 {submitting ? <span className="animate-pulse">Encrypting...</span> : (
                                     <>
@@ -221,7 +221,7 @@ const Registries = () => {
                 </div>
             )}
 
-            <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-3xl overflow-hidden shadow-sm">
+            <div className="bg-white dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-sm overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
@@ -237,7 +237,7 @@ const Registries = () => {
                             {registries.length === 0 ? (
                                 <tr>
                                     <td colSpan="5" className="p-12 text-center text-slate-500 dark:text-slate-400">
-                                        <div className="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-full mb-4">
+                                        <div className="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 flex items-center justify-center rounded-sm mb-4">
                                             <ShieldCheck size={32} className="opacity-50 text-slate-400" />
                                         </div>
                                         <p className="text-lg font-medium">No registries added</p>
@@ -249,7 +249,7 @@ const Registries = () => {
                                     <tr key={reg._id} className="hover:bg-slate-50 dark:hover:bg-slate-700/20 transition-colors group">
                                         <td className="p-5 font-medium text-slate-900 dark:text-white">{reg.name}</td>
                                         <td className="p-5">
-                                            <div className="flex items-center space-x-2 font-mono text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 inline-flex rounded-lg border border-blue-100 dark:border-blue-800">
+                                            <div className="flex items-center space-x-2 font-mono text-sm text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-2 py-1 inline-flex rounded-sm border border-blue-100 dark:border-blue-800">
                                                 <Globe size={14} />
                                                 <span>{reg.url}</span>
                                             </div>
@@ -259,7 +259,7 @@ const Registries = () => {
                                         <td className="p-5 text-right whitespace-nowrap">
                                             <button
                                                 onClick={() => handleDeleteRegistry(reg._id, reg.name)}
-                                                className="text-red-500 hover:text-red-700 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                                                className="text-red-500 hover:text-red-700 p-2 rounded-sm hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
                                                 title="Delete Registry"
                                             >
                                                 <Trash2 size={18} />
