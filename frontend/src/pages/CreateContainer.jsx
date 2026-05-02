@@ -26,7 +26,7 @@ const getEmptyContainer = () => ({
 });
 
 const CreateContainer = () => {
-    const { activeOrg } = useOrg();
+    const { activeOrg, userPlan } = useOrg();
     const [containers, setContainers] = useState([getEmptyContainer()]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -43,17 +43,21 @@ const CreateContainer = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                const [netRes, meRes, myContainersRes, volRes, secRes] = await Promise.all([
+                const [netRes, myContainersRes, volRes, secRes] = await Promise.all([
                     axios.get('/api/networks').catch(() => ({ data: [] })),
-                    axios.get('/api/auth/me'),
-                    axios.get('/api/containers'),
+                    axios.get(`/api/containers?t=${Date.now()}`),
                     axios.get('/api/volumes').catch(() => ({ data: [] })),
                     axios.get('/api/secrets').catch(() => ({ data: [] }))
                 ]);
+                
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
                 setAvailableSecrets(secRes.data || []);
-                setLimits(resolveLimits(meRes.data));
+                
+                const role = localStorage.getItem('role');
+                const planType = activeOrg ? activeOrg.plan : userPlan;
+                setLimits(resolveLimits({ planType, role }));
+                
                 setCurrentContainerCount(myContainersRes.data.length);
 
                 let totalRam = 0;

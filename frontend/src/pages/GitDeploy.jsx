@@ -6,7 +6,7 @@ import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const GitDeploy = () => {
-    const { activeOrg } = useOrg();
+    const { activeOrg, userPlan } = useOrg();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -26,12 +26,13 @@ const GitDeploy = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                const [meRes, containersRes] = await Promise.all([
-                    axios.get('/api/auth/me'),
-                    axios.get('/api/containers')
+                const [containersRes] = await Promise.all([
+                    axios.get(`/api/containers?t=${Date.now()}`)
                 ]);
 
-                setLimits(resolveLimits(meRes.data));
+                const role = localStorage.getItem('role');
+                const planType = activeOrg ? activeOrg.plan : userPlan;
+                setLimits(resolveLimits({ planType, role }));
 
                 const activeContainers = containersRes.data;
                 const activeDomains = activeContainers.filter(c => c.domain && c.domain.trim() !== '').length;

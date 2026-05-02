@@ -6,7 +6,7 @@ import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const Marketplace = () => {
-    const { activeOrg } = useOrg();
+    const { activeOrg, userPlan } = useOrg();
     const [templates, setTemplates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -64,11 +64,10 @@ const Marketplace = () => {
 
                 const token = localStorage.getItem('token');
 
-                const [tplRes, secRes, meRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
+                const [tplRes, secRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
                     axios.get('/api/templates'),
                     axios.get('/api/secrets').catch(() => ({ data: [] })),
-                    axios.get('/api/auth/me'),
-                    axios.get('/api/containers'),
+                    axios.get(`/api/containers?t=${Date.now()}`),
                     axios.get('/api/snapshots').catch(() => ({ data: [] })),
                     axios.get('/api/networks').catch(() => ({ data: [] })),
                     axios.get('/api/volumes').catch(() => ({ data: [] }))
@@ -110,7 +109,9 @@ const Marketplace = () => {
                 setAvailableVolumes(newVolumes);
 
                 // Quotas — ALWAYS resolved fresh from planType, never from cache
-                setLimits(resolveLimits(meRes.data));
+                const role = localStorage.getItem('role');
+                const planType = activeOrg ? activeOrg.plan : userPlan;
+                setLimits(resolveLimits({ planType, role }));
                 
                 const newContainerCount = myContainersRes.data.length;
                 setCurrentContainerCount(newContainerCount);

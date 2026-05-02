@@ -5,7 +5,7 @@ import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const Volumes = () => {
-    const { activeOrg } = useOrg();
+    const { activeOrg, userPlan } = useOrg();
     const [volumes, setVolumes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(false);
@@ -19,12 +19,13 @@ const Volumes = () => {
         setLoading(true);
         setError('');
         try {
-            const [meRes, volRes] = await Promise.all([
-                axios.get('/api/auth/me'),
-                axios.get('/api/volumes').catch(() => ({ data: [] }))
+            const [volRes] = await Promise.all([
+                axios.get(`/api/volumes?t=${Date.now()}`).catch(() => ({ data: [] }))
             ]);
 
-            setLimits(resolveLimits(meRes.data));
+            const role = localStorage.getItem('role');
+            const planType = activeOrg ? activeOrg.plan : userPlan;
+            setLimits(resolveLimits({ planType, role }));
 
             const fetchedVolumes = volRes.data || [];
             setVolumes(fetchedVolumes);

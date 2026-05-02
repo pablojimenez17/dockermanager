@@ -1,11 +1,18 @@
 import React, { useEffect, useRef } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useOrg } from '../context/OrgContext';
 
 const AdBanner = () => {
+    const { userPlan, activeOrg } = useOrg();
     const adRef = useRef(null);
     const pushed = useRef(false);
 
+    const plan = (activeOrg ? activeOrg.plan : userPlan) || 'free';
+    
+    // Always call hooks before conditional returns, but render nothing if not free
     useEffect(() => {
+        if (plan !== 'free') return;
+
         const el = adRef.current;
         if (!el || pushed.current) return;
 
@@ -38,6 +45,8 @@ const AdBanner = () => {
             return () => observer.disconnect();
         }
     }, []);
+
+    if (plan !== 'free') return null;
 
     return (
         <div className="w-full bg-gray-100 dark:bg-slate-800 rounded p-2 flex flex-col items-center justify-center min-h-[100px] border border-gray-200 dark:border-slate-700 relative overflow-hidden group">
