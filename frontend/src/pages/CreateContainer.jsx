@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Database, Globe, Lock, Play, Server, AlertCircle, Settings2, Cpu, HardDrive, Network, ChevronDown, ChevronUp, Plus, Trash2, Layers, Zap, ShieldAlert, Info } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const getEmptyContainer = () => ({
@@ -25,6 +26,7 @@ const getEmptyContainer = () => ({
 });
 
 const CreateContainer = () => {
+    const { activeOrg } = useOrg();
     const [containers, setContainers] = useState([getEmptyContainer()]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -176,7 +178,7 @@ const CreateContainer = () => {
 
                 <div className="panel p-5">
                     <h3 className="text-base font-semibold mb-4 flex items-center">
-                        <ShieldAlert size={16} className="mr-2 text-gray-400" /> Resource Allocation
+                        <ShieldAlert size={16} className="mr-2 text-gray-400" /> Resource Allocation - <span className="ml-1 font-normal text-gray-500">{activeOrg ? activeOrg.name : 'Personal Workspace'}</span>
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
                         <div>

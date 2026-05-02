@@ -234,7 +234,7 @@ router.get('/me', authMiddleware, async (req, res) => {
             agency: { maxContainers: 999, maxRamMb: 131072, maxCpuCores: 64, maxDomains: 999, maxVolumes: 100, maxVolumeSizeMb: 1048576, maxSnapshots: 999, maxBuckets: 999 }
         };
 
-        const planType = user.planType || 'free';
+        const planType = (req.organization ? req.organization.plan : user.planType) || 'free';
         let resolvedLimits = user.limits;
 
         if (user.role === 'admin') {
@@ -248,6 +248,8 @@ router.get('/me', authMiddleware, async (req, res) => {
         }
 
         const responseObj = user.toObject();
+        // Force planType to match the organization's plan if requested
+        responseObj.planType = planType;
         responseObj.limits = resolvedLimits;
 
         res.json(responseObj);

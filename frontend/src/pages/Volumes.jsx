@@ -111,7 +111,7 @@ const Volumes = () => {
             {/* Quotas Visualization */}
             <div className="panel p-6">
                 <h4 className="text-sm font-bold flex items-center mb-4">
-                    <ShieldAlert size={18} className="mr-2 text-brand-500" /> Storage Quotas
+                    <ShieldAlert size={18} className="mr-2 text-brand-500" /> Storage Quotas - <span className="ml-1 font-normal text-slate-500">{activeOrg ? activeOrg.name : 'Personal Workspace'}</span>
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>

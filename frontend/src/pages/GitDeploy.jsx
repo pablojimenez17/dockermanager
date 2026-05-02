@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { GitBranch, Globe, HardDrive, Play, ShieldAlert, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const GitDeploy = () => {
+    const { activeOrg } = useOrg();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -140,7 +142,7 @@ const GitDeploy = () => {
             {/* Quotas Visualization */}
             <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700/80 rounded-sm p-6 shadow-sm mb-8">
                 <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
-                    <ShieldAlert size={18} className="mr-2 text-brand-500" /> Current Plan Quotas
+                    <ShieldAlert size={18} className="mr-2 text-brand-500" /> Current Plan Quotas - <span className="ml-1 font-normal text-slate-500">{activeOrg ? activeOrg.name : 'Personal Workspace'}</span>
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                     <div>

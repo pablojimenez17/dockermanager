@@ -318,7 +318,7 @@ const Marketplace = () => {
             {!loading && (
                 <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80 rounded-sm p-6 shadow-sm mb-8">
                     <h4 className="text-sm font-bold text-slate-800 dark:text-slate-200 mb-4 flex items-center">
-                        <ShieldAlert size={18} className="mr-2 text-brand-500" /> Plan Resource Quotas
+                        <ShieldAlert size={18} className="mr-2 text-brand-500" /> Plan Resource Quotas - <span className="ml-1 font-normal text-slate-500">{activeOrg ? activeOrg.name : 'Personal Workspace'}</span>
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         <div>

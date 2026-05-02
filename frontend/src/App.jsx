@@ -76,8 +76,8 @@ const PublicRoute = ({ children }) => {
 };
 
 const PlanRoute = ({ children, requiredLevel }) => {
-  const { userPlan } = useOrg();
-  const plan = userPlan || 'free';
+  const { userPlan, activeOrg } = useOrg();
+  const plan = (activeOrg ? activeOrg.plan : userPlan) || 'free';
   const role = localStorage.getItem('role');
 
   const levels = {
