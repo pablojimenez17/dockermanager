@@ -25,13 +25,18 @@ const Volumes = () => {
 
             const role = localStorage.getItem('role');
             const planType = activeOrg ? activeOrg.plan : userPlan;
-            setLimits(resolveLimits({ planType, role }));
+            const newLimits = resolveLimits({ planType, role });
+            setLimits(newLimits);
 
             const fetchedVolumes = volRes.data || [];
             setVolumes(fetchedVolumes);
 
             // Calculate usage
             const totalBytes = fetchedVolumes.reduce((acc, vol) => acc + (vol.sizeBytes || 0), 0);
+            
+            console.log('[Volumes] Calculated Limits:', { newLimits, planType, role });
+            console.log('[Volumes] Current Usage:', { count: fetchedVolumes.length, bytes: totalBytes });
+
             setCurrentUsage({
                 count: fetchedVolumes.length,
                 bytes: totalBytes
@@ -46,7 +51,7 @@ const Volumes = () => {
 
     useEffect(() => {
         fetchVolumes();
-    }, [activeOrg]);
+    }, [activeOrg, userPlan]);
 
     const handleCreate = async (e) => {
         e.preventDefault();

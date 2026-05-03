@@ -111,7 +111,8 @@ const Marketplace = () => {
                 // Quotas — ALWAYS resolved fresh from planType, never from cache
                 const role = localStorage.getItem('role');
                 const planType = activeOrg ? activeOrg.plan : userPlan;
-                setLimits(resolveLimits({ planType, role }));
+                const newLimits = resolveLimits({ planType, role });
+                setLimits(newLimits);
                 
                 const newContainerCount = myContainersRes.data.length;
                 setCurrentContainerCount(newContainerCount);
@@ -125,8 +126,13 @@ const Marketplace = () => {
                     }
                 });
                 
-                setCurrentRamMb(Math.round(totalRam));
-                setCurrentCpu(Math.round(totalCpu * 10) / 10);
+                const ramMb = Math.round(totalRam);
+                const cpuCores = Math.round(totalCpu * 10) / 10;
+                setCurrentRamMb(ramMb);
+                setCurrentCpu(cpuCores);
+
+                console.log('[Marketplace] Calculated Limits:', { newLimits, planType, role });
+                console.log('[Marketplace] Current Usage:', { containers: newContainerCount, ram: ramMb, cpu: cpuCores });
 
                 // Cache ONLY templates/secrets/networks/volumes — NOT limits or usage
                 sessionStorage.setItem(cacheKey, JSON.stringify({
@@ -144,7 +150,7 @@ const Marketplace = () => {
             }
         };
         fetchData();
-    }, [addToast, activeOrg]);
+    }, [addToast, activeOrg, userPlan]);
 
     // When a template is selected, initialize the envFields state with defaults
     const openTemplate = (template) => {
@@ -325,7 +331,7 @@ const Marketplace = () => {
                             <div className="flex justify-between text-xs mb-1">
                                 <span className="text-slate-500">Current Containers</span>
                                 <span className={`font-bold ${currentContainerCount > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                    {currentUsage.containers} / {limits.maxContainers}
+                                    {currentContainerCount} / {limits.maxContainers}
                                 </span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">

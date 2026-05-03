@@ -56,9 +56,11 @@ const CreateContainer = () => {
                 
                 const role = localStorage.getItem('role');
                 const planType = activeOrg ? activeOrg.plan : userPlan;
-                setLimits(resolveLimits({ planType, role }));
+                const newLimits = resolveLimits({ planType, role });
+                setLimits(newLimits);
                 
-                setCurrentContainerCount(myContainersRes.data.length);
+                const currentCount = myContainersRes.data.length;
+                setCurrentContainerCount(currentCount);
 
                 let totalRam = 0;
                 let totalCpu = 0;
@@ -68,14 +70,20 @@ const CreateContainer = () => {
                         totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
                     }
                 });
-                setCurrentRamMb(Math.round(totalRam));
-                setCurrentCpu(Math.round(totalCpu * 10) / 10);
+                
+                const ramMb = Math.round(totalRam);
+                const cpuCores = Math.round(totalCpu * 10) / 10;
+                setCurrentRamMb(ramMb);
+                setCurrentCpu(cpuCores);
+
+                console.log('[CreateContainer] Calculated Limits:', { newLimits, planType, role });
+                console.log('[CreateContainer] Current Usage:', { containers: currentCount, ram: ramMb, cpu: cpuCores });
             } catch (err) {
                 console.error("Failed to fetch context:", err);
             }
         };
         fetchContext();
-    }, [activeOrg]);
+    }, [activeOrg, userPlan]);
 
     const handleAddContainer = () => setContainers([...containers, getEmptyContainer()]);
     const handleRemoveContainer = (id) => {

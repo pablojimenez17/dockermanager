@@ -32,10 +32,14 @@ const GitDeploy = () => {
 
                 const role = localStorage.getItem('role');
                 const planType = activeOrg ? activeOrg.plan : userPlan;
-                setLimits(resolveLimits({ planType, role }));
+                const newLimits = resolveLimits({ planType, role });
+                setLimits(newLimits);
 
                 const activeContainers = containersRes.data;
                 const activeDomains = activeContainers.filter(c => c.domain && c.domain.trim() !== '').length;
+
+                console.log('[GitDeploy] Calculated Limits:', { newLimits, planType, role });
+                console.log('[GitDeploy] Current Usage:', { containers: activeContainers.length, domains: activeDomains });
 
                 setCurrentUsage({
                     containers: activeContainers.length,
@@ -46,7 +50,7 @@ const GitDeploy = () => {
             }
         };
         fetchContext();
-    }, [activeOrg]);
+    }, [activeOrg, userPlan]);
 
     const handleChange = (e) => {
         setForm({ ...form, [e.target.name]: e.target.value });
