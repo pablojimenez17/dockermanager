@@ -1,63 +1,63 @@
-import React, { useState } from 'react';
+import { useTranslation } from "react-i18next";import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Sun, Moon, Aperture, Eye, EyeOff } from 'lucide-react';
 import axios from 'axios';
 import { useTheme } from '../components/ThemeContext';
 
-const Login = () => {
-    const { theme, toggleTheme } = useTheme();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [step, setStep] = useState('login'); // 'login' or 'verify'
-    const [verificationCode, setVerificationCode] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+const Login = () => {const { t } = useTranslation();
+  const { theme, toggleTheme } = useTheme();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [step, setStep] = useState('login'); // 'login' or 'verify'
+  const [verificationCode, setVerificationCode] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-    const handleLogin = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-            const res = await axios.post('/api/auth/login', { email, password });
-            if (res.data.requireVerification) {
-                setStep('verify');
-            } else {
-                // Fallback if verification not needed (though backend always requires it now)
-                localStorage.setItem('name', res.data.name);
-                localStorage.setItem('email', res.data.email);
-                localStorage.setItem('role', res.data.role);
-                localStorage.setItem('planType', res.data.planType || 'free');
-                window.location.href = '/app';
-            }
-        } catch (err) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.post('/api/auth/login', { email, password });
+      if (res.data.requireVerification) {
+        setStep('verify');
+      } else {
+        // Fallback if verification not needed (though backend always requires it now)
+        localStorage.setItem('name', res.data.name);
+        localStorage.setItem('email', res.data.email);
+        localStorage.setItem('role', res.data.role);
+        localStorage.setItem('planType', res.data.planType || 'free');
+        window.location.href = '/app';
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    const handleVerify = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setError('');
-        try {
-            const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
-            localStorage.setItem('name', res.data.name);
-            localStorage.setItem('email', res.data.email);
-            localStorage.setItem('role', res.data.role);
-            localStorage.setItem('planType', res.data.planType || 'free');
-            window.location.href = '/app';
-        } catch (err) {
-            setError(err.response?.data?.message || 'Verification failed. Please check your code.');
-        } finally {
-            setLoading(false);
-        }
-    };
+  const handleVerify = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
+      localStorage.setItem('name', res.data.name);
+      localStorage.setItem('email', res.data.email);
+      localStorage.setItem('role', res.data.role);
+      localStorage.setItem('planType', res.data.planType || 'free');
+      window.location.href = '/app';
+    } catch (err) {
+      setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex selection:bg-brand-500/30 overflow-hidden transition-colors duration-200">
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex selection:bg-brand-500/30 overflow-hidden transition-colors duration-200">
 
             {/* ── Left decorative panel (hidden on mobile) ── */}
             <div className="hidden lg:flex lg:w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-white dark:bg-transparent border-r border-slate-200 dark:border-white/6">
@@ -68,7 +68,7 @@ const Login = () => {
                     <div className="w-9 h-9 bg-brand-500/15 rounded-sm flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
                         <Aperture size={20} className="animate-[spin_15s_linear_infinite]" />
                     </div>
-                    <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">Orbit</span>
+                    <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">{t("auto.orbit")}</span>
                 </div>
 
                 {/* Central content */}
@@ -79,38 +79,38 @@ const Login = () => {
                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-400 opacity-75" />
                                 <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-brand-500" />
                             </span>
-                            Self-hosted PaaS
+                            {t("auto.self_hosted_paas")}
                         </div>
                         <h1 className="text-4xl font-black text-slate-900 dark:text-white leading-tight mb-4">
-                            Your containers,<br />
+                            {t("auto.your_containers_")}<br />
                             <span className="text-brand-500">
-                                under control.
+                                {t("auto.under_control_")}
                             </span>
                         </h1>
                         <p className="text-slate-600 dark:text-slate-400 text-sm leading-relaxed max-w-sm">
-                            Deploy, monitor, and scale Docker containers from a single premium dashboard. No DevOps expertise required.
+                            {t("auto.deploy_monitor_and_scale_docker_containe")}
                         </p>
                     </div>
 
                     {/* Feature list */}
                     <div className="flex flex-col gap-3">
                         {[
-                            'Git-powered deployments in seconds',
-                            'Auto-routing with custom domains & TLS',
-                            'Live terminals and real-time log streaming',
-                        ].map((f, i) => (
-                            <div key={i} className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
+            'Git-powered deployments in seconds',
+            'Auto-routing with custom domains & TLS',
+            'Live terminals and real-time log streaming'].
+            map((f, i) =>
+            <div key={i} className="flex items-center gap-3 text-sm text-slate-700 dark:text-slate-300">
                                 <span className="flex-shrink-0 w-5 h-5 rounded-full bg-emerald-100 dark:bg-emerald-500/15 border border-emerald-200 dark:border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 text-xs font-bold">✓</span>
                                 {f}
                             </div>
-                        ))}
+            )}
                     </div>
                 </div>
 
                 {/* Quote */}
                 <div className="relative z-10 border-l-2 border-brand-500/30 pl-4">
-                    <p className="text-slate-500 dark:text-slate-400 text-sm italic">"The developer experience I always wanted for Docker."</p>
-                    <p className="text-xs text-slate-400 dark:text-slate-600 mt-1">— Final Year Project, Institut Pedralbes</p>
+                    <p className="text-slate-500 dark:text-slate-400 text-sm italic">{t("auto._the_developer_experience_i_always_wante")}</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-600 mt-1">{t("auto._final_year_project_institut_pedralbes")}</p>
                 </div>
             </div>
 
@@ -119,10 +119,10 @@ const Login = () => {
                 {/* Top right controls */}
                 <div className="absolute top-6 right-6 flex items-center gap-2">
                     <button
-                        onClick={toggleTheme}
-                        className="p-2 rounded-sm bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/8"
-                        title="Toggle Theme"
-                    >
+            onClick={toggleTheme}
+            className="p-2 rounded-sm bg-slate-100 dark:bg-white/5 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/8"
+            title={t("auto.toggle_theme")}>
+            
                         {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
                     </button>
                 </div>
@@ -132,7 +132,7 @@ const Login = () => {
                     <div className="w-9 h-9 bg-brand-500/15 rounded-sm flex items-center justify-center border border-brand-500/25 text-brand-500 dark:text-brand-400">
                         <Aperture size={20} className="animate-[spin_15s_linear_infinite]" />
                     </div>
-                    <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">Orbit</span>
+                    <span className="text-lg font-bold tracking-wide text-slate-900 dark:text-white">{t("auto.orbit")}</span>
                 </div>
 
                 <div className="w-full max-w-sm">
@@ -142,40 +142,40 @@ const Login = () => {
                             {step === 'login' ? 'Welcome back' : 'Verification Required'}
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-500">
-                            {step === 'login' ? (
-                                <>
-                                    Don't have an account?{' '}
+                            {step === 'login' ?
+              <>
+                                    {t("auto.don_t_have_an_account_")}{' '}
                                     <Link to="/register" className="text-brand-500 dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 font-medium transition-colors">
-                                        Sign up free
+                                        {t("auto.sign_up_free")}
                                     </Link>
-                                </>
-                            ) : (
-                                `We sent a 6-digit code to ${email}`
-                            )}
+                                </> :
+
+              `We sent a 6-digit code to ${email}`
+              }
                         </p>
                     </div>
 
                     {/* Error */}
-                    {error && (
-                        <div className="mb-5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 text-red-600 dark:text-red-400 text-sm py-3 px-4 rounded-sm">
+                    {error &&
+          <div className="mb-5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/25 text-red-600 dark:text-red-400 text-sm py-3 px-4 rounded-sm">
                             {error}
                         </div>
-                    )}
+          }
 
                     {/* Form */}
-                    {step === 'login' ? (
-                        <form onSubmit={handleLogin} className="space-y-4">
+                    {step === 'login' ?
+          <form onSubmit={handleLogin} className="space-y-4">
                             {/* Email */}
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                    Email Address
+                                    {t("auto.email_address")}
                                 </label>
                                 <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    className="w-full px-4 py-3 rounded-sm
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-3 rounded-sm
                                                bg-white dark:bg-white/5
                                                border border-slate-200 dark:border-white/10
                                                text-slate-900 dark:text-white
@@ -185,27 +185,36 @@ const Login = () => {
                                                dark:focus:bg-white/8 focus:bg-slate-50
                                                shadow-sm dark:shadow-none
                                                transition-all"
-                                    placeholder="you@example.com"
-                                />
+
+
+
+
+
+
+
+
+
+                placeholder={t("auto.you_example_com")} />
+              
                             </div>
 
                             {/* Password */}
                             <div className="space-y-1.5">
                                 <div className="flex justify-between items-center">
                                     <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                        Password
+                                        {t("auto.password")}
                                     </label>
                                     <Link to="/forgot-password" className="text-xs font-medium text-brand-500 hover:text-brand-600 dark:text-brand-400 dark:hover:text-brand-300 transition-colors">
-                                        Forgot password?
+                                        {t("auto.forgot_password_")}
                                     </Link>
                                 </div>
                                 <div className="relative">
                                     <input
-                                        type={showPassword ? 'text' : 'password'}
-                                        required
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full px-4 py-3 pr-11 rounded-sm
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-4 py-3 pr-11 rounded-sm
                                                    bg-white dark:bg-white/5
                                                    border border-slate-200 dark:border-white/10
                                                    text-slate-900 dark:text-white
@@ -215,13 +224,22 @@ const Login = () => {
                                                    dark:focus:bg-white/8 focus:bg-slate-50
                                                    shadow-sm dark:shadow-none
                                                    transition-all"
-                                        placeholder="••••••••"
-                                    />
+
+
+
+
+
+
+
+
+
+                  placeholder={t("auto._")} />
+                
                                     <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors"
-                                    >
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
+                  
                                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
                                 </div>
@@ -229,40 +247,44 @@ const Login = () => {
 
                             {/* Submit */}
                             <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                            bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
                                            shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
                                            transition-all disabled:opacity-60 disabled:cursor-not-allowed
-                                           active:scale-[0.98]"
-                            >
-                                {loading ? (
-                                    <>
+                                           active:scale-[0.98]">
+
+
+
+
+              
+                                {loading ?
+              <>
                                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                                         </svg>
-                                        Signing in...
-                                    </>
-                                ) : (
-                                    <>Sign in <ArrowRight size={16} /></>
-                                )}
+                                        {t("auto.signing_in_")}
+                                    </> :
+
+              <>{t("auto.sign_in")} <ArrowRight size={16} /></>
+              }
                             </button>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleVerify} className="space-y-4">
+                        </form> :
+
+          <form onSubmit={handleVerify} className="space-y-4">
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                    6-Digit Code
+                                    {t("auto.6_digit_code")}
                                 </label>
                                 <input
-                                    type="text"
-                                    required
-                                    maxLength={6}
-                                    value={verificationCode}
-                                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                                    className="w-full px-4 py-3 rounded-sm
+                type="text"
+                required
+                maxLength={6}
+                value={verificationCode}
+                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
+                className="w-full px-4 py-3 rounded-sm
                                                bg-white dark:bg-white/5
                                                border border-slate-200 dark:border-white/10
                                                text-slate-900 dark:text-white
@@ -272,41 +294,54 @@ const Login = () => {
                                                dark:focus:bg-white/8 focus:bg-slate-50
                                                shadow-sm dark:shadow-none
                                                transition-all"
-                                    placeholder="------"
-                                />
+
+
+
+
+
+
+
+
+
+                placeholder={t("auto._")} />
+              
                             </div>
 
                             <button
-                                type="submit"
-                                disabled={loading || verificationCode.length !== 6}
-                                className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
+              type="submit"
+              disabled={loading || verificationCode.length !== 6}
+              className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                            bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
                                            shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
                                            transition-all disabled:opacity-60 disabled:cursor-not-allowed
-                                           active:scale-[0.98]"
-                            >
-                                {loading ? (
-                                    <>
+                                           active:scale-[0.98]">
+
+
+
+
+              
+                                {loading ?
+              <>
                                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
                                             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
                                         </svg>
-                                        Verifying...
-                                    </>
-                                ) : (
-                                    <>Verify & Enter <ArrowRight size={16} /></>
-                                )}
+                                        {t("auto.verifying_")}
+                                    </> :
+
+              <>{t("auto.verify_enter")} <ArrowRight size={16} /></>
+              }
                             </button>
                             
                             <button
-                                type="button"
-                                onClick={() => setStep('login')}
-                                className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                            >
-                                Back to login
-                            </button>
+              type="button"
+              onClick={() => setStep('login')}
+              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
+                                {t("auto.back_to_login")}
+                            
+            </button>
                         </form>
-                    )}
+          }
 
                     {/* Divider */}
                     <div className="relative my-6">
@@ -314,32 +349,37 @@ const Login = () => {
                             <div className="w-full border-t border-slate-200 dark:border-white/8" />
                         </div>
                         <div className="relative flex justify-center text-xs text-slate-400 dark:text-slate-600">
-                            <span className="bg-slate-50 dark:bg-slate-950 px-3">or continue without account</span>
+                            <span className="bg-slate-50 dark:bg-slate-950 px-3">{t("auto.or_continue_without_account")}</span>
                         </div>
                     </div>
 
                     <Link
-                        to="/"
-                        className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-sm
+            to="/"
+            className="w-full flex justify-center items-center gap-2 py-3 px-4 rounded-sm
                                    bg-white dark:bg-white/4 hover:bg-slate-100 dark:hover:bg-white/8
                                    text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200
                                    border border-slate-200 dark:border-white/8 hover:border-slate-300 dark:hover:border-white/15
                                    text-sm font-medium shadow-sm dark:shadow-none
-                                   transition-all"
-                    >
-                        ← Back to home
-                    </Link>
+                                   transition-all">
+                        {t("auto._back_to_home")}
+                    
+
+
+
+
+
+          </Link>
                 </div>
 
                 {/* Footer */}
                 <p className="absolute bottom-6 text-xs text-slate-400 dark:text-slate-700 text-center px-6">
-                    By signing in, you agree to the{' '}
-                    <span className="text-slate-500 dark:text-slate-600">Terms of Service</span> and{' '}
-                    <span className="text-slate-500 dark:text-slate-600">Privacy Policy</span>.
+                    {t("auto.by_signing_in_you_agree_to_the")}{' '}
+                    <span className="text-slate-500 dark:text-slate-600">{t("auto.terms_of_service")}</span> {t("auto.and")}{' '}
+                    <span className="text-slate-500 dark:text-slate-600">{t("auto.privacy_policy")}</span>.
                 </p>
             </div>
-        </div>
-    );
+        </div>);
+
 };
 
 export default Login;

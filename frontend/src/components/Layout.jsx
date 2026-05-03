@@ -4,27 +4,29 @@ import Sidebar from './Sidebar';
 import { Menu, ChevronRight, Building } from 'lucide-react';
 import AdBanner from './AdBanner';
 import { useOrg } from '../context/OrgContext';
+import { useTranslation } from 'react-i18next';
 
 const Layout = () => {
+    const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
     const { userPlan, activeOrg, orgs, loadingOrgs } = useOrg();
     const planType = userPlan || 'free';
 
     const routeTitles = {
-        '/app': 'Dashboard',
-        '/app/create': 'Create Container',
-        '/app/git-deploy': 'Deploy from Git',
-        '/app/containers': 'Active Instances',
-        '/app/marketplace': 'Templates',
-        '/app/snapshots': 'Snapshots',
-        '/app/networks': 'Networks',
-        '/app/volumes': 'Volumes',
-        '/app/secrets': 'Secret Manager',
-        '/app/registries': 'Private Registries',
-        '/app/settings': 'Platform Settings',
-        '/app/profile': 'User Profile',
-        '/app/plans': 'Billing & Plans'
+        '/app': t('sidebar.dashboard', 'Dashboard'),
+        '/app/create': t('sidebar.create_container', 'Create Container'),
+        '/app/git-deploy': t('sidebar.git_deploy', 'Deploy from Git'),
+        '/app/containers': t('sidebar.instances', 'Active Instances'),
+        '/app/marketplace': t('sidebar.templates', 'Templates'),
+        '/app/snapshots': t('sidebar.snapshots', 'Snapshots'),
+        '/app/networks': t('sidebar.networks', 'Networks'),
+        '/app/volumes': t('sidebar.volumes', 'Volumes'),
+        '/app/secrets': t('sidebar.secrets', 'Secret Manager'),
+        '/app/registries': t('sidebar.registry', 'Private Registries'),
+        '/app/settings': t('sidebar.settings', 'Platform Settings'),
+        '/app/profile': t('sidebar.account', 'User Profile'),
+        '/app/plans': t('sidebar.billing', 'Billing & Plans')
     };
 
     const currentPath = location.pathname.split('/').slice(0, 3).join('/');
@@ -59,7 +61,7 @@ const Layout = () => {
                         <div className="hidden sm:flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded px-3 py-1.5 text-sm font-medium">
                             <Building size={14} className="text-gray-400 dark:text-slate-500 mr-2" />
                             <span className="text-gray-700 dark:text-slate-300 truncate max-w-[150px]">
-                                {activeOrg ? activeOrg.name : 'Personal Workspace'}
+                                {activeOrg ? activeOrg.name : t('layout.personal_workspace', 'Personal Workspace')}
                             </span>
                         </div>
                     </div>

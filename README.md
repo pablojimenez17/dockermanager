@@ -98,11 +98,45 @@ graph TD
 *   **El "Socket Shield" (`dockermanager-socket-proxy`)**: En sistemas normales, el backend de Node.js tiene control absoluto sobre el motor de Docker (acceso *root* al host). Si un hacker encontrara una vulnerabilidad en tu backend, podría destruir todo el servidor físico. Para impedirlo, el backend está obligado a hablar con Docker a través de este proxy intermedio. El `socket-proxy` intercepta las órdenes y solo deja pasar comandos inofensivos (como arrancar o parar los contenedores de los clientes), bloqueando permanentemente comandos letales (como borrar redes maestras, acceder al sistema de archivos del host o escalar privilegios).
 *   **La Consola Segura (Terminal Web)**: Es importante entender que el enrutador `Proxy VPC LAN` sirve **únicamente** para que los visitantes externos vean la web que un cliente ha alojado (ej. `app.usuario.com`). Cuando el dueño de la app quiere abrir la terminal de comandos desde el panel de OrbitCloud, el flujo es completamente distinto: la conexión WebSocket viaja por la ruta de la plataforma (`Proxy DMZ Inverso`) hacia el `Backend`. Es el Backend quien, a través del `Socket Shield`, inyecta la sesión de terminal (`docker exec`) de forma 100% segura. **Nunca** se abren puertos SSH físicos al exterior ni se conectan directamente los usuarios a sus contenedores.
 
-### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
-Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
-El Backend administra al invocar la API la creencia del patrón VPC Gemelo:
-- **Red por defecto Segura**: Cada usuario porta un prefijo (Ej: `usuario_default_vlan`) donde todo lo desplegado no alcanza salir jamás al exterior de forma directa sin pasar por el IPS.
-- **Red Abierta (`_open`)**: Al solicitar Exposición Web en el panel, el Backend levanta otra gemela temporal inyectando conexión al `Proxy VPC LAN`, despliega tu servicio allí y actualiza tu dominio. Si lo quitas, se borra instantáneamente esta pasarela en modo _Lazy_ sin afectar los demás recursos subyacentes desconectados en la base principal.
+### 👯‍♂️ Redes VPC y Acceso a Internet — Cómo Funciona
+
+Docker tiene una limitación crítica de diseño: **no permite cambiar la bandera `Internal` de una red existente**. Esto significa que no es posible activar o desactivar el acceso a internet de una red sobre la marcha. OrbitCloud resuelve esto mediante el patrón de **redes sibling** (gemelas permanentes):
+
+#### Las dos redes permanentes por usuario
+
+Cada usuario tiene **dos redes Docker dedicadas** que se crean automáticamente en el primer despliegue:
+
+| Red | Nombre Docker | `Internal` | Acceso a Internet |
+|-----|--------------|-----------|-------------------|
+| VPC Privada | `{userId}_default_vlan` | `true` | ❌ Sin acceso (aislada) |
+| VPC Abierta | `{userId}_default_vlan_open` | `false` | ✅ Con acceso (salida vigilada por IPS) |
+
+#### Lógica de selección de red al crear un contenedor
+
+El backend de OrbitCloud selecciona la red correcta según la configuración del usuario en el panel:
+
+```
+networkMode = 'none'          → Red = none (air-gapped, sin stack de red)
+networkMode = custom (tuya)
+  + Internet activado         → Usa/crea '{tuRed}_open' sibling con Internal:false
+  + Internet desactivado      → Usa '{tuRed}' tal cual (Internal:true)
+networkMode = bridge / VPC
+  + Internet activado         → Usa '{userId}_default_vlan_open' (Internal:false)
+  + Internet desactivado      → Usa '{userId}_default_vlan' (Internal:true)
+```
+
+#### ¿Por qué este patrón?
+
+> [!IMPORTANT]
+> Docker **no permite modificar** la bandera `Internal` de una red existente. Si un usuario crea primero un contenedor sin internet (lo que genera `_default_vlan` con `Internal:true`) y luego intenta crear otro con internet activado, si se reutilizara la misma red, el contenedor **no tendría internet aunque el toggle estuviera activo**. El patrón de redes sibling evita este bug estructural usando siempre redes con el flag correcto desde su creación.
+
+#### Redes personalizadas del usuario
+
+Cuando el usuario crea sus propias redes desde la sección **Docker Networks**, estas se crean por defecto con `Internal:true` (sin internet). Si luego despliega un contenedor en esa red con "Internet activado", el backend crea automáticamente una red gemela `{nombreRed}_open` con `Internal:false` y usa esa en su lugar, preservando la red original intacta para otros contenedores.
+
+#### Egress (tráfico de salida)
+
+Incluso los contenedores en redes `_open` **no tienen acceso directo a internet**. Su tráfico de salida pasa obligatoriamente por el **Edge Firewall IPS (Suricata)** que inspecciona cada paquete saliente, bloqueando comunicaciones con servidores de C&C (Command & Control), botnets o IPs maliciosas.
 
 ---
 
