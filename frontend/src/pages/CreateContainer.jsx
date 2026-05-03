@@ -49,9 +49,30 @@ const CreateContainer = () => {
                 setLimits(newLimits);
                 console.log('[CreateContainer] Calculated Limits INSTANTLY:', { newLimits, planType, role });
 
-                const [netRes, myContainersRes, volRes, secRes] = await Promise.all([
+                // Load containers instantly without waiting for networks/volumes/secrets
+                axios.get(`/api/containers?t=${Date.now()}`).then(myContainersRes => {
+                    const currentCount = myContainersRes.data.length;
+                    setCurrentContainerCount(currentCount);
+
+                    let totalRam = 0;
+                    let totalCpu = 0;
+                    myContainersRes.data.forEach(c => {
+                        if (c.hostConfig) {
+                            totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
+                            totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
+                        }
+                    });
+                    
+                    const ramMb = Math.round(totalRam);
+                    const cpuCores = Math.round(totalCpu * 10) / 10;
+                    setCurrentRamMb(ramMb);
+                    setCurrentCpu(cpuCores);
+
+                    console.log('[CreateContainer] Current Usage:', { containers: currentCount, ram: ramMb, cpu: cpuCores });
+                }).catch(err => console.error("Failed to fetch containers for usage:", err));
+
+                const [netRes, volRes, secRes] = await Promise.all([
                     axios.get('/api/networks').catch(() => ({ data: [] })),
-                    axios.get(`/api/containers?t=${Date.now()}`),
                     axios.get('/api/volumes').catch(() => ({ data: [] })),
                     axios.get('/api/secrets').catch(() => ({ data: [] }))
                 ]);
@@ -59,26 +80,6 @@ const CreateContainer = () => {
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
                 setAvailableSecrets(secRes.data || []);
-                
-                const currentCount = myContainersRes.data.length;
-                setCurrentContainerCount(currentCount);
-
-                let totalRam = 0;
-                let totalCpu = 0;
-                myContainersRes.data.forEach(c => {
-                    if (c.hostConfig) {
-                        totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
-                        totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
-                    }
-                });
-                
-                const ramMb = Math.round(totalRam);
-                const cpuCores = Math.round(totalCpu * 10) / 10;
-                setCurrentRamMb(ramMb);
-                setCurrentCpu(cpuCores);
-
-                console.log('[CreateContainer] Calculated Limits:', { newLimits, planType, role });
-                console.log('[CreateContainer] Current Usage:', { containers: currentCount, ram: ramMb, cpu: cpuCores });
             } catch (err) {
                 console.error("Failed to fetch context:", err);
             }

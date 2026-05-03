@@ -15,39 +15,34 @@ const Volumes = () => {
     const [limits, setLimits] = useState({ maxVolumes: 1, maxVolumeSizeMb: 1024 });
     const [currentUsage, setCurrentUsage] = useState({ count: 0, bytes: 0 });
 
-    const fetchVolumes = async () => {
+    const fetchVolumes = () => {
         setLoading(true);
         setError('');
-        try {
-            const role = localStorage.getItem('role');
-            const planType = activeOrg ? activeOrg.plan : userPlan;
-            const newLimits = resolveLimits({ planType, role });
-            setLimits(newLimits);
-            console.log('[Volumes] Calculated Limits INSTANTLY:', { newLimits, planType, role });
+        
+        const role = localStorage.getItem('role');
+        const planType = activeOrg ? activeOrg.plan : userPlan;
+        const newLimits = resolveLimits({ planType, role });
+        setLimits(newLimits);
+        console.log('[Volumes] Calculated Limits INSTANTLY:', { newLimits, planType, role });
 
-            const [volRes] = await Promise.all([
-                axios.get(`/api/volumes?t=${Date.now()}`).catch(() => ({ data: [] }))
-            ]);
-
+        axios.get(`/api/volumes?t=${Date.now()}`).then(volRes => {
             const fetchedVolumes = volRes.data || [];
             setVolumes(fetchedVolumes);
 
             // Calculate usage
             const totalBytes = fetchedVolumes.reduce((acc, vol) => acc + (vol.sizeBytes || 0), 0);
             
-            console.log('[Volumes] Calculated Limits:', { newLimits, planType, role });
             console.log('[Volumes] Current Usage:', { count: fetchedVolumes.length, bytes: totalBytes });
 
             setCurrentUsage({
                 count: fetchedVolumes.length,
                 bytes: totalBytes
             });
-
-        } catch (err) {
+        }).catch(err => {
             setError(err.response?.data?.message || 'Failed to load volumes. Is the server running?');
-        } finally {
+        }).finally(() => {
             setLoading(false);
-        }
+        });
     };
 
     useEffect(() => {

@@ -71,10 +71,31 @@ const Marketplace = () => {
 
                 const token = localStorage.getItem('token');
 
-                const [tplRes, secRes, myContainersRes, snapRes, netRes, volRes] = await Promise.all([
+                // Load containers instantly
+                axios.get(`/api/containers?t=${Date.now()}`).then(myContainersRes => {
+                    const newContainerCount = myContainersRes.data.length;
+                    setCurrentContainerCount(newContainerCount);
+
+                    let totalRam = 0;
+                    let totalCpu = 0;
+                    myContainersRes.data.forEach(c => {
+                        if (c.hostConfig) {
+                            totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
+                            totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
+                        }
+                    });
+                    
+                    const ramMb = Math.round(totalRam);
+                    const cpuCores = Math.round(totalCpu * 10) / 10;
+                    setCurrentRamMb(ramMb);
+                    setCurrentCpu(cpuCores);
+
+                    console.log('[Marketplace] Current Usage:', { containers: newContainerCount, ram: ramMb, cpu: cpuCores });
+                }).catch(err => console.error("Failed to fetch containers for usage:", err));
+
+                const [tplRes, secRes, snapRes, netRes, volRes] = await Promise.all([
                     axios.get('/api/templates'),
                     axios.get('/api/secrets').catch(() => ({ data: [] })),
-                    axios.get(`/api/containers?t=${Date.now()}`),
                     axios.get('/api/snapshots').catch(() => ({ data: [] })),
                     axios.get('/api/networks').catch(() => ({ data: [] })),
                     axios.get('/api/volumes').catch(() => ({ data: [] }))
@@ -115,26 +136,8 @@ const Marketplace = () => {
                 const newVolumes = volRes.data || [];
                 setAvailableVolumes(newVolumes);
 
-                // Quotas — ALWAYS resolved fresh from planType, never from cache
-                const newContainerCount = myContainersRes.data.length;
-                setCurrentContainerCount(newContainerCount);
-
-                let totalRam = 0;
-                let totalCpu = 0;
-                myContainersRes.data.forEach(c => {
-                    if (c.hostConfig) {
-                        totalRam += (c.hostConfig.Memory || 0) / (1024 * 1024);
-                        totalCpu += (c.hostConfig.NanoCPUs || 0) / 1e9;
-                    }
-                });
-                
-                const ramMb = Math.round(totalRam);
-                const cpuCores = Math.round(totalCpu * 10) / 10;
-                setCurrentRamMb(ramMb);
-                setCurrentCpu(cpuCores);
-
+                // Quotas — limits are resolved instantly above, usage is resolved asynchronously.
                 console.log('[Marketplace] Calculated Limits:', { newLimits, planType, role });
-                console.log('[Marketplace] Current Usage:', { containers: newContainerCount, ram: ramMb, cpu: cpuCores });
 
                 // Cache ONLY templates/secrets/networks/volumes — NOT limits or usage
                 sessionStorage.setItem(cacheKey, JSON.stringify({
