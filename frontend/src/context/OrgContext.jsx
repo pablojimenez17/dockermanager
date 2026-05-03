@@ -58,11 +58,25 @@ export const OrgProvider = ({ children }) => {
         }
     };
 
+    const fetchMe = async () => {
+        try {
+            const res = await axios.get('/api/auth/me');
+            if (res.data && res.data.planType) {
+                const fetchedPlan = res.data.planType.toLowerCase();
+                setUserPlan(fetchedPlan);
+                localStorage.setItem('planType', fetchedPlan);
+            }
+        } catch (err) {
+            console.error('Failed to fetch user profile:', err);
+        }
+    };
+
     useEffect(() => {
         // Assume AuthContext handles login state. We just fetch whenever mounted for now.
         // In a real scenario, you'd tie this to user login/logout events.
         if (localStorage.getItem('role')) {
             fetchOrganizations();
+            fetchMe();
         } else {
             setLoadingOrgs(false);
         }
