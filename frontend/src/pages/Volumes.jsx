@@ -46,7 +46,7 @@ const Volumes = () => {
 
     useEffect(() => {
         fetchVolumes();
-    }, [activeOrg, userPlan]);
+    }, [activeOrg]);
 
     const handleCreate = async (e) => {
         e.preventDefault();

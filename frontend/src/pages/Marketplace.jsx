@@ -144,7 +144,7 @@ const Marketplace = () => {
             }
         };
         fetchData();
-    }, [addToast, activeOrg, userPlan]);
+    }, [addToast, activeOrg]);
 
     // When a template is selected, initialize the envFields state with defaults
     const openTemplate = (template) => {
@@ -325,7 +325,7 @@ const Marketplace = () => {
                             <div className="flex justify-between text-xs mb-1">
                                 <span className="text-slate-500">Current Containers</span>
                                 <span className={`font-bold ${currentContainerCount > limits.maxContainers ? 'text-red-500' : 'text-slate-700 dark:text-slate-300'}`}>
-                                    {currentContainerCount} / {limits.maxContainers}
+                                    {currentUsage.containers} / {limits.maxContainers}
                                 </span>
                             </div>
                             <div className="w-full bg-slate-200 dark:bg-slate-700/50 rounded-full h-1.5">
