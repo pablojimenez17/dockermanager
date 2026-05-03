@@ -41,6 +41,7 @@ const scaleIn = {
 
 /* ─── Terminal Demo ───────────────────────────────────────── */
 const TerminalDemo = () => {
+  const { t } = useTranslation();
   const lines = [
   { text: '$ orbit deploy my-api --git github.com/orbit/api', color: 'text-slate-700 dark:text-slate-300' },
   { text: '✓ Cloning repository...', color: 'text-emerald-600 dark:text-emerald-400', delay: 400 },
@@ -95,6 +96,7 @@ const TerminalDemo = () => {
 
 /* ─── Main Component ──────────────────────────────────────── */
 const Welcome = () => {
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
 
   // Pricing Plans Array

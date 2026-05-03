@@ -61,11 +61,46 @@ router.post('/', checkPermission('manageNetworks'), async (req, res) => {
             }
         };
 
-        // If user provided subnet/gateway, add IPAM config
-        if (subnet || gateway) {
+        // If user provided subnet/gateway, add IPAM config.
+        // If NOT provided, auto-generate a unique subnet to avoid collisions between
+        // tenants who all leave the field blank (Docker would assign from the same pool).
+        // Strategy: use a deterministic hash of userId + prefixedName to pick a /24 block
+        // in the 10.128.x.x - 10.254.x.x range (avoiding Docker's defaults: 172.17-31.x, 10.0.x).
+        const needsSubnet = !subnet;
+        let finalSubnet = subnet;
+        let finalGateway = gateway;
+
+        if (needsSubnet) {
+            // Simple hash: sum char codes of userId+name, map to 10.128-254.x.0/24
+            const hashInput = `${req.user.userId}${prefixedName}`;
+            let hash = 0;
+            for (const ch of hashInput) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+            const second = 128 + (hash % 127);       // 128–254
+            const third = (hash >> 7) % 256;          // 0–255
+            finalSubnet = `10.${second}.${third}.0/24`;
+            finalGateway = finalGateway || `10.${second}.${third}.1`;
+
+            // Check if the auto-generated subnet is already in use by another Docker network
+            const allNets = await docker.listNetworks();
+            const usedSubnets = allNets.flatMap(n => (n.IPAM?.Config || []).map(c => c.Subnet)).filter(Boolean);
+            if (usedSubnets.includes(finalSubnet)) {
+                // Collision: shift third octet by 1 and retry once
+                const shiftedThird = (third + 1) % 256;
+                finalSubnet = `10.${second}.${shiftedThird}.0/24`;
+                finalGateway = `10.${second}.${shiftedThird}.1`;
+                if (usedSubnets.includes(finalSubnet)) {
+                    // Still collides — let Docker auto-assign (user should specify manually)
+                    console.warn(`[Network] Auto-subnet collision for ${prefixedName}, letting Docker assign.`);
+                    finalSubnet = undefined;
+                    finalGateway = undefined;
+                }
+            }
+        }
+
+        if (finalSubnet || finalGateway) {
             const ipamConfig = {};
-            if (subnet) ipamConfig.Subnet = subnet;
-            if (gateway) ipamConfig.Gateway = gateway;
+            if (finalSubnet) ipamConfig.Subnet = finalSubnet;
+            if (finalGateway) ipamConfig.Gateway = finalGateway;
 
             networkConfig.IPAM = {
                 Driver: 'default',

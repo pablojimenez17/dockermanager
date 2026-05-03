@@ -179,6 +179,57 @@ Resultado:
 
 ---
 
+### 🛡️ Auto-Subnet — Prevención de Colisiones entre Tenants
+
+#### El problema
+
+Cuando dos usuarios distintos crean una red personalizada dejando el campo **Subnet** vacío, Docker asigna IPs desde el mismo pool por defecto (`172.17.x.x`, `10.0.x.x`). Esto causa que las redes **colisionen silenciosamente**, impidiendo el enrutamiento correcto entre contenedores de diferentes usuarios.
+
+#### La solución: hash determinista de subnet
+
+Si el usuario **no especifica** una subnet manualmente, el backend genera una automáticamente usando un hash de `userId + nombreRed`:
+
+```
+hash(userId + prefixedName) → rango 10.128.0.0 – 10.254.255.0/24
+```
+
+El rango `10.128.x.x` – `10.254.x.x` está fuera de los rangos por defecto de Docker (`172.17-31.x` y `10.0-127.x`), minimizando colisiones accidentales.
+
+**Flujo de resolución:**
+1. Se calcula un bloque `/24` determinista a partir del hash
+2. Se comprueba contra todos los subnets existentes en Docker (`docker.listNetworks()`)
+3. Si ya está ocupado → se prueba el siguiente `/24` (third octet + 1)
+4. Si sigue colisionando → se deja que Docker asigne automáticamente y se loguea un warning
+5. Si el usuario **sí especificó** subnet → se respeta exactamente lo que puso
+
+> [!NOTE]
+> Si dos usuarios generan el mismo hash (colisión matemática), el sistema reintenta con un octeto desplazado antes de rendirse. En la práctica, el espacio `10.128-254.x.x` ofrece ~32.000 bloques `/24` distintos, suficiente para miles de redes concurrentes.
+
+---
+
+### ⚡ Volumes — Cache de `docker system df`
+
+#### El problema
+
+`docker.df()` (equivalente a `docker system df`) **inspecciona todos los recursos del sistema** — imágenes, contenedores, volúmenes — y puede tardar entre 3 y 10 segundos dependiendo de cuántos recursos haya en el host. El código anterior lo ejecutaba en **cada listado de volúmenes y en cada creación**, bloqueando la respuesta.
+
+#### La solución: cache en memoria de 30 segundos
+
+```
+Primera petición  → ejecuta docker.df() (lento), guarda resultado en caché
+Siguientes 30s    → devuelve el caché instantáneamente sin tocar Docker
+Tras 30s          → refresca el caché en la próxima petición
+```
+
+Adicionalmente, en la creación de un volumen nuevo:
+- El check de **cuota por número** (`maxVolumes`) se hace directamente contra la BD — sin llamar a Docker
+- El check de **cuota por tamaño** solo se ejecuta si el plan tiene un límite finito (no para planes Enterprise/Agency con cuota alta)
+
+> [!IMPORTANT]
+> El tamaño mostrado en el panel puede tener hasta **30 segundos de retraso** respecto al tamaño real en disco. Esto es un trade-off deliberado: se prefiere rapidez de carga sobre precisión de tamaño en tiempo real, ya que los volúmenes no cambian de tamaño drásticamente en esa ventana de tiempo.
+
+---
+
 ## 🛡️ 4. Seguridad Profunda e IDS/IPS Suricata
 
 ### 🚫 De Detector (IDS) a Bloqueador Nítido (IPS)
