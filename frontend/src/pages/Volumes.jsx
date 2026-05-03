@@ -166,7 +166,7 @@ const Volumes = () => {
                             />
                         </div>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Crear un volumen puede tardar unos segundos. Por favor ten paciencia.
+                            Creating a volume may take a few seconds. Please be patient.
                         </p>
                         <button
                             type="submit"
