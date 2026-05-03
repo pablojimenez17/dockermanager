@@ -140,6 +140,45 @@ Incluso los contenedores en redes `_open` **no tienen acceso directo a internet*
 
 ---
 
+### 🔗 Redes Múltiples Simultáneas — Multi-Network
+
+Un contenedor puede pertenecer a **más de una red Docker a la vez**, de forma equivalente a como lo hacen Docker Compose y Kubernetes. Esto es útil cuando necesitas que un contenedor tenga aislamiento diferente en cada interfaz. Por ejemplo:
+
+```
+Máquina A (sin internet):
+  → Red primaria: {userId}_default_vlan   (Internal: true, aislada)
+  → Red extra:    mi-red-compartida       (puente con Máquina B)
+
+Máquina B (con internet):
+  → Red primaria: {userId}_default_vlan_open  (Internal: false, con salida)
+  → Red extra:    mi-red-compartida           (puente con Máquina A)
+
+Resultado:
+  ✅ A y B se comunican entre sí por "mi-red-compartida"
+  ❌ A no tiene salida directa a internet
+  ✅ B sí tiene salida a internet (vigilada por Suricata)
+```
+
+#### Cómo funciona internamente
+
+1. El usuario selecciona la **red primaria** en el panel (con/sin internet).
+2. Opcionalmente, añade **redes adicionales** mediante chips en la misma sección de configuración.
+3. El backend crea y arranca el contenedor en la red primaria.
+4. **Post-arranque**, el backend ejecuta `docker network connect <extraRed> <containerId>` para cada red adicional.
+
+> [!NOTE]
+> La conexión a redes extra es **no bloqueante**: si una red no existe o falla la conexión, el backend loguea el error pero el contenedor sigue funcionando en su red primaria. Nunca se cancela un despliegue por un fallo en una red secundaria.
+
+#### Dónde configurarlo en el panel
+
+- **Create Container**: en la sección *Advanced Configuration → Network Mode*, debajo del selector principal de red aparece una sección "Additional networks" con chips removibles y un selector desplegable.
+- **Marketplace (Templates)**: en la sección *3. Resources & Network*, misma UI.
+
+> [!TIP]
+> Si quieres que dos contenedores se vean entre sí pero con distintas políticas de internet, crea primero una red personalizada en **Docker Networks**, y luego añádela como red extra en ambos contenedores al crearlos.
+
+---
+
 ## 🛡️ 4. Seguridad Profunda e IDS/IPS Suricata
 
 ### 🚫 De Detector (IDS) a Bloqueador Nítido (IPS)
