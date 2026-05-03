@@ -45,7 +45,7 @@ const CreateContainer = () => {
             try {
                 const [netRes, myContainersRes, volRes, secRes] = await Promise.all([
                     axios.get('/api/networks').catch(() => ({ data: [] })),
-                    axios.get(`/api/containers?t=${Date.now()}`),
+                    axios.get(`/api/containers?t=${Date.now()}`).catch(() => ({ data: [] })),
                     axios.get('/api/volumes').catch(() => ({ data: [] })),
                     axios.get('/api/secrets').catch(() => ({ data: [] }))
                 ]);
@@ -75,7 +75,7 @@ const CreateContainer = () => {
             }
         };
         fetchContext();
-    }, [activeOrg]);
+    }, [activeOrg, userPlan]);
 
     const handleAddContainer = () => setContainers([...containers, getEmptyContainer()]);
     const handleRemoveContainer = (id) => {

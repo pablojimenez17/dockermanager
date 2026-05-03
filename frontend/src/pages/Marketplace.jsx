@@ -144,7 +144,7 @@ const Marketplace = () => {
             }
         };
         fetchData();
-    }, [addToast, activeOrg]);
+    }, [addToast, activeOrg, userPlan]);
 
     // When a template is selected, initialize the envFields state with defaults
     const openTemplate = (template) => {
