@@ -43,7 +43,14 @@ const Marketplace = () => {
 
     useEffect(() => {
         const fetchData = async () => {
+            setLoading(true);
             try {
+                // INSTANT LIMITS
+                const role = localStorage.getItem('role');
+                const planType = activeOrg ? activeOrg.plan : userPlan;
+                const newLimits = resolveLimits({ planType, role });
+                setLimits(newLimits);
+
                 const cacheKey = `marketplace_cache_${activeOrg?._id || 'default'}`;
                 const cachedData = sessionStorage.getItem(cacheKey);
 
@@ -109,11 +116,6 @@ const Marketplace = () => {
                 setAvailableVolumes(newVolumes);
 
                 // Quotas — ALWAYS resolved fresh from planType, never from cache
-                const role = localStorage.getItem('role');
-                const planType = activeOrg ? activeOrg.plan : userPlan;
-                const newLimits = resolveLimits({ planType, role });
-                setLimits(newLimits);
-                
                 const newContainerCount = myContainersRes.data.length;
                 setCurrentContainerCount(newContainerCount);
 

@@ -19,14 +19,15 @@ const Volumes = () => {
         setLoading(true);
         setError('');
         try {
-            const [volRes] = await Promise.all([
-                axios.get(`/api/volumes?t=${Date.now()}`).catch(() => ({ data: [] }))
-            ]);
-
             const role = localStorage.getItem('role');
             const planType = activeOrg ? activeOrg.plan : userPlan;
             const newLimits = resolveLimits({ planType, role });
             setLimits(newLimits);
+            console.log('[Volumes] Calculated Limits INSTANTLY:', { newLimits, planType, role });
+
+            const [volRes] = await Promise.all([
+                axios.get(`/api/volumes?t=${Date.now()}`).catch(() => ({ data: [] }))
+            ]);
 
             const fetchedVolumes = volRes.data || [];
             setVolumes(fetchedVolumes);

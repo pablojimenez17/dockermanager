@@ -43,6 +43,12 @@ const CreateContainer = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
+                const role = localStorage.getItem('role');
+                const planType = activeOrg ? activeOrg.plan : userPlan;
+                const newLimits = resolveLimits({ planType, role });
+                setLimits(newLimits);
+                console.log('[CreateContainer] Calculated Limits INSTANTLY:', { newLimits, planType, role });
+
                 const [netRes, myContainersRes, volRes, secRes] = await Promise.all([
                     axios.get('/api/networks').catch(() => ({ data: [] })),
                     axios.get(`/api/containers?t=${Date.now()}`),
@@ -53,11 +59,6 @@ const CreateContainer = () => {
                 setAvailableNetworks(netRes.data);
                 setAvailableVolumes(volRes.data || []);
                 setAvailableSecrets(secRes.data || []);
-                
-                const role = localStorage.getItem('role');
-                const planType = activeOrg ? activeOrg.plan : userPlan;
-                const newLimits = resolveLimits({ planType, role });
-                setLimits(newLimits);
                 
                 const currentCount = myContainersRes.data.length;
                 setCurrentContainerCount(currentCount);

@@ -26,19 +26,19 @@ const GitDeploy = () => {
     useEffect(() => {
         const fetchContext = async () => {
             try {
-                const [containersRes] = await Promise.all([
-                    axios.get(`/api/containers?t=${Date.now()}`)
-                ]);
-
                 const role = localStorage.getItem('role');
                 const planType = activeOrg ? activeOrg.plan : userPlan;
                 const newLimits = resolveLimits({ planType, role });
                 setLimits(newLimits);
+                console.log('[GitDeploy] Calculated Limits INSTANTLY:', { newLimits, planType, role });
+
+                const [containersRes] = await Promise.all([
+                    axios.get(`/api/containers?t=${Date.now()}`)
+                ]);
 
                 const activeContainers = containersRes.data;
                 const activeDomains = activeContainers.filter(c => c.domain && c.domain.trim() !== '').length;
 
-                console.log('[GitDeploy] Calculated Limits:', { newLimits, planType, role });
                 console.log('[GitDeploy] Current Usage:', { containers: activeContainers.length, domains: activeDomains });
 
                 setCurrentUsage({
