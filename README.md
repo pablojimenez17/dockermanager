@@ -496,68 +496,80 @@ Tecnologías y herramientas que alimentan el servidor Node.js y controlan la inf
 
 El sistema emplea un diseño documental. En lugar de utilizar bases de datos relacionales lentas en consultas multi-nodo, aprovecha referencias (`mongoose.Schema.Types.ObjectId`) y `.populate()` para vincular entidades, manteniendo la flexibilidad.
 
-### Colecciones Principales y Campos Críticos
+### Colecciones y su Esquema de Datos Completo
 1. **Users (`User.js`):**
-   - *Campos clave:* `email`, `password` (hashed), `role` (`user` o `admin`), `planType` (`free`, `pro`, `enterprise`), `limits` (Sub-documento de cuotas con campos como `maxContainers`, `maxVolumes`), `verificationCode`.
+   - `name`, `email`, `password` (hashed), `role` (`user` o `admin`), `planType` (`free`, `pro`, `enterprise`), `planExpiresAt`, `autoRenew`, `verificationCode`, `verificationCodeExpires`, `resetPasswordCode`, `resetPasswordExpires`.
+   - `limits`: Sub-documento que aloja `maxContainers`, `maxRamMb`, `maxCpuCores`, `maxDomains`, `maxVolumes`, `maxVolumeSizeMb`, `maxSnapshots`, `maxBuckets`.
 2. **Containers (`Container.js`):**
-   - *Campos clave:* `dockerId` (El ID hexadecimal real de 64 caracteres de Docker), `image`, `status` (`created`, `running`, `stopped`), `userId` (Owner), `domain` (URL de Traefik vinculada), `deployedViaGit` (Booleano), `gitRepositoryUrl`.
+   - `name`, `dockerId` (Hexadecimal de 64 chars), `image`, `status` (`created`, `running`, `stopped`), `userId`, `organizationId`, `domain` (URL de Traefik), `deployedViaGit` (Booleano), `gitRepositoryUrl`, `gitWebhookSecret`.
 3. **Organizations (`Organization.js`), Memberships (`Membership.js`) y Roles (`Role.js`):**
-   - *Organizaciones:* `name`, `ownerId`.
-   - *Membresías:* Unen `userId` con `organizationId` y `roleId`.
-   - *Roles:* Objeto booleano inmenso de privilegios (`canCreateContainers: true`, `canManageBilling: false`).
+   - *Organizations:* `name`, `ownerId`, `plan`.
+   - *Memberships:* `userId`, `organizationId`, `roleId`.
+   - *Roles:* `organizationId`, `name`, `permissions` (Objeto con booleanos: `manageContainers`, `deleteContainers`, `manageVolumes`, `deleteVolumes`, `manageNetworks`, `manageRegistries`, `manageSecrets`).
 4. **Networks (`Network.js`):**
-   - *Campos clave:* `name` (Nombre lógico del panel), `dockerNetworkId`, `subnet` (El bloque determinista, ej. `10.128.5.0/24`), `isInternal` (Si carece de Egress a Internet).
+   - `name` (Lógico), `dockerId` (Físico), `subnet` (Rango IP, ej. `10.128.5.0/24`), `isInternal` (Sin salida a Internet), `userId`, `organizationId`.
 5. **Volumes (`Volume.js`):**
-   - *Campos clave:* `name`, `dockerVolumeName`, `sizeMb`, `attachedContainers` (Array de ObjectIds).
+   - `name`, `dockerId`, `sizeMb`, `userId`, `organizationId`, `attachedContainers` (Array de referencias a Contenedores).
 6. **Registries (`Registry.js`) y Secrets (`Secret.js`):**
-   - *Campos clave:* `registryUrl`, `username`, `password` (Encriptados antes de guardar).
+   - *Registries:* `userId`, `organizationId`, `name`, `url`, `username`, `encryptedPassword`, `iv` (Vector de inicialización AES).
+   - *Secrets:* `name`, `encryptedValue`, `iv`, `userId`, `organizationId`.
 7. **AuditLogs (`AuditLog.js`):**
-   - *Campos clave:* `userId`, `action` (`DELETE_CONTAINER`, `LOGIN_FAILED`), `resourceName`, `ipAddress`, `createdAt`.
+   - `userId`, `action` (Ej. `DELETE_CONTAINER`), `resourceName`, `details`, `ipAddress`, `createdAt`.
 8. **BackupConfig (`BackupConfig.js`):**
-   - *Campos clave:* `db` (`{enabled, intervalMs}`), `retention` (Entero del máximo de archivos vivos por bucket).
+   - `enabled`, `intervalMs`, `retention`.
+   - Sub-configuraciones: `db`, `server`, `web` (cada una con `enabled` y `intervalMs`).
+9. **OrganizationInvite (`OrganizationInvite.js`):**
+   - `organizationId`, `email`, `roleId`, `token`, `expiresAt`.
 
 ---
 
-## 🔌 13. Mapa de la API REST (Endpoints Detallados)
+## 🔌 13. Mapa de la API REST y Control de Cuotas
 
-A excepción del login, todos los endpoints exigen el header `Authorization: Bearer <jwt>`.
+A excepción del login y verificación, todos los endpoints exigen el header `Authorization: Bearer <jwt>`.
+
+> [!IMPORTANT]
+> **La Barrera de las Cuotas (`checkPlanLimits` Middleware):** 
+> Al crear recursos (Contenedores, Volúmenes, Dominios), la API ejecuta una validación estricta de cuotas antes de tocar Docker. ¿Por qué es crítico?
+> 1. **Protege el Modelo de Negocio:** Evita que un usuario de plan "Free" modifique el código del frontend en su navegador para intentar saltarse el muro de pago y crear bases de datos infinitas.
+> 2. **Evita el Colapso del Nodo (OOM):** Un solo usuario abusando de peticiones POST sin límite podría agotar la memoria RAM del servidor VPS físico, tumbando los contenedores de todos los demás clientes.
+> 3. **Consistencia de Datos:** Compara en tiempo real los recursos vivos en MongoDB contra los `limits` anclados en el perfil del usuario. Si un cliente pide `maxVolumeSizeMb=50GB` y su plan solo soporta 10GB, la API responde con un `403 Forbidden` instantáneo y la creación se aborta limpiamente.
 
 ### 👤 Autenticación y Perfil (`/api/auth`)
-- `POST /register`: { `name`, `email`, `password` } -> Crea usuario y envía correo.
+- `POST /register`: { `name`, `email`, `password` } -> Crea usuario y envía correo OTP.
 - `POST /login`: { `email`, `password` } -> Devuelve `{ token, user }`.
-- `POST /verify`: { `email`, `code` } -> Activa la cuenta verificando el OTP.
+- `POST /verify`: { `email`, `code` } -> Activa la cuenta verificando el OTP temporal.
 - `GET /me`: Devuelve el `user` poblado y las métricas de consumo actuales para renderizar progresos de cuota.
 
 ### 📦 Contenedores y App Marketplace (`/api/containers`, `/api/templates`)
 - `GET /`: Soporta query params `?orgId=<id>` para listar contenedores B2B o personales.
-- `POST /`: Comando maestro. Recibe un JSON gordo: `{ image, name, networkMode, environment: { key: value }, volumes: [{ source, target }], ports: [{ host, container }] }`. Crea la imagen, inyecta subredes, genera volúmenes bajo demanda y levanta el Docker.
-- `POST /template`: { `templateId`, `name`, `envVars` } -> Clona una app preconfigurada (ej. Ghost, Redis).
-- `POST /:id/start` | `POST /:id/stop`: No requieren body. Impactan directamente al Socket Proxy.
-- `PUT /:id/redeploy`: Forza `docker pull` de la última etiqueta `latest` y recrea el contenedor en frío.
+- `POST /`: **(Punto Crítico de Cuotas)** Recibe `{ image, name, networkMode, environment, volumes, ports }`. Valida `maxContainers`, `maxRamMb` y `maxCpuCores`. Si pasa, inyecta subredes y levanta el contenedor.
+- `POST /template`: { `templateId`, `name`, `envVars` } -> Clona una app preconfigurada del catálogo.
+- `POST /:id/start` | `POST /:id/stop`: Modifican el daemon a través del Socket Proxy seguro.
+- `PUT /:id/redeploy`: Forza `docker pull latest` y recrea el contenedor manteniendo datos.
 - `DELETE /:id`: { `force: true/false` } -> Purgado total en host físico y BD.
-- `POST /:id/snapshot`: { `snapshotName` } -> Hace un `docker commit` y lo expone como una imagen personalizada.
+- `POST /:id/snapshot`: **(Punto de Cuota)** Valida `maxSnapshots` y realiza un `docker commit`.
 
-### 🌐 Infraestructura: Redes y Volúmenes (`/api/networks`, `/api/volumes`, `/api/buckets`)
-- `POST /networks`: { `name`, `subnet` (opcional), `isInternal` (booleano) } -> Usa hashing determinista para la subred si viene vacía.
-- `POST /volumes`: { `name`, `sizeMb` } -> Chequea la cuota del usuario (`maxVolumeSizeMb`) antes de crear.
-- `DELETE /:id`: Si un volumen está vinculado a un array `attachedContainers`, lanza un HTTP 409 Conflict.
+### 🌐 Infraestructura (`/api/networks`, `/api/volumes`)
+- `POST /networks`: { `name`, `subnet` (opcional), `isInternal` } -> Genera subnet determinista.
+- `POST /volumes`: **(Punto Crítico de Cuotas)** { `name`, `sizeMb` } -> Bloqueado si excede el `maxVolumes` o la sumatoria global roza `maxVolumeSizeMb`.
+- `DELETE /:id`: Denegado si el volumen tiene `attachedContainers` vivos.
 
 ### 🏢 Plataforma Colaborativa B2B (`/api/org`)
-- `POST /`: { `name` } -> Instancia la empresa y asigna al creador el Rol Maestro por defecto.
-- `POST /:orgId/invites`: { `email`, `roleId` } -> Genera token criptográfico temporal y envía email.
-- `POST /:orgId/roles`: { `name`, `permissions`: { `canManage...`: true } } -> Crea permisos RBAC customizados.
-- `DELETE /:orgId/members/:membershipId`: Revoca privilegios de inmediato.
+- `POST /`: { `name` } -> Instancia la empresa y asigna el Rol Maestro.
+- `POST /:orgId/invites`: { `email`, `roleId` } -> Genera token y despacha email SendGrid.
+- `POST /:orgId/roles`: { `name`, `permissions`: {...} } -> Crea permisos RBAC.
+- `DELETE /:orgId/members/:membershipId`: Revoca privilegios en cascada.
 
-### ⚙️ Almacén de Secretos (`/api/secrets`, `/api/registries`)
-- `POST /secrets`: { `key`, `value` } -> El backend intercepta el `value` y le aplica encriptación AES-256-CBC antes de tocar Mongo.
-- `POST /registries`: { `url`, `username`, `password` } -> Inyecta la autenticación privada cuando se usa `docker pull` contra repositorios empresariales como AWS ECR.
+### ⚙️ Bóveda Criptográfica (`/api/secrets`, `/api/registries`)
+- `POST /secrets`: { `key`, `value` } -> El backend cifra `value` con AES-256-CBC antes de insertarlo en Mongo.
+- `POST /registries`: { `url`, `username`, `password` } -> Inyecta Auth Base64 seguro para que el Host Docker pueda hacer `pull` desde ECR o GitLab Privado.
 
 ### 🛡️ Panel de Supervisión Total (Admin) (`/api/admin`)
-*(Requieren JWT donde `user.role === 'admin'`)*
-- `GET /users`, `GET /containers`: Listados masivos y sin filtrar de todo el ecosistema.
-- `GET /audit`: Devuelve el JSON de los AuditLogs de los últimos 30 días ordenado descendentemente.
-- `POST /backup/run/:type`: `:type` puede ser `all`, `db`, `server` o `web`. Llama al `backupService.js` para generar el Tarball/Mongodump.
-- `GET /backup/list`, `DELETE /backup/:bucket/:filename`: Gestión CRUD directa al servidor local MinIO a través de su SDK.
+*(Requieren JWT con `role === 'admin'`)*
+- `GET /users`, `GET /containers`: Listados masivos absolutos del ecosistema.
+- `GET /audit`: Exporta los `AuditLogs` de las últimas transacciones críticas.
+- `POST /backup/run/:type`: Llama a `tar/mongodump` según el `:type` (all, db, server, web).
+- `GET /backup/list`, `DELETE /backup/:bucket/:filename`: Manipulación del Zero-Trust Storage MinIO.
 
 --- 
 
