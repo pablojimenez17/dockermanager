@@ -266,14 +266,156 @@ No se abren puertos SSH por cliente ni se abren puertos remotos. Las sesiones de
 
 ---
 
-## 💾 6. Almacenamiento Zero-Trust y Backups S3
+## 🔄 6. Alta Disponibilidad y Recuperación Automática
 
-La persistencia de copias de seguridad de configuración global rige mediante una zona muerta Zero-Trust. El sistema de DB y Archivos jamás está directamente unido al disco o volumen de acceso compartido.
-El nodo `backend` empaqueta con `tar/mongodump` 3 elementos críticos: MongoDB, Web-Panel y el Server System. Los inyecta vía protocolo AWS S3 apuntando a una muralla HAProxy en el puerto estricto interno 9000, quien cruza de a un solo sentido el paquete para blindarlo en **MinIO**. Si alguien ataca o formatea la VPC/DMZ, la base interna MinIO carece de retorno salvaguardando las bases de la Plataforma inmutables. 
+### El Problema Original
+
+El backend de OrbitCloud podía quedarse **colgado** tras ciertos reinicios o errores internos (por ejemplo, pérdida de conexión con MongoDB, o un reinicio del VPS). Cuando esto ocurría:
+- Los usuarios no podían crear ni listar contenedores.
+- Los sockets se desconectaban permanentemente.
+- El único remedio era **cerrar sesión y volver a entrar**, o en los peores casos, hacer SSH al VPS para reiniciar manualmente los contenedores.
+
+### La Solución: Tres Capas de Resiliencia
+
+#### 1️⃣ Docker `restart: always` + Healthchecks
+
+Los servicios críticos de la plataforma tienen ahora política de reinicio automático:
+
+```yaml
+# docker-compose.yml
+backend:
+  restart: always
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+frontend:
+  restart: always
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+mongodb:
+  restart: always
+```
+
+- **`restart: always`**: Docker Engine reinicia el contenedor automáticamente tras cualquier crash o reinicio del VPS, sin intervención humana.
+- **`healthcheck`**: Si el endpoint `/api/health` falla 3 veces seguidas (90 segundos), Docker marca el contenedor como `unhealthy` y lo reinicia forzosamente.
+- **`GET /api/health`**: Endpoint sin autenticación que devuelve `{ status: "ok", ts: <timestamp> }`. Usado también por Traefik y balanceadores externos.
+
+> [!TIP]
+> Para consultar el estado de salud de un contenedor: `docker inspect --format='{{.State.Health.Status}}' dockermanager-backend`
+
+#### 2️⃣ Socket.IO — Reconexión Automática sin Cerrar Sesión
+
+Anteriormente, si el backend reiniciaba, el socket del navegador se desconectaba permanentemente y el usuario tenía que cerrar sesión para recuperar la funcionalidad en tiempo real.
+
+Ahora, todos los puntos de conexión socket del frontend (`Dashboard`, `ViewContainers`, `AdminDashboard`) usan reconexión exponencial automática:
+
+```js
+const socket = io('', {
+  reconnection: true,
+  reconnectionAttempts: Infinity,  // reintenta indefinidamente
+  reconnectionDelay: 1500,         // 1.5s entre primer y segundo intento
+  reconnectionDelayMax: 15000,     // máximo 15s entre intentos
+});
+socket.on('connect', () => fetchData()); // refresca datos al reconectar
+```
+
+**Comportamiento resultante:**
+- El backend reinicia → el socket del navegador detecta la desconexión y empieza a reintentar.
+- Cuando el backend vuelve (típicamente en 5-30s con `restart: always`), el socket reconecta automáticamente.
+- El callback `on('connect')` lanza un refresco de datos para que la UI muestre el estado actualizado.
+- **El usuario nunca tiene que cerrar sesión.**
 
 ---
 
-## 📊 7. Observabilidad Integral
+## 💾 7. Almacenamiento Zero-Trust y Backups S3
+
+La persistencia de copias de seguridad de configuración global rige mediante una zona muerta Zero-Trust. El sistema de DB y Archivos jamás está directamente unido al disco o volumen de acceso compartido.
+El nodo `backend` empaqueta con `tar/mongodump` 3 elementos críticos: MongoDB, Web-Panel y el Server System. Los inyecta vía protocolo AWS S3 apuntando a una muralla HAProxy en el puerto estricto interno 9000, quien cruza de a un solo sentido el paquete para blindarlo en **MinIO**. Si alguien ataca o formatea la VPC/DMZ, la base interna MinIO carece de retorno salvaguardando las bases de la Plataforma inmutables.
+
+### 🗂️ Sistema de Backups Granulares
+
+El sistema de backups ha evolucionado de un modelo monolítico (todo o nada, cada 24h fijo en código) a un sistema **completamente configurable desde la interfaz web**.
+
+#### Tipos de backup independientes
+
+| Tipo | Contenido | Bucket MinIO |
+|------|-----------|--------------|
+| **Database** | `mongodump --archive --gzip` de la BD `dockermanager` | `backups-mongodb` |
+| **Backend** | `docker export` del filesystem del contenedor `dockermanager-backend` | `backups-server` |
+| **Frontend** | `docker export` del filesystem del contenedor `dockermanager-frontend` | `backups-web` |
+
+#### Configuración persistente en MongoDB (`BackupConfig`)
+
+```js
+{
+  db:     { enabled: true,  intervalMs: 86400000 }, // cada 24h
+  server: { enabled: true,  intervalMs: 86400000 },
+  web:    { enabled: true,  intervalMs: 86400000 },
+  retention: 7  // copias a conservar por bucket
+}
+```
+
+El documento es un **singleton**: si no existe, se crea con valores por defecto al arrancar el servidor.
+
+#### Scheduler dinámico — Recarga en caliente
+
+```
+Antes: setInterval fijo en server.js con BACKUP_INTERVAL_MS (variable de entorno)
+Ahora: 3 setIntervals independientes en backupService.js,
+       leyendo la config de MongoDB.
+
+Cuando el admin guarda cambios desde el panel → PUT /api/admin/backup/config
+→ reloadScheduler() cancela los intervalos existentes y los recrea con la nueva config
+→ NO es necesario reiniciar el servidor
+```
+
+#### Panel de Administración — 4 Botones + Configurador
+
+Desde el **Panel de Control Admin → Sección Backups**:
+
+1. **4 botones de ejecución manual inmediata:**
+   - `Backup All` — lanza los 3 en paralelo
+   - `Database` — solo `mongodump`
+   - `Backend` — solo export del contenedor backend
+   - `Frontend` — solo export del contenedor frontend
+
+2. **Configurador del scheduler por tipo:**
+   - Toggle on/off individual por tipo
+   - Campo de intervalo en horas (mínimo 1h, máximo 720h)
+   - Campo de copias a conservar (retention)
+   - Botón "Guardar Configuración" → actualiza MongoDB + recarga scheduler en caliente
+
+#### Rotación automática
+
+Cada vez que se ejecuta un backup, `rotateBucket(bucket, retention)` lista los objetos del bucket, los ordena por fecha y elimina los más antiguos que sobrepasen el límite `retention`.
+
+#### API Endpoints (solo admin)
+
+```
+POST /api/admin/backup/run         → backup completo (todos los tipos)
+POST /api/admin/backup/run/db      → solo base de datos
+POST /api/admin/backup/run/server  → solo backend
+POST /api/admin/backup/run/web     → solo frontend
+GET  /api/admin/backup/config      → configuración actual del scheduler
+PUT  /api/admin/backup/config      → actualizar config + recargar scheduler
+GET  /api/admin/backup/list        → listar todos los archivos de backup en MinIO
+DELETE /api/admin/backup/:bucket/:filename → eliminar un backup específico
+```
+
+> [!NOTE]
+> La configuración de backups depende de MongoDB. Si la BD no está disponible al arrancar el servidor, el scheduler hace un único reintento 30 segundos después. Si sigue sin estar disponible, no se iniciará ningún scheduler automático pero los endpoints manuales seguirán funcionando.
+
+---
+
+## 📊 8. Observabilidad Integral
 
 Una Plataforma de este tamaño dispone de un panel propio paralelo unificado bajo una base monitorizada temporal de métricas para dominar la visión de todos los frentes posibles:
 
@@ -285,7 +427,7 @@ Una Plataforma de este tamaño dispone de un panel propio paralelo unificado baj
 
 ---
 
-## 📧 8. Servicio de Correo y Autenticación 2FA
+## 📧 9. Servicio de Correo y Autenticación 2FA
 
 OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y notificaciones transaccionales gestionadas a través del motor **SendGrid**. Esta capa adicional de seguridad protege el acceso al panel de control y a los entornos de los clientes.
 
@@ -295,7 +437,7 @@ OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y no
 
 ---
 
-## ⚖️ 9. Modelo de Responsabilidad Compartida
+## ⚖️ 10. Modelo de Responsabilidad Compartida
 
 | Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en OrbitCloud |
 |-----------------------|-------------------------|--------------------------------|

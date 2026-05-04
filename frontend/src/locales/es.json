@@ -545,6 +545,17 @@
     "orbitcloud": "OrbitCloud",
     "notifications": "Notificaciones",
     "disconnect": "Desconectar",
-    "terminal_session": "sesión de terminal"
+    "terminal_session": "sesión de terminal",
+    "backup_all": "Backup Completo",
+    "backup_db": "Base de Datos",
+    "backup_backend": "Backend",
+    "backup_frontend": "Frontend",
+    "backup_scheduler_config": "Configuración del Programador",
+    "interval_hours": "Intervalo (horas)",
+    "backup_retention": "Copias a conservar",
+    "save_config": "Guardar Configuración",
+    "saving_": "Guardando...",
+    "loading_": "Cargando...",
+    "run_backup_now": "Ejecutar Backup Ahora"
   }
 }

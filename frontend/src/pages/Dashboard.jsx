@@ -60,10 +60,16 @@ const Dashboard = () => {const { t } = useTranslation();
     fetchSummary();
     const interval = setInterval(fetchSummary, 30000);
 
-    const socket = io('');
-    socket.on('container:status_change', () => {
-      fetchSummary();
+    // Auto-reconnect: if the backend restarts, the socket will reconnect
+    // automatically without requiring the user to log out and back in.
+    const socket = io('', {
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 15000,
     });
+    socket.on('connect', () => fetchSummary());
+    socket.on('container:status_change', () => fetchSummary());
 
     return () => {
       clearInterval(interval);

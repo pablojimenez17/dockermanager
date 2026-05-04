@@ -539,6 +539,17 @@
     "orbitcloud": "OrbitCloud",
     "notifications": "Notifications",
     "disconnect": "Disconnect",
-    "terminal_session": "terminal session"
+    "terminal_session": "terminal session",
+    "backup_all": "Backup All",
+    "backup_db": "Database",
+    "backup_backend": "Backend",
+    "backup_frontend": "Frontend",
+    "backup_scheduler_config": "Scheduler Configuration",
+    "interval_hours": "Interval (hours)",
+    "backup_retention": "Copies to keep",
+    "save_config": "Save Config",
+    "saving_": "Saving...",
+    "loading_": "Loading...",
+    "run_backup_now": "Run Backup Now"
   }
 }

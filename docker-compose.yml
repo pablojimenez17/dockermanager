@@ -144,10 +144,18 @@ services:
   # 5. DMZ: Backend
   # FIX #3: Backend router now accepts both web and websecure entrypoints
   # FIX #7: Credentials read from environment variables (.env / Docker Secrets)
+  # HA: restart:always + healthcheck ensure the service recovers automatically
   backend:
     build: ./backend
     image: dockermanager/backend:local
     container_name: dockermanager-backend
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     environment:
       - MONGO_URI=mongodb://mongodb:27017/dockermanager
       - DOCKER_HOST=tcp://socket-proxy:2375
@@ -156,8 +164,6 @@ services:
       # MinIO credentials — same source as the MinIO container itself
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
-      - BACKUP_INTERVAL_MS=86400000          # 24h
-      - BACKUP_RETENTION=7
       - MONGO_CONTAINER_NAME=dockermanager-mongo
     networks:
       - dmz_net
@@ -177,10 +183,18 @@ services:
       - "traefik.docker.network=dmz_net"
 
   # 6. DMZ: Frontend
+  # HA: restart:always + healthcheck keep the frontend always available
   frontend:
     build: ./frontend
     image: dockermanager/frontend:local
     container_name: dockermanager-frontend
+    restart: always
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
     networks:
       - dmz_net
     labels:
@@ -192,9 +206,11 @@ services:
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
 
   # 7. DMZ: MongoDB
+  # HA: restart:always keeps MongoDB up after host reboots
   mongodb:
     image: mongo:latest
     container_name: dockermanager-mongo
+    restart: always
     volumes:
       - mongo-data:/data/db
     networks:

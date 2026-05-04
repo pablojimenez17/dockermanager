@@ -1,5 +1,5 @@
-import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
-import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock, DatabaseBackup, RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+﻿import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
+import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock, DatabaseBackup, RefreshCw, CheckCircle, AlertCircle, Database, Box, Globe, Settings2, ToggleLeft, ToggleRight, Save } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -17,6 +17,13 @@ const AdminDashboard = () => {const { t } = useTranslation();
   const [backupList, setBackupList] = useState([]);
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupRunning, setBackupRunning] = useState(false);
+  // Individual backup running states
+  const [runningType, setRunningType] = useState(null); // 'all'|'db'|'server'|'web'
+  // Scheduler config
+  const [backupConfig, setBackupConfig] = useState(null);
+  const [configLoading, setConfigLoading] = useState(false);
+  const [configSaving, setConfigSaving] = useState(false);
+  const [localConfig, setLocalConfig] = useState(null);
 
   // Keep ref to latest containers for socket closure
   const containersRef = useRef([]);
@@ -51,17 +58,55 @@ const AdminDashboard = () => {const { t } = useTranslation();
     }
   };
 
-  const handleRunBackup = async () => {
-    setBackupRunning(true);
-    addToast('Backup Started', 'Running full system backup...', 'info');
+  const fetchBackupConfig = async () => {
+    setConfigLoading(true);
     try {
-      await axios.post('/api/admin/backup/run');
-      addToast('Backup Completed', 'All backups stored in MinIO successfully.', 'success');
+      const res = await axios.get('/api/admin/backup/config');
+      setBackupConfig(res.data);
+      setLocalConfig({
+        db:     { enabled: res.data.db.enabled,     intervalH: Math.round(res.data.db.intervalMs / 3600000) },
+        server: { enabled: res.data.server.enabled, intervalH: Math.round(res.data.server.intervalMs / 3600000) },
+        web:    { enabled: res.data.web.enabled,    intervalH: Math.round(res.data.web.intervalMs / 3600000) },
+        retention: res.data.retention
+      });
+    } catch (err) {
+      addToast('Config Error', 'Could not load backup scheduler config.', 'error');
+    } finally {
+      setConfigLoading(false);
+    }
+  };
+
+  const saveBackupConfig = async () => {
+    setConfigSaving(true);
+    try {
+      await axios.put('/api/admin/backup/config', {
+        db:     { enabled: localConfig.db.enabled,     intervalMs: localConfig.db.intervalH * 3600000 },
+        server: { enabled: localConfig.server.enabled, intervalMs: localConfig.server.intervalH * 3600000 },
+        web:    { enabled: localConfig.web.enabled,    intervalMs: localConfig.web.intervalH * 3600000 },
+        retention: localConfig.retention
+      });
+      addToast('Config Saved', 'Backup scheduler updated and reloaded.', 'success');
+      fetchBackupConfig();
+    } catch (err) {
+      addToast('Save Failed', err.response?.data?.message || 'Could not save config.', 'error');
+    } finally {
+      setConfigSaving(false);
+    }
+  };
+
+  const handleRunBackup = async (type = 'all') => {
+    setRunningType(type);
+    const labels = { all: 'Full System', db: 'Database', server: 'Backend', web: 'Frontend' };
+    const endpoints = { all: '/api/admin/backup/run', db: '/api/admin/backup/run/db', server: '/api/admin/backup/run/server', web: '/api/admin/backup/run/web' };
+    addToast('Backup Started', `Running ${labels[type]} backup...`, 'info');
+    try {
+      await axios.post(endpoints[type]);
+      addToast('Backup Completed', `${labels[type]} backup stored in MinIO.`, 'success');
       fetchBackupList();
     } catch (err) {
-      addToast('Backup Failed', err.response?.data?.error || 'Backup process failed.', 'error');
+      addToast('Backup Failed', err.response?.data?.error || `${labels[type]} backup failed.`, 'error');
     } finally {
-      setBackupRunning(false);
+      setRunningType(null);
     }
   };
 
@@ -79,10 +124,17 @@ const AdminDashboard = () => {const { t } = useTranslation();
   useEffect(() => {
     fetchData();
     fetchBackupList();
+    fetchBackupConfig();
     const interval = setInterval(fetchData, 30000);
 
-    // Setup Real-time Docker events socket
-    const socket = io('');
+    // Auto-reconnect socket — backend restarts won't force logout
+    const socket = io('', {
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 15000,
+    });
+    socket.on('connect', () => fetchData());
 
     socket.on('container:status_change', ({ dockerId, status }) => {
       const currentContainers = containersRef.current;
@@ -263,8 +315,7 @@ const AdminDashboard = () => {const { t } = useTranslation();
                     </table>
                 </div>
             </div>
-
-            {/* Backup Section */}
+            {/* Backup Section */}
             <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-4 md:p-8 shadow-sm mb-12">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 border-b border-slate-200 dark:border-slate-700 pb-4 gap-4">
                     <h3 className="text-xl font-bold flex items-center space-x-2 text-slate-900 dark:text-white">
@@ -272,29 +323,79 @@ const AdminDashboard = () => {const { t } = useTranslation();
                         <span>{t("auto.minio_backups")}</span>
                         <span className="text-sm font-normal text-slate-400 ml-1">({backupList.length} {t("auto.files_")}</span>
                     </h3>
-                    <div className="flex items-center gap-3">
-                        <button
-              id="admin-refresh-backups"
-              onClick={fetchBackupList}
-              disabled={backupLoading}
-              className="flex items-center gap-2 px-4 py-2 rounded-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm disabled:opacity-50">
-              
-                            <RefreshCw size={14} className={backupLoading ? 'animate-spin' : ''} />
-                            {t("auto.refresh")}
-                        </button>
-                        <button
-              id="admin-run-backup"
-              onClick={handleRunBackup}
-              disabled={backupRunning}
-              className="flex items-center gap-2 px-5 py-2 rounded-sm bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm transition-colors shadow disabled:opacity-60 disabled:cursor-not-allowed">
-              
-                            {backupRunning ?
-              <><RefreshCw size={14} className="animate-spin" /> {t("auto.running_")}</> :
+                    <button id="admin-refresh-backups" onClick={fetchBackupList} disabled={backupLoading}
+                      className="flex items-center gap-2 px-4 py-2 rounded-sm border border-slate-200 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-sm disabled:opacity-50">
+                        <RefreshCw size={14} className={backupLoading ? 'animate-spin' : ''} />{t("auto.refresh")}
+                    </button>
+                </div>
 
-              <><DatabaseBackup size={14} /> {t("auto.run_backup_now")}</>
-              }
-                        </button>
-                    </div>
+                {/* 4 Backup Action Buttons */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
+                    {[
+                      { type: 'all',    label: t('auto.backup_all'),     icon: DatabaseBackup, color: 'emerald' },
+                      { type: 'db',     label: t('auto.backup_db'),      icon: Database,       color: 'blue' },
+                      { type: 'server', label: t('auto.backup_backend'), icon: Box,            color: 'amber' },
+                      { type: 'web',    label: t('auto.backup_frontend'),icon: Globe,          color: 'purple' },
+                    ].map(({ type, label, icon: Icon, color }) => (
+                      <button key={type} id={`admin-backup-${type}`}
+                        onClick={() => handleRunBackup(type)}
+                        disabled={runningType !== null}
+                        className={`flex flex-col items-center justify-center gap-2 px-4 py-4 rounded-sm font-semibold text-sm transition-all shadow-sm disabled:opacity-60 disabled:cursor-not-allowed
+                          bg-${color}-50 dark:bg-${color}-900/20 border border-${color}-200 dark:border-${color}-700/50
+                          text-${color}-700 dark:text-${color}-300 hover:bg-${color}-100 dark:hover:bg-${color}-900/40`}>
+                        {runningType === type
+                          ? <RefreshCw size={20} className="animate-spin" />
+                          : <Icon size={20} />}
+                        <span>{runningType === type ? t('auto.running_') : label}</span>
+                      </button>
+                    ))}
+                </div>
+
+                {/* Scheduler Config */}
+                <div className="border border-slate-200 dark:border-slate-700 rounded-sm p-5 mb-8 bg-slate-50 dark:bg-slate-900/40">
+                    <h4 className="font-bold flex items-center gap-2 mb-5 text-slate-800 dark:text-slate-200">
+                        <Settings2 size={16} className="text-slate-500" />{t('auto.backup_scheduler_config')}
+                    </h4>
+                    {configLoading || !localConfig ? (
+                      <div className="text-sm text-slate-400 py-4 text-center"><RefreshCw size={14} className="animate-spin inline mr-2" />{t('auto.loading_')}</div>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-5">
+                          {[{key:'db',label:t('auto.backup_db'),color:'blue'},{key:'server',label:t('auto.backup_backend'),color:'amber'},{key:'web',label:t('auto.backup_frontend'),color:'purple'}].map(({key,label,color})=>(
+                            <div key={key} className={`border border-${color}-200 dark:border-${color}-700/40 rounded-sm p-4 bg-white dark:bg-slate-800`}>
+                              <div className="flex items-center justify-between mb-3">
+                                <span className={`font-semibold text-sm text-${color}-700 dark:text-${color}-300`}>{label}</span>
+                                <button onClick={()=>setLocalConfig(p=>({...p,[key]:{...p[key],enabled:!p[key].enabled}}))} className="transition-colors">
+                                  {localConfig[key].enabled
+                                    ? <ToggleRight size={24} className="text-emerald-500" />
+                                    : <ToggleLeft  size={24} className="text-slate-400" />}
+                                </button>
+                              </div>
+                              <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">{t('auto.interval_hours')}</label>
+                              <input type="number" min="1" max="720"
+                                value={localConfig[key].intervalH}
+                                onChange={e=>setLocalConfig(p=>({...p,[key]:{...p[key],intervalH:parseInt(e.target.value)||1}}))}
+                                disabled={!localConfig[key].enabled}
+                                className="w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white disabled:opacity-40 outline-none focus:ring-1 focus:ring-blue-500" />
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex items-end gap-4">
+                          <div className="flex-1 max-w-[160px]">
+                            <label className="text-xs text-slate-500 dark:text-slate-400 block mb-1">{t('auto.backup_retention')}</label>
+                            <input type="number" min="1" max="30"
+                              value={localConfig.retention}
+                              onChange={e=>setLocalConfig(p=>({...p,retention:parseInt(e.target.value)||1}))}
+                              className="w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white outline-none focus:ring-1 focus:ring-blue-500" />
+                          </div>
+                          <button onClick={saveBackupConfig} disabled={configSaving}
+                            className="flex items-center gap-2 px-5 py-2 rounded-sm bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm transition-colors shadow disabled:opacity-60">
+                            {configSaving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+                            {configSaving ? t('auto.saving_') : t('auto.save_config')}
+                          </button>
+                        </div>
+                      </>
+                    )}
                 </div>
 
                 {backupLoading && backupList.length === 0 ?

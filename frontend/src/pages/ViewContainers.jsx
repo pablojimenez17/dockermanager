@@ -64,8 +64,16 @@ const ViewContainers = () => {const { t } = useTranslation();
     fetchContainers();
     const interval = setInterval(fetchContainers, 30000);
 
-    const socket = io('', { withCredentials: true });
+    // Auto-reconnect: backend restarts won't force the user to log out
+    const socket = io('', {
+      withCredentials: true,
+      reconnection: true,
+      reconnectionAttempts: Infinity,
+      reconnectionDelay: 1500,
+      reconnectionDelayMax: 15000,
+    });
 
+    socket.on('connect', () => fetchContainers());
     socket.on('container:status_change', ({ dockerId, status }) => {
       const currentContainers = containersRef.current;
       const target = currentContainers.find((c) => dockerId.includes(c.dockerId) || c.dockerId.includes(dockerId));
