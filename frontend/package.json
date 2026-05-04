@@ -12,9 +12,11 @@
   "dependencies": {
     "axios": "^1.13.5",
     "framer-motion": "^12.38.0",
+    "i18next": "^26.0.8",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-i18next": "^17.0.6",
     "react-router-dom": "^7.13.1",
     "recharts": "^3.8.0",
     "socket.io-client": "^4.8.3",
@@ -22,6 +24,10 @@
     "xterm-addon-fit": "^0.8.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
+    "@babel/generator": "^7.29.1",
+    "@babel/parser": "^7.29.3",
+    "@babel/traverse": "^7.29.0",
     "@eslint/js": "^9.39.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",

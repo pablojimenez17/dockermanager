@@ -23,9 +23,11 @@ router.use(authMiddleware);
 
 /**
  * Ensures a user's isolated VPC network exists.
- * - Driver: bridge (isolated at L2)
- * - Internal: true (no egress to internet by default)
- * - enableInternet: false => Internal:true, enableInternet: true => Internal:false
+ * Docker does NOT allow changing the Internal flag of an existing network.
+ * To avoid bugs, we maintain TWO permanent sibling networks per user:
+ *   - {userId}_default_vlan        → Internal:true  (no internet egress, private)
+ *   - {userId}_default_vlan_open   → Internal:false (internet allowed)
+ * The correct one is chosen at deploy time based on enableInternet.
  * Returns the Docker network name.
  */
 const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = false) => {
@@ -34,7 +36,7 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
         const nets = await docker.listNetworks({ filters: { name: [networkName] } });
         const exactMatch = nets.find(n => n.Name === networkName);
         if (!exactMatch) {
-            console.log(`[VPC] Creating isolated VPC network: ${networkName} (internal=${!enableInternet})`);
+            console.log(`[VPC] Creating VPC network: ${networkName} (internal=${!enableInternet})`);
             await docker.createNetwork({
                 Name: networkName,
                 Driver: 'bridge',
@@ -42,8 +44,18 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
                 Labels: {
                     'dockermanager.vpc': 'true',
                     'dockermanager.owner': userId.toString(),
+                    'dockermanager.internet': enableInternet ? 'true' : 'false',
                 }
             });
+        } else {
+            // Verify the network's Internal flag matches what we expect.
+            // If there's a mismatch (e.g. network was created with wrong flag),
+            // log a warning — we cannot fix it without recreating the network.
+            const expectedInternal = !enableInternet;
+            if (exactMatch.Internal !== expectedInternal) {
+                console.warn(`[VPC] Network ${networkName} exists with Internal=${exactMatch.Internal} but expected Internal=${expectedInternal}. ` +
+                    `This may cause internet access issues. Consider deleting the network and recreating it.`);
+            }
         }
     } catch (err) {
         console.error(`[VPC] Failed to ensure VPC network ${networkName}:`, err.message);
@@ -409,25 +421,37 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             if (networkMode === 'none') {
                 // Air-gapped: no network at all
                 safeNetworkMode = 'none';
+
             } else if (networkName) {
                 // Multi-container stack: use dedicated internal stack network
                 safeNetworkMode = networkName;
+
             } else if (networkMode && networkMode !== 'bridge' && networkMode !== 'lan_net' && networkMode !== 'dockermanager_lan_net') {
-                // User explicitly picked one of their own custom networks (prefixed).
-                // Docker does not allow changing Internal flag of an existing network,
-                // so if internet is requested we ensure a parallel '-open' sibling exists.
+                // User explicitly picked one of their own custom networks.
+                // Docker does NOT allow changing the Internal flag of an existing network.
+                // Strategy: if internet is requested, use/create a '_open' sibling of that network.
+                //           if private, use the network as-is.
                 if (enableInternet) {
-                    const openSuffix = networkMode.endsWith('_open') ? networkMode : `${networkMode}_open`;
-                    safeNetworkMode = await ensureUserVpc(ownerId, openSuffix.replace(`${ownerId}_`, ''), true);
+                    const baseName = networkMode.endsWith('_open')
+                        ? networkMode.slice(0, -5) // strip existing _open to get base
+                        : networkMode;
+                    const openSuffix = `${baseName}_open`.replace(`${ownerId}_`, '');
+                    safeNetworkMode = await ensureUserVpc(ownerId, openSuffix, true);
                 } else {
                     safeNetworkMode = networkMode;
                 }
 
             } else {
-                // Default / bridge / lan_net → redirect to user's private VPC
-                safeNetworkMode = enableInternet
-                    ? await ensureUserVpc(ownerId, 'default_vlan', true)  // Internal:false
-                    : userVpcName;                                          // Internal:true
+                // Default / bridge / lan_net → redirect to user's private VPC.
+                // IMPORTANT: We use two separate permanent networks to avoid the Docker
+                // limitation of not being able to change Internal flag on existing networks:
+                //   - default_vlan      → Internal:true  (isolated, no internet)
+                //   - default_vlan_open → Internal:false (internet allowed)
+                if (enableInternet) {
+                    safeNetworkMode = await ensureUserVpc(ownerId, 'default_vlan_open', true);
+                } else {
+                    safeNetworkMode = userVpcName; // always Internal:true
+                }
             }
             console.log(`[VPC] Container '${name}' will use network: ${safeNetworkMode} (internet=${enableInternet})`);
 
@@ -529,6 +553,38 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 // This is the single controlled ingress point into the user's VPC.
                 if (domain && domain.trim() !== '' && domainPort && safeNetworkMode !== 'none') {
                     await attachProxyToVpc(safeNetworkMode);
+                }
+
+                // ── Extra Networks ──────────────────────────────────────────────
+                // If the user selected additional networks, connect the running
+                // container to each one after creation.
+                // This is the Docker Compose-equivalent of multi-network membership:
+                // a container can be on the private VPC (Internal:true) AND
+                // simultaneously on another network (e.g. a shared service mesh).
+                const extraNetworks = item.extraNetworks || [];
+                for (const extraNet of extraNetworks) {
+                    try {
+                        // Skip if this is the same as the primary network
+                        if (extraNet === safeNetworkMode) continue;
+
+                        // Ensure the network exists. If it's 'bridge' use Docker's default.
+                        let resolvedExtra = extraNet;
+                        if (extraNet !== 'bridge') {
+                            // Treat as a user-named network - ensure it exists (do NOT change Internal flag)
+                            const existingNets = await docker.listNetworks({ filters: { name: [extraNet] } });
+                            const exactMatch = existingNets.find(n => n.Name === extraNet);
+                            if (!exactMatch) {
+                                console.warn(`[VPC] Extra network '${extraNet}' not found, skipping.`);
+                                continue;
+                            }
+                        }
+
+                        console.log(`[VPC] Connecting container '${instanceName}' to extra network: ${resolvedExtra}`);
+                        await docker.getNetwork(resolvedExtra).connect({ Container: container.id });
+                    } catch (netErr) {
+                        // Non-fatal: log and continue - don't fail the whole deployment
+                        console.error(`[VPC] Failed to connect '${instanceName}' to extra network '${extraNet}':`, netErr.message);
+                    }
                 }
 
                 // Save to database

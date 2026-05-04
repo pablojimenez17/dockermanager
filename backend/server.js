@@ -89,6 +89,9 @@ app.use(cors({
 }));
 app.use(cookieParser());
 
+// Health check — no auth required, used by Docker healthcheck & load balancers
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/containers', containerRoutes);

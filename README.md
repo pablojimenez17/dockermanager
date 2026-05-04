@@ -98,11 +98,135 @@ graph TD
 *   **El "Socket Shield" (`dockermanager-socket-proxy`)**: En sistemas normales, el backend de Node.js tiene control absoluto sobre el motor de Docker (acceso *root* al host). Si un hacker encontrara una vulnerabilidad en tu backend, podría destruir todo el servidor físico. Para impedirlo, el backend está obligado a hablar con Docker a través de este proxy intermedio. El `socket-proxy` intercepta las órdenes y solo deja pasar comandos inofensivos (como arrancar o parar los contenedores de los clientes), bloqueando permanentemente comandos letales (como borrar redes maestras, acceder al sistema de archivos del host o escalar privilegios).
 *   **La Consola Segura (Terminal Web)**: Es importante entender que el enrutador `Proxy VPC LAN` sirve **únicamente** para que los visitantes externos vean la web que un cliente ha alojado (ej. `app.usuario.com`). Cuando el dueño de la app quiere abrir la terminal de comandos desde el panel de OrbitCloud, el flujo es completamente distinto: la conexión WebSocket viaja por la ruta de la plataforma (`Proxy DMZ Inverso`) hacia el `Backend`. Es el Backend quien, a través del `Socket Shield`, inyecta la sesión de terminal (`docker exec`) de forma 100% segura. **Nunca** se abren puertos SSH físicos al exterior ni se conectan directamente los usuarios a sus contenedores.
 
-### 👯‍♂️ Redes Gemelas (Generación Automática de VPC)
-Docker carece de un botón mágico para dar/quitar Internet interno en vivo a contenedores blindados.
-El Backend administra al invocar la API la creencia del patrón VPC Gemelo:
-- **Red por defecto Segura**: Cada usuario porta un prefijo (Ej: `usuario_default_vlan`) donde todo lo desplegado no alcanza salir jamás al exterior de forma directa sin pasar por el IPS.
-- **Red Abierta (`_open`)**: Al solicitar Exposición Web en el panel, el Backend levanta otra gemela temporal inyectando conexión al `Proxy VPC LAN`, despliega tu servicio allí y actualiza tu dominio. Si lo quitas, se borra instantáneamente esta pasarela en modo _Lazy_ sin afectar los demás recursos subyacentes desconectados en la base principal.
+### 👯‍♂️ Redes VPC y Acceso a Internet — Cómo Funciona
+
+Docker tiene una limitación crítica de diseño: **no permite cambiar la bandera `Internal` de una red existente**. Esto significa que no es posible activar o desactivar el acceso a internet de una red sobre la marcha. OrbitCloud resuelve esto mediante el patrón de **redes sibling** (gemelas permanentes):
+
+#### Las dos redes permanentes por usuario
+
+Cada usuario tiene **dos redes Docker dedicadas** que se crean automáticamente en el primer despliegue:
+
+| Red | Nombre Docker | `Internal` | Acceso a Internet |
+|-----|--------------|-----------|-------------------|
+| VPC Privada | `{userId}_default_vlan` | `true` | ❌ Sin acceso (aislada) |
+| VPC Abierta | `{userId}_default_vlan_open` | `false` | ✅ Con acceso (salida vigilada por IPS) |
+
+#### Lógica de selección de red al crear un contenedor
+
+El backend de OrbitCloud selecciona la red correcta según la configuración del usuario en el panel:
+
+```
+networkMode = 'none'          → Red = none (air-gapped, sin stack de red)
+networkMode = custom (tuya)
+  + Internet activado         → Usa/crea '{tuRed}_open' sibling con Internal:false
+  + Internet desactivado      → Usa '{tuRed}' tal cual (Internal:true)
+networkMode = bridge / VPC
+  + Internet activado         → Usa '{userId}_default_vlan_open' (Internal:false)
+  + Internet desactivado      → Usa '{userId}_default_vlan' (Internal:true)
+```
+
+#### ¿Por qué este patrón?
+
+> [!IMPORTANT]
+> Docker **no permite modificar** la bandera `Internal` de una red existente. Si un usuario crea primero un contenedor sin internet (lo que genera `_default_vlan` con `Internal:true`) y luego intenta crear otro con internet activado, si se reutilizara la misma red, el contenedor **no tendría internet aunque el toggle estuviera activo**. El patrón de redes sibling evita este bug estructural usando siempre redes con el flag correcto desde su creación.
+
+#### Redes personalizadas del usuario
+
+Cuando el usuario crea sus propias redes desde la sección **Docker Networks**, estas se crean por defecto con `Internal:true` (sin internet). Si luego despliega un contenedor en esa red con "Internet activado", el backend crea automáticamente una red gemela `{nombreRed}_open` con `Internal:false` y usa esa en su lugar, preservando la red original intacta para otros contenedores.
+
+#### Egress (tráfico de salida)
+
+Incluso los contenedores en redes `_open` **no tienen acceso directo a internet**. Su tráfico de salida pasa obligatoriamente por el **Edge Firewall IPS (Suricata)** que inspecciona cada paquete saliente, bloqueando comunicaciones con servidores de C&C (Command & Control), botnets o IPs maliciosas.
+
+---
+
+### 🔗 Redes Múltiples Simultáneas — Multi-Network
+
+Un contenedor puede pertenecer a **más de una red Docker a la vez**, de forma equivalente a como lo hacen Docker Compose y Kubernetes. Esto es útil cuando necesitas que un contenedor tenga aislamiento diferente en cada interfaz. Por ejemplo:
+
+```
+Máquina A (sin internet):
+  → Red primaria: {userId}_default_vlan   (Internal: true, aislada)
+  → Red extra:    mi-red-compartida       (puente con Máquina B)
+
+Máquina B (con internet):
+  → Red primaria: {userId}_default_vlan_open  (Internal: false, con salida)
+  → Red extra:    mi-red-compartida           (puente con Máquina A)
+
+Resultado:
+  ✅ A y B se comunican entre sí por "mi-red-compartida"
+  ❌ A no tiene salida directa a internet
+  ✅ B sí tiene salida a internet (vigilada por Suricata)
+```
+
+#### Cómo funciona internamente
+
+1. El usuario selecciona la **red primaria** en el panel (con/sin internet).
+2. Opcionalmente, añade **redes adicionales** mediante chips en la misma sección de configuración.
+3. El backend crea y arranca el contenedor en la red primaria.
+4. **Post-arranque**, el backend ejecuta `docker network connect <extraRed> <containerId>` para cada red adicional.
+
+> [!NOTE]
+> La conexión a redes extra es **no bloqueante**: si una red no existe o falla la conexión, el backend loguea el error pero el contenedor sigue funcionando en su red primaria. Nunca se cancela un despliegue por un fallo en una red secundaria.
+
+#### Dónde configurarlo en el panel
+
+- **Create Container**: en la sección *Advanced Configuration → Network Mode*, debajo del selector principal de red aparece una sección "Additional networks" con chips removibles y un selector desplegable.
+- **Marketplace (Templates)**: en la sección *3. Resources & Network*, misma UI.
+
+> [!TIP]
+> Si quieres que dos contenedores se vean entre sí pero con distintas políticas de internet, crea primero una red personalizada en **Docker Networks**, y luego añádela como red extra en ambos contenedores al crearlos.
+
+---
+
+### 🛡️ Auto-Subnet — Prevención de Colisiones entre Tenants
+
+#### El problema
+
+Cuando dos usuarios distintos crean una red personalizada dejando el campo **Subnet** vacío, Docker asigna IPs desde el mismo pool por defecto (`172.17.x.x`, `10.0.x.x`). Esto causa que las redes **colisionen silenciosamente**, impidiendo el enrutamiento correcto entre contenedores de diferentes usuarios.
+
+#### La solución: hash determinista de subnet
+
+Si el usuario **no especifica** una subnet manualmente, el backend genera una automáticamente usando un hash de `userId + nombreRed`:
+
+```
+hash(userId + prefixedName) → rango 10.128.0.0 – 10.254.255.0/24
+```
+
+El rango `10.128.x.x` – `10.254.x.x` está fuera de los rangos por defecto de Docker (`172.17-31.x` y `10.0-127.x`), minimizando colisiones accidentales.
+
+**Flujo de resolución:**
+1. Se calcula un bloque `/24` determinista a partir del hash
+2. Se comprueba contra todos los subnets existentes en Docker (`docker.listNetworks()`)
+3. Si ya está ocupado → se prueba el siguiente `/24` (third octet + 1)
+4. Si sigue colisionando → se deja que Docker asigne automáticamente y se loguea un warning
+5. Si el usuario **sí especificó** subnet → se respeta exactamente lo que puso
+
+> [!NOTE]
+> Si dos usuarios generan el mismo hash (colisión matemática), el sistema reintenta con un octeto desplazado antes de rendirse. En la práctica, el espacio `10.128-254.x.x` ofrece ~32.000 bloques `/24` distintos, suficiente para miles de redes concurrentes.
+
+---
+
+### ⚡ Volumes — Cache de `docker system df`
+
+#### El problema
+
+`docker.df()` (equivalente a `docker system df`) **inspecciona todos los recursos del sistema** — imágenes, contenedores, volúmenes — y puede tardar entre 3 y 10 segundos dependiendo de cuántos recursos haya en el host. El código anterior lo ejecutaba en **cada listado de volúmenes y en cada creación**, bloqueando la respuesta.
+
+#### La solución: cache en memoria de 30 segundos
+
+```
+Primera petición  → ejecuta docker.df() (lento), guarda resultado en caché
+Siguientes 30s    → devuelve el caché instantáneamente sin tocar Docker
+Tras 30s          → refresca el caché en la próxima petición
+```
+
+Adicionalmente, en la creación de un volumen nuevo:
+- El check de **cuota por número** (`maxVolumes`) se hace directamente contra la BD — sin llamar a Docker
+- El check de **cuota por tamaño** solo se ejecuta si el plan tiene un límite finito (no para planes Enterprise/Agency con cuota alta)
+
+> [!IMPORTANT]
+> El tamaño mostrado en el panel puede tener hasta **30 segundos de retraso** respecto al tamaño real en disco. Esto es un trade-off deliberado: se prefiere rapidez de carga sobre precisión de tamaño en tiempo real, ya que los volúmenes no cambian de tamaño drásticamente en esa ventana de tiempo.
 
 ---
 
@@ -142,14 +266,156 @@ No se abren puertos SSH por cliente ni se abren puertos remotos. Las sesiones de
 
 ---
 
-## 💾 6. Almacenamiento Zero-Trust y Backups S3
+## 🔄 6. Alta Disponibilidad y Recuperación Automática
 
-La persistencia de copias de seguridad de configuración global rige mediante una zona muerta Zero-Trust. El sistema de DB y Archivos jamás está directamente unido al disco o volumen de acceso compartido.
-El nodo `backend` empaqueta con `tar/mongodump` 3 elementos críticos: MongoDB, Web-Panel y el Server System. Los inyecta vía protocolo AWS S3 apuntando a una muralla HAProxy en el puerto estricto interno 9000, quien cruza de a un solo sentido el paquete para blindarlo en **MinIO**. Si alguien ataca o formatea la VPC/DMZ, la base interna MinIO carece de retorno salvaguardando las bases de la Plataforma inmutables. 
+### El Problema Original
+
+El backend de OrbitCloud podía quedarse **colgado** tras ciertos reinicios o errores internos (por ejemplo, pérdida de conexión con MongoDB, o un reinicio del VPS). Cuando esto ocurría:
+- Los usuarios no podían crear ni listar contenedores.
+- Los sockets se desconectaban permanentemente.
+- El único remedio era **cerrar sesión y volver a entrar**, o en los peores casos, hacer SSH al VPS para reiniciar manualmente los contenedores.
+
+### La Solución: Tres Capas de Resiliencia
+
+#### 1️⃣ Docker `restart: always` + Healthchecks
+
+Los servicios críticos de la plataforma tienen ahora política de reinicio automático:
+
+```yaml
+# docker-compose.yml
+backend:
+  restart: always
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+    start_period: 40s
+
+frontend:
+  restart: always
+  healthcheck:
+    test: ["CMD", "wget", "-qO-", "http://localhost:80"]
+    interval: 30s
+    timeout: 10s
+    retries: 3
+
+mongodb:
+  restart: always
+```
+
+- **`restart: always`**: Docker Engine reinicia el contenedor automáticamente tras cualquier crash o reinicio del VPS, sin intervención humana.
+- **`healthcheck`**: Si el endpoint `/api/health` falla 3 veces seguidas (90 segundos), Docker marca el contenedor como `unhealthy` y lo reinicia forzosamente.
+- **`GET /api/health`**: Endpoint sin autenticación que devuelve `{ status: "ok", ts: <timestamp> }`. Usado también por Traefik y balanceadores externos.
+
+> [!TIP]
+> Para consultar el estado de salud de un contenedor: `docker inspect --format='{{.State.Health.Status}}' dockermanager-backend`
+
+#### 2️⃣ Socket.IO — Reconexión Automática sin Cerrar Sesión
+
+Anteriormente, si el backend reiniciaba, el socket del navegador se desconectaba permanentemente y el usuario tenía que cerrar sesión para recuperar la funcionalidad en tiempo real.
+
+Ahora, todos los puntos de conexión socket del frontend (`Dashboard`, `ViewContainers`, `AdminDashboard`) usan reconexión exponencial automática:
+
+```js
+const socket = io('', {
+  reconnection: true,
+  reconnectionAttempts: Infinity,  // reintenta indefinidamente
+  reconnectionDelay: 1500,         // 1.5s entre primer y segundo intento
+  reconnectionDelayMax: 15000,     // máximo 15s entre intentos
+});
+socket.on('connect', () => fetchData()); // refresca datos al reconectar
+```
+
+**Comportamiento resultante:**
+- El backend reinicia → el socket del navegador detecta la desconexión y empieza a reintentar.
+- Cuando el backend vuelve (típicamente en 5-30s con `restart: always`), el socket reconecta automáticamente.
+- El callback `on('connect')` lanza un refresco de datos para que la UI muestre el estado actualizado.
+- **El usuario nunca tiene que cerrar sesión.**
 
 ---
 
-## 📊 7. Observabilidad Integral
+## 💾 7. Almacenamiento Zero-Trust y Backups S3
+
+La persistencia de copias de seguridad de configuración global rige mediante una zona muerta Zero-Trust. El sistema de DB y Archivos jamás está directamente unido al disco o volumen de acceso compartido.
+El nodo `backend` empaqueta con `tar/mongodump` 3 elementos críticos: MongoDB, Web-Panel y el Server System. Los inyecta vía protocolo AWS S3 apuntando a una muralla HAProxy en el puerto estricto interno 9000, quien cruza de a un solo sentido el paquete para blindarlo en **MinIO**. Si alguien ataca o formatea la VPC/DMZ, la base interna MinIO carece de retorno salvaguardando las bases de la Plataforma inmutables.
+
+### 🗂️ Sistema de Backups Granulares
+
+El sistema de backups ha evolucionado de un modelo monolítico (todo o nada, cada 24h fijo en código) a un sistema **completamente configurable desde la interfaz web**.
+
+#### Tipos de backup independientes
+
+| Tipo | Contenido | Bucket MinIO |
+|------|-----------|--------------|
+| **Database** | `mongodump --archive --gzip` de la BD `dockermanager` | `backups-mongodb` |
+| **Backend** | `docker export` del filesystem del contenedor `dockermanager-backend` | `backups-server` |
+| **Frontend** | `docker export` del filesystem del contenedor `dockermanager-frontend` | `backups-web` |
+
+#### Configuración persistente en MongoDB (`BackupConfig`)
+
+```js
+{
+  db:     { enabled: true,  intervalMs: 86400000 }, // cada 24h
+  server: { enabled: true,  intervalMs: 86400000 },
+  web:    { enabled: true,  intervalMs: 86400000 },
+  retention: 7  // copias a conservar por bucket
+}
+```
+
+El documento es un **singleton**: si no existe, se crea con valores por defecto al arrancar el servidor.
+
+#### Scheduler dinámico — Recarga en caliente
+
+```
+Antes: setInterval fijo en server.js con BACKUP_INTERVAL_MS (variable de entorno)
+Ahora: 3 setIntervals independientes en backupService.js,
+       leyendo la config de MongoDB.
+
+Cuando el admin guarda cambios desde el panel → PUT /api/admin/backup/config
+→ reloadScheduler() cancela los intervalos existentes y los recrea con la nueva config
+→ NO es necesario reiniciar el servidor
+```
+
+#### Panel de Administración — 4 Botones + Configurador
+
+Desde el **Panel de Control Admin → Sección Backups**:
+
+1. **4 botones de ejecución manual inmediata:**
+   - `Backup All` — lanza los 3 en paralelo
+   - `Database` — solo `mongodump`
+   - `Backend` — solo export del contenedor backend
+   - `Frontend` — solo export del contenedor frontend
+
+2. **Configurador del scheduler por tipo:**
+   - Toggle on/off individual por tipo
+   - Campo de intervalo en horas (mínimo 1h, máximo 720h)
+   - Campo de copias a conservar (retention)
+   - Botón "Guardar Configuración" → actualiza MongoDB + recarga scheduler en caliente
+
+#### Rotación automática
+
+Cada vez que se ejecuta un backup, `rotateBucket(bucket, retention)` lista los objetos del bucket, los ordena por fecha y elimina los más antiguos que sobrepasen el límite `retention`.
+
+#### API Endpoints (solo admin)
+
+```
+POST /api/admin/backup/run         → backup completo (todos los tipos)
+POST /api/admin/backup/run/db      → solo base de datos
+POST /api/admin/backup/run/server  → solo backend
+POST /api/admin/backup/run/web     → solo frontend
+GET  /api/admin/backup/config      → configuración actual del scheduler
+PUT  /api/admin/backup/config      → actualizar config + recargar scheduler
+GET  /api/admin/backup/list        → listar todos los archivos de backup en MinIO
+DELETE /api/admin/backup/:bucket/:filename → eliminar un backup específico
+```
+
+> [!NOTE]
+> La configuración de backups depende de MongoDB. Si la BD no está disponible al arrancar el servidor, el scheduler hace un único reintento 30 segundos después. Si sigue sin estar disponible, no se iniciará ningún scheduler automático pero los endpoints manuales seguirán funcionando.
+
+---
+
+## 📊 8. Observabilidad Integral
 
 Una Plataforma de este tamaño dispone de un panel propio paralelo unificado bajo una base monitorizada temporal de métricas para dominar la visión de todos los frentes posibles:
 
@@ -161,7 +427,7 @@ Una Plataforma de este tamaño dispone de un panel propio paralelo unificado baj
 
 ---
 
-## 📧 8. Servicio de Correo y Autenticación 2FA
+## 📧 9. Servicio de Correo y Autenticación 2FA
 
 OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y notificaciones transaccionales gestionadas a través del motor **SendGrid**. Esta capa adicional de seguridad protege el acceso al panel de control y a los entornos de los clientes.
 
@@ -171,7 +437,7 @@ OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y no
 
 ---
 
-## ⚖️ 9. Modelo de Responsabilidad Compartida
+## ⚖️ 10. Modelo de Responsabilidad Compartida
 
 | Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en OrbitCloud |
 |-----------------------|-------------------------|--------------------------------|

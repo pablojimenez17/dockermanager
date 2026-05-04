@@ -31,6 +31,9 @@ import ChatAssistant from './components/ChatAssistant';
 // Global Axios config for HTTP-Only Cookies
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = '';
+axios.defaults.headers.common['Cache-Control'] = 'no-cache, no-store, must-revalidate';
+axios.defaults.headers.common['Pragma'] = 'no-cache';
+axios.defaults.headers.common['Expires'] = '0';
 
 // Interceptor to auto-logout on 401 Unauthorized, excluding auth check endpoints
 axios.interceptors.response.use(
@@ -76,8 +79,8 @@ const PublicRoute = ({ children }) => {
 };
 
 const PlanRoute = ({ children, requiredLevel }) => {
-  const { userPlan } = useOrg();
-  const plan = userPlan || 'free';
+  const { userPlan, activeOrg } = useOrg();
+  const plan = (activeOrg ? activeOrg.plan : userPlan) || 'free';
   const role = localStorage.getItem('role');
 
   const levels = {
@@ -102,7 +105,7 @@ const PlanRoute = ({ children, requiredLevel }) => {
 
   return (
     <div className="flex flex-col items-center justify-center p-12 text-center h-[70vh] animate-fade-in">
-      <div className="w-20 h-20 bg-brand-500/10 rounded-2xl flex items-center justify-center mb-6 border border-brand-500/20 shadow-sm text-brand-500">
+      <div className="w-20 h-20 bg-brand-500/10 rounded-sm flex items-center justify-center mb-6 border border-brand-500/20 shadow-sm text-brand-500">
         <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
       </div>
       <h2 className="text-2xl font-bold mb-3 text-slate-900 dark:text-white">Feature Locked</h2>
@@ -112,7 +115,7 @@ const PlanRoute = ({ children, requiredLevel }) => {
 
       <NavLink
         to="/app/plans"
-        className="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-xl font-bold shadow-md shadow-brand-500/20 transition-all hover:scale-105 active:scale-95"
+        className="bg-brand-600 hover:bg-brand-700 text-white px-8 py-3 rounded-sm font-bold shadow-sm shadow-brand-500/20 transition-all active:scale-95"
       >
         View Plans & Upgrade
       </NavLink>

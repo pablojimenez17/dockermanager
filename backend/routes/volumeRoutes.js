@@ -14,31 +14,26 @@ const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_H
 
 router.use(authMiddleware);
 
-// Fetch total volumes usage via Docker system df -v
-const getDockerDfVolumes = async () => {
-    try {
-        const { stdout } = await execPromise('docker system df -v --format="{{json .}}"');
-        // Parse the json lines for Volumes space
-        const lines = stdout.trim().split('\\n');
-        for (const line of lines) {
-            if (!line) continue;
-            try {
-                const data = JSON.parse(line);
-                // Try to find volume-specific output if format returns it
-            } catch (e) { }
-        }
-    } catch (e) {
-        console.error('Exec docker df failed:', e);
-    }
+// ── Docker df() cache ─────────────────────────────────────────────────────
+// docker.df() / `docker system df` is SLOW (inspects all resources).
+// Cache the result for 30 seconds to avoid blocking every volumes request.
+let _dfCache = null;
+let _dfCacheTime = 0;
+const DF_CACHE_TTL_MS = 30_000; // 30 seconds
 
-    // Fallback or preferred: Use docker ode df() which returns the /system/df endpoint output natively
+const getDockerDfVolumes = async () => {
+    const now = Date.now();
+    if (_dfCache && (now - _dfCacheTime) < DF_CACHE_TTL_MS) {
+        return _dfCache;
+    }
     try {
         const dfData = await docker.df();
-        // dfData.Volumes is an array of { Name: string, UsageData: { Size: number, RefCount: number } }
-        return dfData.Volumes || [];
+        _dfCache = dfData.Volumes || [];
+        _dfCacheTime = now;
+        return _dfCache;
     } catch (e) {
-        console.error('Docker.df() failed:', e);
-        return [];
+        console.error('Docker.df() failed:', e.message);
+        return _dfCache || []; // return stale cache on error rather than crashing
     }
 };
 
@@ -99,23 +94,21 @@ router.post('/', checkPermission('manageVolumes'), async (req, res) => {
             });
         }
 
-        // Sum current usage
-        const dockerVolumes = await getDockerDfVolumes();
-        let currentTotalBytes = 0;
-        currentVolumesDb.forEach(dbVol => {
-            const sysVol = dockerVolumes.find(v => v.Name === dbVol.name);
-            if (sysVol && sysVol.UsageData) {
-                currentTotalBytes += sysVol.UsageData.Size;
-            }
-        });
-
-        const maxBytes = limits.maxVolumeSizeMb * 1024 * 1024;
-        // Check if current usage ALREADY exceeds total limits. 
-        // We cannot predict the new volume's final size, but we can block creation if the account is already full.
-        if (currentTotalBytes >= maxBytes) {
-            return res.status(403).json({
-                message: `Quota Exceeded: You are using ${Math.round(currentTotalBytes / 1024 / 1024)}MB of your ${limits.maxVolumeSizeMb}MB max volume storage.`
+        // Size quota: only check if limit is finite (skip for unlimited plans)
+        // We use the cached df() result to avoid blocking this request.
+        if (limits.maxVolumeSizeMb && limits.maxVolumeSizeMb < 999999) {
+            const dockerVolumes = await getDockerDfVolumes();
+            let currentTotalBytes = 0;
+            currentVolumesDb.forEach(dbVol => {
+                const sysVol = dockerVolumes.find(v => v.Name === dbVol.name);
+                if (sysVol && sysVol.UsageData) currentTotalBytes += sysVol.UsageData.Size;
             });
+            const maxBytes = limits.maxVolumeSizeMb * 1024 * 1024;
+            if (currentTotalBytes >= maxBytes) {
+                return res.status(403).json({
+                    message: `Quota Exceeded: You are using ${Math.round(currentTotalBytes / 1024 / 1024)}MB of your ${limits.maxVolumeSizeMb}MB max volume storage.`
+                });
+            }
         }
 
         // ==========================================

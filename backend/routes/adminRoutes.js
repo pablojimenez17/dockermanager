@@ -5,8 +5,10 @@ import path from 'path';
 import User from '../models/User.js';
 import Container from '../models/Container.js';
 import AuditLog from '../models/AuditLog.js';
+import BackupConfig from '../models/BackupConfig.js';
 import authMiddleware from '../middleware/auth.js';
-import { runBackup } from '../services/backupService.js';
+import { runBackup, runDbBackup, runServerBackup, runWebBackup, reloadScheduler } from '../services/backupService.js';
+import * as Minio from 'minio';
 
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
@@ -49,10 +51,7 @@ router.get('/system-containers', async (req, res) => {
 // Get all containers globally
 router.get('/containers', async (req, res) => {
     try {
-        // Find containers with populated user details
         const dbContainers = await Container.find().populate('userId', 'name email');
-
-        // Enrich from Docker directly as well
         const enrichedContainers = await Promise.all(dbContainers.map(async (c) => {
             try {
                 const dockerContainer = docker.getContainer(c.dockerId);
@@ -67,7 +66,6 @@ router.get('/containers', async (req, res) => {
                 return { ...c.toObject(), state: 'error/not_found', owner: c.userId?.name || 'Unknown' };
             }
         }));
-
         res.json(enrichedContainers);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching global containers', error: error.message });
@@ -81,8 +79,6 @@ router.delete('/containers/:id', async (req, res) => {
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found' });
         }
-
-        // Try to stop/remove from Docker — tolerate if it no longer exists
         try {
             const container = docker.getContainer(dbContainer.dockerId);
             try { await container.stop(); } catch (_) {}
@@ -90,16 +86,13 @@ router.delete('/containers/:id', async (req, res) => {
         } catch (dockerErr) {
             console.warn(`[Admin] Container ${dbContainer.dockerId} not found in Docker, removing from DB only.`);
         }
-
         await Container.deleteOne({ _id: req.params.id });
-
         await AuditLog.create({
             userId: req.user.userId,
             action: 'FORCE_DELETE_CONTAINER',
             resourceName: dbContainer.name,
             details: `Admin forcefully removed container owned by ${dbContainer.userId}`
         });
-
         res.json({ message: 'Container forcibly removed by admin' });
     } catch (error) {
         res.status(500).json({ message: 'Error removing container', error: error.message });
@@ -119,13 +112,18 @@ router.get('/audit', async (req, res) => {
     }
 });
 
-import * as Minio from 'minio';
-
-// ... (existing code) ...
+// MinIO helper (shared instance)
+const getMinioClient = () => new Minio.Client({
+    endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
+    port:      9000,
+    useSSL:    false,
+    accessKey: process.env.MINIO_ROOT_USER || 'admin',
+    secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
+});
 
 // ── Backup endpoints (admin only) ──────────────────────────────────────────
 
-// Trigger an immediate manual backup
+// Trigger a full system backup (all 3 types)
 router.post('/backup/run', async (req, res) => {
     try {
         const results = await runBackup();
@@ -140,26 +138,101 @@ router.post('/backup/run', async (req, res) => {
     }
 });
 
+// Trigger only the database backup
+router.post('/backup/run/db', async (req, res) => {
+    try {
+        const cfg = await BackupConfig.getSingleton();
+        const result = await runDbBackup(cfg.retention);
+        res.status(result.success ? 200 : 500).json(result);
+    } catch (err) {
+        res.status(500).json({ message: 'DB backup failed.', error: err.message });
+    }
+});
+
+// Trigger only the backend (server) backup
+router.post('/backup/run/server', async (req, res) => {
+    try {
+        const cfg = await BackupConfig.getSingleton();
+        const result = await runServerBackup(cfg.retention);
+        res.status(result.success ? 200 : 500).json(result);
+    } catch (err) {
+        res.status(500).json({ message: 'Server backup failed.', error: err.message });
+    }
+});
+
+// Trigger only the frontend (web) backup
+router.post('/backup/run/web', async (req, res) => {
+    try {
+        const cfg = await BackupConfig.getSingleton();
+        const result = await runWebBackup(cfg.retention);
+        res.status(result.success ? 200 : 500).json(result);
+    } catch (err) {
+        res.status(500).json({ message: 'Web backup failed.', error: err.message });
+    }
+});
+
+// Get current backup scheduler configuration
+router.get('/backup/config', async (req, res) => {
+    try {
+        const cfg = await BackupConfig.getSingleton();
+        res.json(cfg);
+    } catch (err) {
+        res.status(500).json({ message: 'Could not fetch backup config.', error: err.message });
+    }
+});
+
+// Update backup scheduler configuration and reload scheduler in-place
+router.put('/backup/config', async (req, res) => {
+    try {
+        const { db, server, web, retention } = req.body;
+        const cfg = await BackupConfig.getSingleton();
+
+        if (db !== undefined) {
+            if (typeof db.enabled === 'boolean') cfg.db.enabled = db.enabled;
+            if (db.intervalMs && db.intervalMs >= 3600000) cfg.db.intervalMs = db.intervalMs; // min 1h
+        }
+        if (server !== undefined) {
+            if (typeof server.enabled === 'boolean') cfg.server.enabled = server.enabled;
+            if (server.intervalMs && server.intervalMs >= 3600000) cfg.server.intervalMs = server.intervalMs;
+        }
+        if (web !== undefined) {
+            if (typeof web.enabled === 'boolean') cfg.web.enabled = web.enabled;
+            if (web.intervalMs && web.intervalMs >= 3600000) cfg.web.intervalMs = web.intervalMs;
+        }
+        if (retention && retention >= 1) cfg.retention = retention;
+
+        cfg.markModified('db');
+        cfg.markModified('server');
+        cfg.markModified('web');
+        await cfg.save();
+
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'BACKUP_CONFIG_UPDATED',
+            resourceName: 'backup-config',
+            details: `Admin updated backup scheduler config.`
+        });
+
+        // Reload the live scheduler without restarting the server
+        await reloadScheduler();
+
+        res.json({ message: 'Backup configuration updated and scheduler reloaded.', config: cfg });
+    } catch (err) {
+        res.status(500).json({ message: 'Could not update backup config.', error: err.message });
+    }
+});
+
 // List all available backup files across all MinIO buckets
 router.get('/backup/list', async (req, res) => {
-    const minioClient = new Minio.Client({
-        endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
-        port:      9000,
-        useSSL:    false,
-        accessKey: process.env.MINIO_ROOT_USER || 'admin',
-        secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
-    });
-
+    const minioClient = getMinioClient();
     const BUCKETS = ['backups-mongodb', 'backups-server', 'backups-web'];
 
     try {
         const allObjects = [];
-
         for (const bucket of BUCKETS) {
             try {
                 const exists = await minioClient.bucketExists(bucket);
                 if (!exists) continue;
-
                 const stream = minioClient.listObjects(bucket, '', true);
                 for await (const obj of stream) {
                     allObjects.push({
@@ -173,7 +246,6 @@ router.get('/backup/list', async (req, res) => {
                 console.warn(`[Backup List] Could not list bucket ${bucket}:`, bucketErr.message);
             }
         }
-
         res.json(allObjects.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (err) {
         res.status(500).json({ message: 'Could not fetch remote backup list from MinIO', error: err.message });
@@ -184,19 +256,10 @@ router.get('/backup/list', async (req, res) => {
 router.delete('/backup/:bucket/:filename', async (req, res) => {
     const { bucket, filename } = req.params;
     const ALLOWED_BUCKETS = ['backups-mongodb', 'backups-server', 'backups-web'];
-
     if (!ALLOWED_BUCKETS.includes(bucket)) {
         return res.status(400).json({ message: 'Invalid bucket name.' });
     }
-
-    const minioClient = new Minio.Client({
-        endPoint:  process.env.MINIO_ENDPOINT || 'storage-fw',
-        port:      9000,
-        useSSL:    false,
-        accessKey: process.env.MINIO_ROOT_USER || 'admin',
-        secretKey: process.env.MINIO_ROOT_PASSWORD || 'password123'
-    });
-
+    const minioClient = getMinioClient();
     try {
         await minioClient.removeObject(bucket, filename);
         await AuditLog.create({

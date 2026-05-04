@@ -1,158 +1,158 @@
-import React, { useState, useEffect } from 'react';
+import { useTranslation } from "react-i18next";import React, { useState, useEffect } from 'react';
 import { User, Shield, Bell, Save, AlertCircle, CreditCard, CalendarX2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 
-const Settings = () => {
-    const [name, setName] = useState('');
-    const [email, setEmail] = useState('');
-    const [theme, setTheme] = useState('dark');
-    const [notifications, setNotifications] = useState(true);
-    const [saved, setSaved] = useState(false);
-    const [role, setRole] = useState('user');
-    
-    // Subscription states
-    const [planData, setPlanData] = useState(null);
-    const [cancelling, setCancelling] = useState(false);
-    const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
-    const [cancelStep, setCancelStep] = useState(1);
-    const [cancelConfirmText, setCancelConfirmText] = useState('');
-    const [cancelReason, setCancelReason] = useState('');
-    const [countdown, setCountdown] = useState(0);
-    const { addToast } = useToast();
+const Settings = () => {const { t } = useTranslation();
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [theme, setTheme] = useState('dark');
+  const [notifications, setNotifications] = useState(true);
+  const [saved, setSaved] = useState(false);
+  const [role, setRole] = useState('user');
 
-    useEffect(() => {
-        const storedName = localStorage.getItem('name');
-        const storedEmail = localStorage.getItem('email');
-        const storedRole = localStorage.getItem('role');
-        if (storedName) setName(storedName);
-        if (storedEmail) setEmail(storedEmail);
-        if (storedRole) setRole(storedRole);
+  // Subscription states
+  const [planData, setPlanData] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [cancelStep, setCancelStep] = useState(1);
+  const [cancelConfirmText, setCancelConfirmText] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const { addToast } = useToast();
 
-        // Fetch fresh subscription data
-        const fetchUserData = async () => {
-            try {
-                const res = await axios.get('/api/auth/me');
-                setPlanData({
-                    planType: res.data.planType,
-                    planExpiresAt: res.data.planExpiresAt,
-                    autoRenew: res.data.autoRenew
-                });
-            } catch (err) {
-                console.error("Failed to fetch user data for settings", err);
-            }
-        };
-        fetchUserData();
-    }, []);
+  useEffect(() => {
+    const storedName = localStorage.getItem('name');
+    const storedEmail = localStorage.getItem('email');
+    const storedRole = localStorage.getItem('role');
+    if (storedName) setName(storedName);
+    if (storedEmail) setEmail(storedEmail);
+    if (storedRole) setRole(storedRole);
 
-    useEffect(() => {
-        let timer;
-        if (cancelStep === 4 && countdown > 0) {
-            timer = setTimeout(() => setCountdown(prev => prev - 1), 1000);
-        }
-        return () => clearTimeout(timer);
-    }, [cancelStep, countdown]);
-
-    const startCancelProcess = () => {
-        setCancelStep(1);
-        setCancelConfirmText('');
-        setCancelReason('');
-        setIsCancelModalOpen(true);
+    // Fetch fresh subscription data
+    const fetchUserData = async () => {
+      try {
+        const res = await axios.get('/api/auth/me');
+        setPlanData({
+          planType: res.data.planType,
+          planExpiresAt: res.data.planExpiresAt,
+          autoRenew: res.data.autoRenew
+        });
+      } catch (err) {
+        console.error("Failed to fetch user data for settings", err);
+      }
     };
+    fetchUserData();
+  }, []);
 
-    const goToFinalStep = () => {
-        setCancelStep(4);
-        setCountdown(5);
-    };
+  useEffect(() => {
+    let timer;
+    if (cancelStep === 4 && countdown > 0) {
+      timer = setTimeout(() => setCountdown((prev) => prev - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [cancelStep, countdown]);
 
-    const executeCancelPlan = async () => {
-        setCancelling(true);
-        try {
-            const res = await axios.post('/api/plans/cancel');
-            setPlanData(prev => ({ ...prev, autoRenew: false, planExpiresAt: res.data.planExpiresAt }));
-            addToast('Plan Cancelled', res.data.message, 'success');
-            setIsCancelModalOpen(false);
-        } catch (error) {
-            addToast('Error', error.response?.data?.message || 'Failed to cancel plan', 'error');
-        } finally {
-            setCancelling(false);
-        }
-    };
+  const startCancelProcess = () => {
+    setCancelStep(1);
+    setCancelConfirmText('');
+    setCancelReason('');
+    setIsCancelModalOpen(true);
+  };
 
-    const handleSave = (e) => {
-        e.preventDefault();
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
-    };
+  const goToFinalStep = () => {
+    setCancelStep(4);
+    setCountdown(5);
+  };
 
-    return (
-        <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">
+  const executeCancelPlan = async () => {
+    setCancelling(true);
+    try {
+      const res = await axios.post('/api/plans/cancel');
+      setPlanData((prev) => ({ ...prev, autoRenew: false, planExpiresAt: res.data.planExpiresAt }));
+      addToast('Plan Cancelled', res.data.message, 'success');
+      setIsCancelModalOpen(false);
+    } catch (error) {
+      addToast('Error', error.response?.data?.message || 'Failed to cancel plan', 'error');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleSave = (e) => {
+    e.preventDefault();
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  return (
+    <div className="p-4 md:p-8 pb-20 text-slate-900 dark:text-white max-w-4xl mx-auto">
             <div className="mb-10">
-                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">Settings</h1>
-                <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">Manage your account preferences and application layout.</p>
+                <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight mb-2">{t("auto.settings")}</h1>
+                <p className="text-slate-600 dark:text-slate-400 text-base sm:text-lg">{t("auto.manage_your_account_preferences_and_appl")}</p>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-3xl p-8 shadow-xl">
+            <div className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm p-8 shadow-sm">
                 <h3 className="text-xl font-bold mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4">
                     <User className="text-brand-500 dark:text-brand-400" />
-                    <span>Profile Management</span>
+                    <span>{t("auto.profile_management")}</span>
                 </h3>
 
                 <form onSubmit={handleSave} className="space-y-6">
-                    {saved && (
-                        <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-4 px-4 rounded-xl flex items-start space-x-3">
+                    {saved &&
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-4 px-4 rounded-sm flex items-start space-x-3">
                             <Save size={20} className="shrink-0 mt-0.5" />
-                            <span>Settings saved successfully.</span>
+                            <span>{t("auto.settings_saved_successfully_")}</span>
                         </div>
-                    )}
+          }
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Full Name</label>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t("auto.full_name")}</label>
                             <input
-                                type="text"
-                                disabled
-                                value={name}
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 cursor-not-allowed mb-4"
-                            />
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Email Address</label>
+                type="text"
+                disabled
+                value={name}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 cursor-not-allowed mb-4" />
+              
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t("auto.email_address")}</label>
                             <input
-                                type="email"
-                                disabled
-                                value={email}
-                                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-500 dark:text-slate-400 cursor-not-allowed"
-                            />
-                            <p className="text-xs text-slate-500 mt-2">Credentials cannot be changed after registration.</p>
+                type="email"
+                disabled
+                value={email}
+                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 cursor-not-allowed" />
+              
+                            <p className="text-xs text-slate-500 mt-2">{t("auto.credentials_cannot_be_changed_after_regi")}</p>
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Role</label>
-                            <div className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl text-slate-600 dark:text-slate-400 flex items-center space-x-2">
-                                {role === 'admin' ? (
-                                    <>
+                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t("auto.role")}</label>
+                            <div className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-600 dark:text-slate-400 flex items-center space-x-2">
+                                {role === 'admin' ?
+                <>
                                         <Shield size={16} className="text-purple-600 dark:text-purple-400" />
-                                        <span className="text-purple-600 dark:text-purple-400 font-semibold">Administrator</span>
-                                    </>
-                                ) : (
-                                    <>
+                                        <span className="text-purple-600 dark:text-purple-400 font-semibold">{t("auto.administrator")}</span>
+                                    </> :
+
+                <>
                                         <User size={16} className="text-slate-600 dark:text-slate-400" />
-                                        <span>Standard User</span>
+                                        <span>{t("auto.standard_user")}</span>
                                     </>
-                                )}
+                }
                             </div>
-                            {role === 'admin' && <p className="text-xs text-purple-600/80 dark:text-purple-400/80 mt-2">You have unrestricted administrative access.</p>}
+                            {role === 'admin' && <p className="text-xs text-purple-600/80 dark:text-purple-400/80 mt-2">{t("auto.you_have_unrestricted_administrative_acc")}</p>}
                         </div>
                     </div>
 
                     <h3 className="text-xl font-bold mt-10 mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4">
                         <Bell className="text-amber-500 dark:text-amber-400" />
-                        <span>Preferences</span>
+                        <span>{t("auto.preferences")}</span>
                     </h3>
 
-                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl">
+                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm">
                         <div>
-                            <h4 className="font-semibold text-slate-900 dark:text-white">Receive Alert Notifications</h4>
-                            <p className="text-sm text-slate-600 dark:text-slate-400">Get notified when a container crashes or exits unexpectedly.</p>
+                            <h4 className="font-semibold text-slate-900 dark:text-white">{t("auto.receive_alert_notifications")}</h4>
+                            <p className="text-sm text-slate-600 dark:text-slate-400">{t("auto.get_notified_when_a_container_crashes_or")}</p>
                         </div>
                         <label className="relative inline-flex items-center cursor-pointer">
                             <input type="checkbox" className="sr-only peer" checked={notifications} onChange={(e) => setNotifications(e.target.checked)} />
@@ -162,185 +162,185 @@ const Settings = () => {
 
                     <h3 className="text-xl font-bold mt-10 mb-6 flex items-center space-x-2 border-b border-slate-200 dark:border-slate-700 pb-4">
                         <CreditCard className="text-indigo-500 dark:text-indigo-400" />
-                        <span>Subscription Management</span>
+                        <span>{t("auto.subscription_management")}</span>
                     </h3>
 
-                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-6">
-                        {planData ? (
-                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-sm p-6">
+                        {planData ?
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                                 <div className="space-y-1">
-                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Current Plan</p>
+                                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("auto.current_plan")}</p>
                                     <div className="flex items-center gap-3">
                                         <h4 className="text-2xl font-black text-slate-900 dark:text-white capitalize">{planData.planType}</h4>
-                                        {planData.planType !== 'free' && (
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${planData.autoRenew ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'}`}>
+                                        {planData.planType !== 'free' &&
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${planData.autoRenew ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'}`}>
                                                 {planData.autoRenew ? 'Auto-Renews' : 'Cancels Automatically'}
                                             </span>
-                                        )}
+                  }
                                     </div>
                                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
                                         {planData.planType === 'free' ? 'You are on the permanently free hobby tier.' : `Your billing cycle ends on ${new Date(planData.planExpiresAt).toLocaleDateString()}.`}
                                     </p>
                                 </div>
                                 
-                                {planData.planType !== 'free' && planData.autoRenew && (
-                                    <button
-                                        type="button"
-                                        disabled={cancelling}
-                                        onClick={startCancelProcess}
-                                        className="shrink-0 flex items-center justify-center space-x-2 py-2.5 px-6 rounded-xl text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95"
-                                    >
+                                {planData.planType !== 'free' && planData.autoRenew &&
+              <button
+                type="button"
+                disabled={cancelling}
+                onClick={startCancelProcess}
+                className="shrink-0 flex items-center justify-center space-x-2 py-2.5 px-6 rounded-sm text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95">
+                
                                         <CalendarX2 size={18} />
                                         <span>{cancelling ? 'Cancelling...' : 'Cancel Plan'}</span>
                                     </button>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="animate-pulse text-sm text-slate-500">Loading subscription data...</div>
-                        )}
+              }
+                            </div> :
+
+            <div className="animate-pulse text-sm text-slate-500">{t("auto.loading_subscription_data_")}</div>
+            }
                     </div>
 
                     <div className="pt-6">
                         <button
-                            type="submit"
-                            className="flex justify-center items-center space-x-2 py-3 px-8 rounded-xl shadow-lg text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 transition-all hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]"
-                        >
-                            <span>Save Changes</span>
+              type="submit"
+              className="flex justify-center items-center space-x-2 py-3 px-8 rounded-sm shadow-sm text-sm font-bold text-white bg-brand-500 hover:bg-brand-600 transition-all hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]">
+              
+                            <span>{t("auto.save_changes")}</span>
                         </button>
                     </div>
                 </form>
             </div>
-            {isCancelModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-800 rounded-3xl w-full max-w-lg shadow-2xl overflow-hidden animate-fade-in border border-slate-200 dark:border-slate-700">
+            {isCancelModalOpen &&
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-800 rounded-sm w-full max-w-lg shadow-md overflow-hidden animate-fade-in border border-slate-200 dark:border-slate-700">
                         <div className="p-8">
                             <div className="w-16 h-16 bg-red-100 dark:bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-sm">
                                 <AlertCircle size={32} />
                             </div>
                             
-                            {cancelStep === 1 ? (
-                                <div className="text-center space-y-4">
-                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Are you completely sure?</h3>
+                            {cancelStep === 1 ?
+            <div className="text-center space-y-4">
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{t("auto.are_you_completely_sure_")}</h3>
                                     <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-                                        If you cancel your <strong className="capitalize">{planData?.planType}</strong> plan, at the end of the current billing cycle your account will be forcefully downgraded to the <strong>Hobby</strong> tier.
+                                        {t("auto.if_you_cancel_your")} <strong className="capitalize">{planData?.planType}</strong> {t("auto.plan_at_the_end_of_the_current_billing_c")} <strong>{t("auto.hobby")}</strong> {t("auto.tier_")}
                                     </p>
-                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 rounded-xl p-4 text-left mt-4 mb-2">
+                                    <div className="bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-500/20 rounded-sm p-4 text-left mt-4 mb-2">
                                         <h4 className="font-bold text-red-800 dark:text-red-400 mb-2 flex items-center gap-2">
-                                            <AlertCircle size={16} /> You will lose access to:
+                                            <AlertCircle size={16} /> {t("auto.you_will_lose_access_to_")}
                                         </h4>
                                         <ul className="list-disc list-inside text-sm text-red-700/80 dark:text-red-400/80 space-y-1 ml-1">
-                                            <li>Increased container and RAM limits</li>
-                                            <li>Advanced Custom Domains</li>
-                                            <li>Premium Support SLA</li>
-                                            <li>Organization management capabilities</li>
+                                            <li>{t("auto.increased_container_and_ram_limits")}</li>
+                                            <li>{t("auto.advanced_custom_domains")}</li>
+                                            <li>{t("auto.premium_support_sla")}</li>
+                                            <li>{t("auto.organization_management_capabilities")}</li>
                                         </ul>
                                         <p className="text-xs font-bold text-red-800 dark:text-red-400 mt-3 uppercase tracking-wider">
-                                            Any containers exceeding hobby limits will automatically be stopped.
+                                            {t("auto.any_containers_exceeding_hobby_limits_wi")}
                                         </p>
                                     </div>
                                     <div className="flex gap-3 pt-4">
-                                        <button 
-                                            onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                        >
-                                            Keep My Plan
-                                        </button>
-                                        <button 
-                                            onClick={() => setCancelStep(2)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors"
-                                        >
-                                            Continue Cancellation
-                                        </button>
+                                        <button
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                            {t("auto.keep_my_plan")}
+                                        
+                </button>
+                                        <button
+                  onClick={() => setCancelStep(2)}
+                  className="flex-1 py-3 px-4 rounded-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors">
+                                            {t("auto.continue_cancellation")}
+                                        
+                </button>
                                     </div>
-                                </div>
-                            ) : cancelStep === 2 ? (
-                                <div className="text-center space-y-4 animate-fade-in">
-                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">We hate to see you go...</h3>
-                                    <p className="text-slate-600 dark:text-slate-400">Please tell us why you are leaving so we can understand where to improve.</p>
+                                </div> :
+            cancelStep === 2 ?
+            <div className="text-center space-y-4 animate-fade-in">
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{t("auto.we_hate_to_see_you_go_")}</h3>
+                                    <p className="text-slate-600 dark:text-slate-400">{t("auto.please_tell_us_why_you_are_leaving_so_we")}</p>
                                     
                                     <div className="space-y-3 mt-4 text-left max-h-48 overflow-y-auto px-2 custom-scrollbar">
-                                        {['Too expensive', 'Missing features', 'Don\'t use it enough', 'Switching to a competitor', 'Other / Prefer not to say'].map(reason => (
-                                            <label key={reason} className={`flex items-center p-3.5 rounded-xl border cursor-pointer transition-colors ${cancelReason === reason ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                                        {['Too expensive', 'Missing features', 'Don\'t use it enough', 'Switching to a competitor', 'Other / Prefer not to say'].map((reason) =>
+                <label key={reason} className={`flex items-center p-3.5 rounded-sm border cursor-pointer transition-colors ${cancelReason === reason ? 'border-brand-500 bg-brand-50 dark:bg-brand-500/10' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
                                                 <input type="radio" className="mr-3 w-4 h-4 text-brand-600" name="cancelReason" checked={cancelReason === reason} onChange={() => setCancelReason(reason)} />
                                                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{reason}</span>
                                             </label>
-                                        ))}
+                )}
                                     </div>
 
                                     <div className="flex gap-3 pt-4">
-                                        <button 
-                                            onClick={() => setCancelStep(1)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                        >
-                                            Go Back
-                                        </button>
-                                        <button 
-                                            onClick={() => setCancelStep(3)}
-                                            disabled={!cancelReason}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
-                                            Next Step
-                                        </button>
+                                        <button
+                  onClick={() => setCancelStep(1)}
+                  className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                            {t("auto.go_back")}
+                                        
+                </button>
+                                        <button
+                  onClick={() => setCancelStep(3)}
+                  disabled={!cancelReason}
+                  className="flex-1 py-3 px-4 rounded-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 dark:bg-red-500/10 dark:text-red-400 dark:border-red-500/30 dark:hover:bg-red-500/20 font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                                            {t("auto.next_step")}
+                                        
+                </button>
                                     </div>
-                                </div>
-                            ) : cancelStep === 3 ? (
-                                <div className="text-center space-y-4 animate-fade-in pb-2">
-                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white pt-2">Are you sure?</h3>
+                                </div> :
+            cancelStep === 3 ?
+            <div className="text-center space-y-4 animate-fade-in pb-2">
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white pt-2">{t("auto.are_you_sure_")}</h3>
                                     <p className="text-slate-600 dark:text-slate-400 max-w-sm mx-auto leading-relaxed">
-                                        We really don't want to lose you! Our platform is constantly evolving and we have awesome new features on the roadmap that we'd love for you to experience. Stay with us!
+                                        {t("auto.we_really_don_t_want_to_lose_you_our_pla")}
                                     </p>
                                     <div className="flex gap-3 pt-6">
-                                        <button 
-                                            onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-lg shadow-brand-500/30"
-                                        >
-                                            I'll Stay
-                                        </button>
-                                        <button 
-                                            onClick={goToFinalStep}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                        >
-                                            No, Continue
-                                        </button>
+                                        <button
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-sm bg-brand-600 text-white font-bold hover:bg-brand-700 transition-colors shadow-sm shadow-brand-500/30">
+                                            {t("auto.i_ll_stay")}
+                                        
+                </button>
+                                        <button
+                  onClick={goToFinalStep}
+                  className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                            {t("auto.no_continue")}
+                                        
+                </button>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="text-center space-y-4 animate-fade-in">
-                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">Final Confirmation</h3>
+                                </div> :
+
+            <div className="text-center space-y-4 animate-fade-in">
+                                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white">{t("auto.final_confirmation")}</h3>
                                     <p className="text-slate-600 dark:text-slate-400 text-sm">
-                                        This process cannot be undone. To definitively cancel your subscription, please type <strong className="select-none inline-block bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">I AGREE TO CANCEL</strong> below. You cannot copy-paste it.
+                                        {t("auto.this_process_cannot_be_undone_to_definit")} <strong className="select-none inline-block bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded">{t("auto.i_agree_to_cancel")}</strong> {t("auto.below_you_cannot_copy_paste_it_")}
                                     </p>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Type exactly: I AGREE TO CANCEL"
-                                        value={cancelConfirmText}
-                                        onChange={(e) => setCancelConfirmText(e.target.value)}
-                                        onPaste={(e) => { e.preventDefault(); addToast('Warning', 'Copy-pasting is not allowed for this confirmation', 'error') }}
-                                        className="w-full mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-xl p-3 text-center tracking-wide font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-red-500"
-                                    />
+                                    <input
+                type="text"
+                placeholder={t("auto.type_exactly_i_agree_to_cancel")}
+                value={cancelConfirmText}
+                onChange={(e) => setCancelConfirmText(e.target.value)}
+                onPaste={(e) => {e.preventDefault();addToast('Warning', 'Copy-pasting is not allowed for this confirmation', 'error');}}
+                className="w-full mt-4 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm p-3 text-center tracking-wide font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-red-500" />
+              
                                     <div className="flex gap-3 pt-6">
-                                        <button 
-                                            onClick={() => setIsCancelModalOpen(false)}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors"
-                                        >
-                                            Change Mind, Keep Plan
-                                        </button>
-                                        <button 
-                                            onClick={executeCancelPlan}
-                                            disabled={cancelConfirmText !== 'I AGREE TO CANCEL' || cancelling || countdown > 0}
-                                            className="flex-1 py-3 px-4 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-red-500/30"
-                                        >
+                                        <button
+                  onClick={() => setIsCancelModalOpen(false)}
+                  className="flex-1 py-3 px-4 rounded-sm bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors">
+                                            {t("auto.change_mind_keep_plan")}
+                                        
+                </button>
+                                        <button
+                  onClick={executeCancelPlan}
+                  disabled={cancelConfirmText !== 'I AGREE TO CANCEL' || cancelling || countdown > 0}
+                  className="flex-1 py-3 px-4 rounded-sm bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-sm shadow-red-500/30">
+                  
                                             {cancelling ? 'Scheduling...' : countdown > 0 ? `Wait ${countdown}s...` : 'Confirm Cancellation'}
                                         </button>
                                     </div>
                                 </div>
-                            )}
+            }
                         </div>
                     </div>
                 </div>
-            )}
-        </div>
-    );
+      }
+        </div>);
+
 };
 
 export default Settings;

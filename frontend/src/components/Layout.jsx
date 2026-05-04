@@ -1,75 +1,92 @@
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Link } from 'react-router-dom';
 import Sidebar from './Sidebar';
-import { Menu } from 'lucide-react';
+import { Menu, ChevronRight, Building } from 'lucide-react';
 import AdBanner from './AdBanner';
 import { useOrg } from '../context/OrgContext';
+import { useTranslation } from 'react-i18next';
 
 const Layout = () => {
+    const { t } = useTranslation();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const location = useLocation();
-    const { userPlan } = useOrg();
+    const { userPlan, activeOrg, orgs, loadingOrgs } = useOrg();
     const planType = userPlan || 'free';
 
-    // Dynamically update document title based on the active route
-    useEffect(() => {
-        const routeTitles = {
-            '/app': 'Dashboard',
-            '/app/deploy': 'Create Container',
-            '/app/github': 'Deploy from Git',
-            '/app/containers': 'My Containers',
-            '/app/templates': 'Templates',
-            '/app/snapshots': 'Snapshots',
-            '/app/networks': 'Networks',
-            '/app/buckets': 'Buckets',
-            '/app/secrets': 'Secret Manager',
-            '/app/registries': 'Private Registries',
-            '/app/settings': 'Platform Settings',
-            '/app/profile': 'User Profile',
-            '/app/plans': 'Billing & Plans'
-        };
+    const routeTitles = {
+        '/app': t('sidebar.dashboard', 'Dashboard'),
+        '/app/create': t('sidebar.create_container', 'Create Container'),
+        '/app/git-deploy': t('sidebar.git_deploy', 'Deploy from Git'),
+        '/app/containers': t('sidebar.instances', 'Active Instances'),
+        '/app/marketplace': t('sidebar.templates', 'Templates'),
+        '/app/snapshots': t('sidebar.snapshots', 'Snapshots'),
+        '/app/networks': t('sidebar.networks', 'Networks'),
+        '/app/volumes': t('sidebar.volumes', 'Volumes'),
+        '/app/secrets': t('sidebar.secrets', 'Secret Manager'),
+        '/app/registries': t('sidebar.registry', 'Private Registries'),
+        '/app/settings': t('sidebar.settings', 'Platform Settings'),
+        '/app/profile': t('sidebar.account', 'User Profile'),
+        '/app/plans': t('sidebar.billing', 'Billing & Plans')
+    };
 
-        const currentPath = location.pathname.split('/').slice(0, 3).join('/'); // Match base routes handling IDs
-        const pageTitle = routeTitles[currentPath] || 'App';
-        document.title = `${pageTitle} | Orbit`;
-    }, [location]);
+    const currentPath = location.pathname.split('/').slice(0, 3).join('/');
+    const pageTitle = routeTitles[currentPath] || 'Orbit';
+
+    useEffect(() => {
+        document.title = `${pageTitle} | OrbitCloud`;
+    }, [location, pageTitle]);
 
     return (
-        <div className="flex h-screen overflow-hidden bg-slate-100 dark:bg-[#0b1120] text-slate-900 dark:text-white transition-colors duration-300 relative w-full font-sans">
-            {/* Subtle Ambient Background Gradients for Glassmorphism */}
-            <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-brand-500/30 dark:bg-brand-500/20 blur-[140px] pointer-events-none z-0"></div>
-            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] rounded-full bg-indigo-500/30 dark:bg-indigo-500/20 blur-[120px] pointer-events-none z-0"></div>
-
+        <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-slate-100 transition-colors duration-200 relative w-full font-sans">
             <Sidebar isOpen={isMobileMenuOpen} setIsOpen={setIsMobileMenuOpen} />
 
             <main className="flex-1 flex flex-col h-screen overflow-y-auto overflow-x-hidden relative z-10">
-                {/* Mobile Header with Hamburger Menu */}
-                <div className="md:hidden flex items-center p-4 bg-white/50 dark:bg-slate-900/40 backdrop-blur-xl border-b border-white/80 dark:border-white/10 sticky top-0 z-30">
-                    <button
-                        onClick={() => setIsMobileMenuOpen(true)}
-                        className="p-2 mr-4 rounded-xl bg-white/80 dark:bg-slate-800 border border-white/50 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-brand-500 hover:text-white dark:hover:bg-brand-500 transition-colors shadow-sm"
-                    >
-                        <Menu size={24} />
-                    </button>
-                    <span className="font-bold text-lg tracking-wide text-brand-600 dark:text-brand-400">Orbit</span>
-                </div>
+                {/* Top Navigation Bar (AWS Style) */}
+                <header className="bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 h-14 flex items-center justify-between px-4 sticky top-0 z-30 shrink-0">
+                    <div className="flex items-center">
+                        <button
+                            onClick={() => setIsMobileMenuOpen(true)}
+                            className="md:hidden p-1.5 mr-3 rounded hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 dark:text-slate-400 transition-colors"
+                        >
+                            <Menu size={20} />
+                        </button>
+                        
+                        <div className="md:hidden text-sm font-semibold text-gray-900 dark:text-white ml-2">
+                            {pageTitle}
+                        </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3">
+                        {/* Context Selector (OrgSwitcher simplified for header) */}
+                        <div className="hidden sm:flex items-center bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded px-3 py-1.5 text-sm font-medium">
+                            <Building size={14} className="text-gray-400 dark:text-slate-500 mr-2" />
+                            <span className="text-gray-700 dark:text-slate-300 truncate max-w-[150px]">
+                                {activeOrg ? activeOrg.name : t('layout.personal_workspace', 'Personal Workspace')}
+                            </span>
+                        </div>
+                    </div>
+                </header>
 
                 {/* Mobile Ad Banner Strip */}
-                {planType === 'free' && (
-                    <div className="md:hidden px-4 pt-4 shrink-0">
-                        <AdBanner />
-                    </div>
-                )}
+                <div className="md:hidden px-4 pt-4 shrink-0">
+                    <AdBanner />
+                </div>
 
-                <div className="container mx-auto max-w-7xl p-4 md:p-8 lg:p-10">
-                    <Outlet />
+                <div className="p-4 md:p-6 lg:p-8 w-full max-w-7xl mx-auto">
+                    {loadingOrgs ? (
+                        <div className="flex h-full min-h-[50vh] items-center justify-center">
+                            <span className="animate-spin w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full"></span>
+                        </div>
+                    ) : (
+                        <Outlet />
+                    )}
                 </div>
             </main>
 
             {/* Mobile Overlay */}
             {isMobileMenuOpen && (
                 <div
-                    className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 md:hidden transition-opacity"
+                    className="fixed inset-0 bg-gray-900/50 dark:bg-slate-900/80 backdrop-blur-sm z-30 md:hidden transition-opacity duration-300"
                     onClick={() => setIsMobileMenuOpen(false)}
                 ></div>
             )}
