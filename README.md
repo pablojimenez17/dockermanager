@@ -448,6 +448,105 @@ OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y no
 | **Roles / Autenticación CMS App** | Usuario ⚠️ | Configurar un Wordpress propio `admin/1234` será bajo tus secuelas. |
 | **Archivos en Volúmenes App**     | Usuario ⚠️ | Persistir en Minio (S3 Snapshot) requiere que se inicie bajo petición. |
 
+---
+
+## 💻 11. Stack Tecnológico y Estructura de Archivos
+
+### 🎨 Frontend (Panel de Control y UI)
+Tecnologías y librerías clave utilizadas en el desarrollo del cliente web:
+- **Core:** React 19, Vite (Bundler hiper-rápido).
+- **Enrutamiento:** React Router DOM v7 (Manejo de navegación estilo SPA).
+- **Estilos y UI:** Tailwind CSS v3 (Framework de utilidades), Lucide React (Iconografía), Framer Motion (Animaciones fluidas y micro-interacciones).
+- **Gestión de Estado y Peticiones:** Axios (Cliente HTTP para la API), Socket.io-client (Conexiones bidireccionales en tiempo real para el estado de los contenedores y telemetría).
+- **Internacionalización (i18n):** i18next y react-i18next (Soporte multi-idioma).
+- **Terminal Web:** Xterm.js y xterm-addon-fit (Renderizado de consola interactiva directo en el navegador para sesiones `docker exec`).
+- **Visualización de Datos:** Recharts (Gráficos estadísticos para CPU, RAM y Red).
+
+#### Estructura de Directorios (`/frontend/src/`)
+- `/components/`: Componentes modulares y reutilizables (Botones, Modales, Toast Notifications, Tarjetas).
+- `/pages/`: Vistas completas de la aplicación web (Ej. `Dashboard.jsx`, `CreateContainer.jsx`, `AdminDashboard.jsx`, `Marketplace.jsx`, etc.).
+- `/context/`: Proveedores de contexto de React.
+- `/locales/`: Archivos JSON con el diccionario de traducciones (`en.json`, `es.json`, etc.).
+- `/utils/`: Funciones de utilidad auxiliares.
+- `App.jsx` y `main.jsx`: Puntos de entrada de la aplicación web y definición principal de rutas.
+
+### 🧠 Backend (API, Cerebro y Orquestador)
+Tecnologías y herramientas que alimentan el servidor Node.js y controlan la infraestructura subyacente:
+- **Core:** Node.js, Express (Framework web para API REST rápida y minimalista).
+- **Base de Datos:** Mongoose (ODM avanzado para modelado y validación de MongoDB).
+- **Autenticación y Seguridad:** JSON Web Tokens (JWT) para sesiones, Bcryptjs (Hashing de contraseñas), Helmet (Protección de cabeceras HTTP), Express Rate Limit (Defensa anti-DDoS), XSS Clean y Express Mongo Sanitize (Prevención de inyecciones maliciosas).
+- **Orquestación de Contenedores:** Dockerode (SDK para manipular el Daemon de Docker y controlar el ciclo de vida completo de contenedores, redes y volúmenes).
+- **Comunicaciones:** Socket.io (Servidor de WebSockets que transmite eventos del sistema y la salida en vivo de las terminales a los clientes).
+- **Almacenamiento (S3):** MinIO SDK (Integración con repositorios de objetos S3 para los Backups Zero-Trust).
+- **Servicios Externos:** Twilio (Envío de SMS para alertas críticas), SendGrid Mail (Servicio transaccional de correos para códigos OTP y bienvenida).
+- **Repositorios Git:** Simple-Git (Automatización para la descarga, clonación y despliegue continuo de código del cliente).
+
+#### Estructura de Directorios (`/backend/`)
+- `server.js`: Punto de entrada que inicializa Express, los WebSockets, la base de datos y arranca los Schedulers de mantenimientos y copias de seguridad.
+- `/models/`: Esquemas de Mongoose que dictan la forma de los documentos en la base de datos.
+- `/routes/`: Controladores de los diferentes endpoints de la API, segregados lógicamente (ej. rutas de contenedores, redes, administradores).
+- `/middleware/`: Interceptores de seguridad para proteger rutas (verificar identidades JWT, roles de usuario, permisos B2B y límites de cuota de planes).
+- `/services/`: Módulos de lógica pesada independiente, como el sistema de recolección (Reaper) o el gestor de los proxies de enrutamiento (Traefik).
+
+---
+
+## 🗄️ 12. Arquitectura de la Base de Datos (MongoDB)
+
+El sistema emplea un diseño de base de datos documental a través de MongoDB. En lugar de utilizar bases de datos relacionales pesadas, aprovecha referencias asíncronas (`ObjectIds`) para vincular entidades, manteniendo la flexibilidad estructural de los recursos en la nube.
+
+### Colecciones Principales y su Propósito
+1. **Users (`User.js`):** El centro de la autenticación. Custodia datos personales, nivel de privilegios (`user`, `admin`), contraseñas hasheadas y límites absolutos basados en la suscripción (ej. `planType`, `maxContainers`, `maxVolumes`).
+2. **Containers (`Container.js`):** Es el registro maestro que empareja lo que el usuario ve en pantalla con la realidad física del VPS. Relaciona un servicio con su `dockerId` real, su dueño (`userId` u `organizationId`), el dominio externo asignado y metadatos de despliegues vía Git.
+3. **Organizations (`Organization.js`), Memberships (`Membership.js`) y Roles (`Role.js`):** El eje del modelo B2B Multi-Tenant. Permiten que múltiples usuarios colaboren bajo un mismo paraguas. Una `Organization` es dueña de recursos. Las `Memberships` unen usuarios a organizaciones asignándoles un `Role`. Los roles tienen permisos sumamente granulares (`canManageContainers`, `canManageNetworks`, etc.).
+4. **Networks (`Network.js`):** Rastrea las redes VPC creadas por los usuarios, registrando su subred determinista generada por hash, su modo de aislamiento (`Internal`) y a qué usuario pertenecen.
+5. **Volumes (`Volume.js`):** Catálogo de almacenamiento en bloque persistente atado al disco del servidor, permitiendo montar bases de datos estables dentro de los contenedores.
+6. **Registries (`Registry.js`) y Secrets (`Secret.js`):** Bóvedas de credenciales. Almacenan, de forma segura, tokens de plataformas externas (Docker Hub, GitLab) y variables de entorno ocultas.
+7. **AuditLogs (`AuditLog.js`):** Una caja negra inmutable. Guarda un registro cronológico de todas las interacciones críticas (borrar contenedores, reiniciar servicios, fallos de sistema) para facilitar las auditorías en el panel de administrador.
+8. **BackupConfig (`BackupConfig.js`):** Documento único (Singleton) que determina los intervalos de horas y la retención máxima para los trabajos cronometrados de respaldo automatizado hacia el clúster S3 MinIO.
+
+---
+
+## 🔌 13. Mapa de la API REST (Endpoints)
+
+El backend de la plataforma funciona como una API RESTful estructurada. A excepción del registro, el login y los webhooks externos, el 100% de la API está blindada y exige el envío de la cabecera `Authorization: Bearer <token_jwt>`.
+
+### 👤 Autenticación y Perfil (`/api/auth`)
+- `POST /register`: Da de alta a un usuario y despacha un correo OTP.
+- `POST /login`: Verifica credenciales, devuelve un token de sesión.
+- `POST /verify`: Completa el MFA validando el código temporal (OTP).
+- `GET /me`: Obtiene información íntegra del perfil actual y su consumo de cuotas restante.
+
+### 📦 Contenedores y App Marketplace (`/api/containers`, `/api/templates`)
+- `GET /`: Devuelve el catálogo completo de contenedores vinculados al usuario (o su organización actual).
+- `POST /`: Comando maestro para crear un contenedor nuevo. Resuelve automáticamente las dependencias de red, subredes, volúmenes e inyecta reglas proxy.
+- `POST /template`: Clona y despliega un contenedor usando una imagen pre-configurada (ej. WordPress, MySQL) desde el Marketplace.
+- `POST /:id/start` | `POST /:id/stop`: Modifican el estado de ejecución de un contenedor apagándolo o encendiéndolo físicamente en Docker.
+- `PUT /:id/redeploy`: Destruye el contenedor actual de manera segura y lo recrea tirando la capa más nueva de la imagen (Ideal para CD).
+- `DELETE /:id`: Aniquila el contenedor del host y purga sus enlaces en base de datos de manera definitiva.
+- `POST /:id/snapshot`: Genera y empaqueta un *Commit* del contenedor actual, permitiendo revertir configuraciones.
+
+### 🌐 Infraestructura: Redes y Volúmenes (`/api/networks`, `/api/volumes`, `/api/buckets`)
+- `GET /`: Lista las redes puente aisladas o los volúmenes físicos del usuario.
+- `POST /`: Instaura y aprovisiona una nueva red en Docker o particiona un disco lógico.
+- `DELETE /:id`: Desmantela el recurso, protegiéndose y abortando el proceso si dicho recurso aún está en uso por un contenedor activo.
+
+### 🏢 Plataforma Colaborativa B2B (`/api/org`)
+- `POST /`: Crea una nueva Organización de equipo.
+- `GET /my-orgs`: Lista de las entidades a las que el usuario actual tiene acceso.
+- `POST /:orgId/invites`: Emite invitaciones al correo electrónico de terceros para anexarlos a la corporación.
+- `GET /:orgId/roles` | `POST /:orgId/roles` | `DELETE /...`: Gestión del Control de Acceso Basado en Roles (RBAC) personalizado.
+- `DELETE /:orgId/members/:membershipId`: Expulsa a un colaborador y revoca su acceso.
+
+### ⚙️ Almacén de Secretos (`/api/secrets`, `/api/registries`)
+- `GET /` | `POST /` | `DELETE /:id`: ABM (Alta, Baja y Modificación) para credenciales corporativas (Private Git Registries) y Variables de Entorno globales.
+
+### 🛡️ Panel de Supervisión Total (Admin) (`/api/admin`)
+*(Estas rutas aplican el middleware verificador de roles asegurando que únicamente los superusuarios las crucen)*
+- `GET /users`, `GET /containers`: Vista de águila de todos los clientes y toda la topología de contenedores existente en el servidor físico.
+- `GET /audit`: Recupera la caja negra de los `AuditLogs`.
+- `POST /backup/run/all`, `POST /backup/run/db`...: Activadores manuales para forzar volcados de sistema hacia el blindaje S3 MinIO en tiempo real.
+- `GET /backup/list`, `DELETE /backup/:bucket/:filename`: Listado y purgado directo dentro de la caja fuerte de almacenamiento aislado MinIO.
+
 --- 
 
 _Documentación estructurada y consolidada para OrbitCloud SaaS_
