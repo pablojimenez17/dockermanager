@@ -480,7 +480,7 @@ Tecnologías y herramientas que alimentan el servidor Node.js y controlan la inf
 - **Orquestación de Contenedores:** Dockerode (Habla por socket UNIX con el motor Docker para hacer el trabajo sucio: `docker.createContainer()`, `docker.pull()`).
 - **WebSockets:** Socket.io (Configurado con adaptadores CORS estrictos y middleware de autenticación por Token para impedir el secuestro de sesiones).
 - **Backups (S3):** MinIO SDK (Abre flujos `Stream` directamente desde `tar-fs` hacia el almacén de objetos S3).
-- **Mensajería:** Twilio (SMS OTP) y SendGrid Mail (Emails de verificación y reseteos usando templates HTML).
+- **Mensajería:** Twilio SendGrid Mail (Emails de verificación y reseteos usando templates HTML).
 - **GitOps:** Simple-Git (Para despliegues continuos haciendo pulls en directorios clonados).
 
 #### Estructura de Directorios (`/backend/`)
