@@ -150,12 +150,6 @@ services:
     image: dockermanager/backend:local
     container_name: dockermanager-backend
     restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5000/api/health >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
     environment:
       - MONGO_URI=mongodb://mongodb:27017/dockermanager
       - DOCKER_HOST=tcp://socket-proxy:2375
@@ -175,7 +169,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.backend.rule=HostRegexp(`^(www\\.)?orbitcloud\\.app$`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
+      - "traefik.http.routers.backend.rule=(Host(`orbitcloud.app`) || Host(`www.orbitcloud.app`)) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
       # FIX #3: Accept both HTTP and HTTPS — global redirect handles the upgrade
       - "traefik.http.routers.backend.entrypoints=web,websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
@@ -189,18 +183,12 @@ services:
     image: dockermanager/frontend:local
     container_name: dockermanager-frontend
     restart: always
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80 >/dev/null || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 20s
     networks:
       - dmz_net
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.frontend.rule=HostRegexp(`^(www\\.)?orbitcloud\\.app$`)"
+      - "traefik.http.routers.frontend.rule=Host(`orbitcloud.app`) || Host(`www.orbitcloud.app`)"
       - "traefik.http.routers.frontend.entrypoints=web,websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
