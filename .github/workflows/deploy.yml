@@ -40,4 +40,18 @@ jobs:
             sleep 5
             docker compose -f docker-compose.yml ps
 
+            echo ">>> Smoke test Traefik router for orbitcloud.app..."
+            STATUS_CODE=$(curl -s -o /tmp/orbitcloud-smoke.html -w "%{http_code}" -H "Host: orbitcloud.app" http://127.0.0.1/)
+            if [ "$STATUS_CODE" = "404" ]; then
+              echo "ERROR: Traefik still returning 404 for orbitcloud.app"
+              echo "=== docker compose ps ==="
+              docker compose -f docker-compose.yml ps || true
+              echo "=== traefik logs (last 120 lines) ==="
+              docker logs --tail 120 dockermanager-proxy || true
+              echo "=== frontend logs (last 120 lines) ==="
+              docker logs --tail 120 dockermanager-frontend || true
+              exit 1
+            fi
+            echo "Smoke test HTTP status: $STATUS_CODE"
+
             echo ">>> Deploy completed successfully"
