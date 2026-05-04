@@ -169,7 +169,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.backend.rule=Host(`orbitcloud.app`) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
+      - "traefik.http.routers.backend.rule=(Host(`orbitcloud.app`) || Host(`www.orbitcloud.app`)) && (PathPrefix(`/api`) || PathPrefix(`/socket.io`))"
       # FIX #3: Accept both HTTP and HTTPS — global redirect handles the upgrade
       - "traefik.http.routers.backend.entrypoints=web,websecure"
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
@@ -186,10 +186,11 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"
-      - "traefik.http.routers.frontend.rule=Host(`orbitcloud.app`)"
+      - "traefik.http.routers.frontend.rule=Host(`orbitcloud.app`) || Host(`www.orbitcloud.app`)"
       - "traefik.http.routers.frontend.entrypoints=web,websecure"
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
+      - "traefik.docker.network=dmz_net"
 
   # 7. DMZ: MongoDB
   mongodb:

@@ -8,7 +8,7 @@ Brief actionable notes to help AI code agents be productive in this repo.
 - The Backend (Node.js) is the control plane: it talks to Docker through the socket proxy (`docker-socket-proxy`) and to storage via `storage-fw` → MinIO. Key backend files: `backend/server.js`, `backend/proxyService.js`, `backend/services/*`.
 
 ## Developer workflows (how to run & debug)
-- Whole-stack (recommended dev): from repo root run `docker compose up -d --build`. Compose automatically merges `docker-compose.override.yml` for local hot-reload behavior.
+- Whole-stack dev: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build`. Production VPS: `docker compose up -d --build` (only `docker-compose.yml`).
 - Backend locally (without Docker): `cd backend && npm install && npm run dev` (uses `node --watch server.js`). Ensure `MONGO_URI` and `DOCKER_HOST` point to reachable services or run with docker compose.
 - Frontend locally: `cd frontend && npm install && npm run dev` (Vite). CORS in `backend/server.js` already allows `http://localhost:5173` and `http://localhost`.
 - Inspect final merged compose file: `docker compose config`.
@@ -29,7 +29,7 @@ Brief actionable notes to help AI code agents be productive in this repo.
 ## Integration points & external dependencies
 - Docker Engine: controlled via `socket-proxy` (`tecnativa/docker-socket-proxy`). The backend relies on `dockerode` and expects `DOCKER_HOST` to be `tcp://socket-proxy:2375` inside compose.
 - Traefik: two instances — `proxy-inverso` (admin/dmz) and `lan-proxy` (user containers). Routing is controlled by Docker labels.
-- MinIO: internal S3-compatible storage; access from backend must go through `storage-fw` (HAProxy). Dev override exposes MinIO on host ports `9000/9001`.
+- MinIO: internal S3-compatible storage; access from backend must go through `storage-fw` (HAProxy). `docker-compose.dev.yml` exposes MinIO on host ports `9000/9001`.
 - Ollama: on-prem local AI service initialized by `backend/services/ollamaService.js` and used via `/api/ai`.
 
 ## Code patterns and examples
@@ -38,7 +38,7 @@ Brief actionable notes to help AI code agents be productive in this repo.
 - Network labeling: user VPCs are created with label `dockermanager.vpc=true` and are garbage-collected by the Reaper.
 
 ## Quick troubleshooting tips
-- If HTTPS fails locally, backend falls back to HTTP (see the `try/catch` in `backend/server.js`). For dev, `docker-compose.override.yml` forces dev modes and port mappings.
+- If HTTPS fails locally, backend falls back to HTTP (see the `try/catch` in `backend/server.js`). For dev, `docker-compose.dev.yml` forces dev modes and port mappings.
 - Common dev start: `docker compose up -d --build && docker compose logs -f backend` to watch backend boot messages.
 - To quickly seed an admin user, check `backend/server.js` (it creates a `test` admin user on first boot).
 

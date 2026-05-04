@@ -23,9 +23,9 @@ La infraestructura de OrbitCloud ejecuta en producción integrando de forma cont
 
 El proyecto rige un ecosistema dual para dividir de forma inquebrantable el desarrollo local de la ejecución real en el Cloud:
 
-### `docker-compose.yml` vs `docker-compose.override.yml`
-- **Producción (`docker-compose.yml`)**: Diseñado para Linux/VPS. El Firewall acapara los puestos 80/443 íntegros e intercepta **todo el tráfico**. Se fuerza a construir del código base sin ataduras al sistema nativo.
-- **Local (`docker-compose.override.yml`)**: Preparado para Windows/Mac OS donde `iptables` nativo no surte efecto en el _Virtual Switch_ de Docker. Expone puertos 80/443 de Traefik para desarrollo rápido con Vite HMR y Nodemodules mapeados al disco duro local.
+### `docker-compose.yml` vs `docker-compose.dev.yml`
+- **Producción (`docker-compose.yml`)**: Diseñado para Linux/VPS. El Firewall acapara los puestos 80/443 íntegros e intercepta **todo el tráfico**. `docker compose up` debe usar **solo** este archivo en el servidor (sin override automático) para no sustituir el frontend por Vite por error.
+- **Local (`docker-compose.dev.yml`)**: Desarrollo con hot-reload. Ejemplo: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build`. Expone MinIO en el host y usa Vite/Nodemon donde aplica.
 
 ### 🤖 CI/CD (Despliegue Continuo)
 Se sitúa en un entorno autogestionado `.github/workflows/deploy.yml`. Cada `git push` a `main`:
