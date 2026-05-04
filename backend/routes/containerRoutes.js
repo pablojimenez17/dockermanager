@@ -560,8 +560,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 // container to each one after creation.
                 // This is the Docker Compose-equivalent of multi-network membership:
                 // a container can be on the private VPC (Internal:true) AND
-                // simultaneously on another network (e.g. a shared service mesh).
-                const extraNetworks = item.extraNetworks || [];
+                const extraNetworks = config.extraNetworks || [];
                 for (const extraNet of extraNetworks) {
                     try {
                         // Skip if this is the same as the primary network
