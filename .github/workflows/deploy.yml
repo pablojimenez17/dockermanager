@@ -40,10 +40,21 @@ jobs:
             sleep 5
             docker compose -f docker-compose.yml ps
 
-            echo ">>> Smoke test Traefik router for orbitcloud.app..."
-            STATUS_CODE=$(curl -s -o /tmp/orbitcloud-smoke.html -w "%{http_code}" -H "Host: orbitcloud.app" http://127.0.0.1/)
+            echo ">>> Smoke test Traefik (inside proxy netns — avoids Suricata/DNAT on localhost)..."
+            # Exit 56 from curl on the host was recv error via edge-fw → not a reliable Traefik check.
+            STATUS_CODE=""
+            for attempt in 1 2 3 4 5 6; do
+              STATUS_CODE=$(docker run --rm --network container:dockermanager-proxy curlimages/curl:8.5.0 \
+                -s -o /dev/null -w "%{http_code}" --connect-timeout 8 --max-redirs 0 \
+                -H "Host: orbitcloud.app" http://127.0.0.1:80/ || echo "000")
+              if [ "$STATUS_CODE" != "000" ] && [ -n "$STATUS_CODE" ]; then
+                break
+              fi
+              echo "  ... Traefik not ready yet (attempt $attempt/6), sleep 5s"
+              sleep 5
+            done
             if [ "$STATUS_CODE" = "404" ]; then
-              echo "ERROR: Traefik still returning 404 for orbitcloud.app"
+              echo "ERROR: Traefik still returning 404 for orbitcloud.app (no matching router?)"
               echo "=== docker compose ps ==="
               docker compose -f docker-compose.yml ps || true
               echo "=== traefik logs (last 120 lines) ==="
@@ -52,6 +63,11 @@ jobs:
               docker logs --tail 120 dockermanager-frontend || true
               exit 1
             fi
-            echo "Smoke test HTTP status: $STATUS_CODE"
+            if [ "$STATUS_CODE" = "000" ] || [ -z "$STATUS_CODE" ]; then
+              echo "ERROR: Could not connect to Traefik on :80 inside proxy container"
+              docker compose -f docker-compose.yml ps || true
+              exit 1
+            fi
+            echo "Smoke test HTTP status (entrypoint :80, redirects not followed): $STATUS_CODE"
 
             echo ">>> Deploy completed successfully"
