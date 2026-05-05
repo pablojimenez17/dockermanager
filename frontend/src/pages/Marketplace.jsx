@@ -662,37 +662,40 @@ const Marketplace = () => {const { t } = useTranslation();
 
                                         {/* Internet Access Toggle */}
                                         {selectedNetwork !== 'none' &&
-                                          <div className={`flex items-center justify-between p-3.5 rounded-sm border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}>
-                                                <div className="flex items-center space-x-3">
-                                                    {enableInternet ?
-                      <Globe size={18} className="text-amber-500 shrink-0" /> :
-                      <Lock size={18} className="text-slate-400 shrink-0" />
-                      }
-                                                    <div>
-                                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center">
-                                                            {enableInternet ? 'Acceso a Internet Activado' : 'Contenedor Privado'}
-                                                            <div className="relative group/tooltip ml-2 flex items-center">
-                                                                <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
-                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
-                                                                    {t("auto.permite_acceso_desde_fuera_de_tu_red_ais")}
-                                                                </div>
+                                          <div
+                                            className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-sm border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}
+                                          >
+                                            <div className="flex items-start sm:items-center space-x-3">
+                                                {enableInternet ?
+                                                  <Globe size={18} className="text-amber-500 shrink-0 mt-0.5" /> :
+                                                  <Lock size={18} className="text-slate-400 shrink-0 mt-0.5" />
+                                                }
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center flex-wrap">
+                                                        {enableInternet ? 'Acceso a Internet Activado' : 'Contenedor Privado'}
+                                                        <div className="relative group/tooltip ml-2 flex items-center">
+                                                            <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
+                                                                {t("auto.permite_acceso_desde_fuera_de_tu_red_ais")}
                                                             </div>
-                                                        </p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                                                            {enableInternet ?
-                          '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.' :
-                          'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'
-                          }
-                                                        </p>
-                                                    </div>
+                                                        </div>
+                                                    </p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                                                        {enableInternet ?
+                                                          '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.' :
+                                                          'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'
+                                                        }
+                                                    </p>
                                                 </div>
-                                                <button
-                      type="button"
-                      onClick={() => setEnableInternet((v) => !v)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${enableInternet ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
-                                                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enableInternet ? 'translate-x-6' : 'translate-x-1'}`} />
-                                                </button>
                                             </div>
+                                            <button
+                                              type="button"
+                                              onClick={() => setEnableInternet((v) => !v)}
+                                              className={`relative inline-flex h-6 w-11 items-center justify-center rounded-full transition-colors focus:outline-none self-start sm:self-auto ${enableInternet ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            >
+                                              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${enableInternet ? 'translate-x-6' : 'translate-x-1'}`} />
+                                            </button>
+                                          </div>
                                         }
 
                                         <div className="grid grid-cols-2 gap-4">

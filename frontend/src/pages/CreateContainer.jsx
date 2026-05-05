@@ -291,27 +291,7 @@ const CreateContainer = () => {
                             )}
                           </select>
 
-                          {/* Contenedor privado (sin salida a internet) */}
-                          <div className="mt-4 flex items-center justify-between rounded border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-900/40 px-3 py-2">
-                            <div>
-                              <p className="text-xs font-medium text-gray-800 dark:text-slate-100 flex items-center gap-1">
-                                <Lock size={12} className="text-red-500" />
-                                Contenedor privado
-                              </p>
-                              <p className="text-[11px] text-gray-500 dark:text-slate-400">
-                                Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.
-                              </p>
-                            </div>
-                            <label className="relative inline-flex items-center cursor-pointer ml-3">
-                              <input
-                                type="checkbox"
-                                checked={!c.enableInternet}
-                                onChange={(e) => updateContainer(c.id, 'enableInternet', !e.target.checked)}
-                                className="sr-only peer"
-                              />
-                              <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-slate-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
-                            </label>
-                          </div>
+                          {/* (El toggle superior de “Contenedor privado” se oculta para mantener solo “Acceso a Internet Activado”) */}
 
                           {/* ── Additional Networks ───────────────────── */}
                           {/* Contenedor de Acceso a Internet / Privacidad */}
