@@ -237,6 +237,13 @@ router.get('/', async (req, res) => {
                     ...c.toObject(),
                     state: info.State.Status,
                     ports: info.NetworkSettings.Ports,
+                    restartInfo: {
+                        isRestarting: info.State.Status === 'restarting' || info.State.Restarting === true,
+                        exitCode: info.State.ExitCode,
+                        oomKilled: info.State.OOMKilled === true,
+                        error: info.State.Error || '',
+                        restartCount: info.RestartCount ?? info.State.RestartCount ?? 0
+                    },
                     hostConfig: {
                         Memory: info.HostConfig.Memory || 0,
                         NanoCPUs: info.HostConfig.NanoCPUs || 0

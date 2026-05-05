@@ -192,6 +192,15 @@ const ViewContainers = () => {const { t } = useTranslation();
   c.image.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const getRestartReason = (container) => {
+    const info = container.restartInfo;
+    if (!info) return '';
+    if (info.oomKilled) return 'OOMKilled (sin memoria)';
+    if (typeof info.exitCode === 'number' && info.exitCode !== 0) return `Exit code ${info.exitCode}`;
+    if (info.error && info.error.trim() !== '') return info.error;
+    return '';
+  };
+
   return (
     <div className="text-gray-900 dark:text-slate-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 space-y-4 sm:space-y-0">
@@ -256,7 +265,7 @@ const ViewContainers = () => {const { t } = useTranslation();
 
             filteredContainers.map((container) =>
             <React.Fragment key={container._id}>
-                                    <tr className={`border-l-[3px] ${container.state === 'running' ? 'border-l-green-500' : 'border-l-red-500'}`}>
+                                    <tr className={`border-l-[3px] ${container.state === 'running' ? 'border-l-green-500' : container.state === 'restarting' ? 'border-l-amber-500' : 'border-l-red-500'}`}>
                                         <td className="text-center">
                                             <button onClick={() => toggleExpand(container)} className="p-1 hover:bg-gray-200 dark:hover:bg-slate-700 rounded text-gray-500">
                                                 {expandedContainers[container._id] ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -265,11 +274,21 @@ const ViewContainers = () => {const { t } = useTranslation();
                                         <td>
                                             <div className="font-semibold text-gray-900 dark:text-white">{container.name}</div>
                                             <div className="text-xs text-gray-500 font-mono mt-0.5" title={container.dockerId}>{container.dockerId.substring(0, 12)}</div>
+                                            {container.state === 'restarting' &&
+                  <div className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
+                                                    {getRestartReason(container) || 'El contenedor se está reiniciando'}
+                                                    {container.restartInfo?.restartCount > 0 ? ` · reintentos: ${container.restartInfo.restartCount}` : ''}
+                                                </div>
+                  }
                                         </td>
                                         <td>
                                             {container.state === 'running' ?
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
                                                     {t("auto.running")}
+                                                </span> : container.state === 'restarting' ?
+
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400">
+                                                    Restarting
                                                 </span> :
 
                   <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
@@ -285,7 +304,7 @@ const ViewContainers = () => {const { t } = useTranslation();
                                         </td>
                                         <td className="text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end space-x-2">
-                                                {container.state === 'running' ?
+                                                {container.state === 'running' || container.state === 'restarting' ?
                     <>
                                                         <div className="relative group/tooltip">
                                                             <button onClick={() => handleAction(container._id, 'stop')} className="text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 p-1.5 rounded hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
