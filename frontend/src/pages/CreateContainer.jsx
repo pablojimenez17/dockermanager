@@ -19,9 +19,6 @@ const getEmptyContainer = () => ({
   ipv4Address: '',
   envVars: [{ key: '', value: '', type: 'raw' }],
   showAdvanced: false,
-  exposeDomain: false,
-  domain: '',
-  domainPort: '',
   volumeName: '',
   volumeMountPath: ''
 });
@@ -160,8 +157,8 @@ const CreateContainer = () => {const { t } = useTranslation();
           enableInternet: c.enableInternet === true,
           extraNetworks: c.extraNetworks || [],
           ipv4Address: c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' ? c.ipv4Address : undefined,
-          domain: c.exposeDomain ? c.domain : undefined,
-          domainPort: c.exposeDomain ? c.domainPort : undefined,
+          domain: undefined,
+          domainPort: undefined,
           volumeName: c.volumeName && c.volumeMountPath ? c.volumeName : undefined,
           volumeMountPath: c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined
         };
@@ -243,42 +240,14 @@ const CreateContainer = () => {const { t } = useTranslation();
 
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.port_binding_optional_")}</label>
-                                    <input type="text" value={c.portBinding} onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)} placeholder={t("auto.8080_80")} disabled={c.exposeDomain} className={`w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-brand-500 outline-none text-sm font-mono ${c.exposeDomain ? 'opacity-50' : ''}`} />
+                                    <input
+                                      type="text"
+                                      value={c.portBinding}
+                                      onChange={(e) => updateContainer(c.id, 'portBinding', e.target.value)}
+                                      placeholder={t("auto.8080_80")}
+                                      className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-brand-500 outline-none text-sm font-mono"
+                                    />
                                     <p className="text-xs text-gray-500 mt-1">{t("auto.format_host_container")}</p>
-                                </div>
-
-                                <div className="border border-gray-200 dark:border-slate-700 rounded p-4 bg-gray-50/50 dark:bg-slate-800/30">
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center">
-                                                <Globe size={16} className="mr-2 text-brand-500" /> {t("auto.expose_to_internet")}
-                                                <div className="relative group/tooltip ml-2 flex items-center">
-                                                    <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
-                                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
-                                                        {t("auto.permite_acceso_desde_fuera_de_tu_red_ais")}
-                                                    </div>
-                                                </div>
-                                            </h4>
-                                            <p className="text-xs text-gray-500 mt-1">{t("auto.route_external_traffic_via_traefik_proxy")}</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input type="checkbox" checked={c.exposeDomain} onChange={(e) => updateContainer(c.id, 'exposeDomain', e.target.checked)} className="sr-only peer" />
-                                            <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-slate-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-brand-600"></div>
-                                        </label>
-                                    </div>
-
-                                    {c.exposeDomain &&
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 pt-4 border-t border-gray-200 dark:border-slate-700">
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.custom_domain")}</label>
-                                                <input type="text" value={c.domain || ''} onChange={(e) => updateContainer(c.id, 'domain', e.target.value)} placeholder={t("auto.app_example_com")} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
-                                            </div>
-                                            <div>
-                                                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.target_internal_port")}</label>
-                                                <input type="number" value={c.domainPort || ''} onChange={(e) => updateContainer(c.id, 'domainPort', e.target.value)} placeholder={t("auto.80")} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
-                                            </div>
-                                        </div>
-                }
                                 </div>
 
                                 <div className="border border-gray-200 dark:border-slate-700 rounded overflow-hidden">
@@ -314,12 +283,34 @@ const CreateContainer = () => {const { t } = useTranslation();
                                                         </div>
                                                     </label>
                                                     <select value={c.networkMode} onChange={(e) => updateContainer(c.id, 'networkMode', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm">
-                                                        <option value="bridge">{t("auto.bridge_default_vpc_")}</option>
-                                                        <option value="none">{t("auto.none_isolated_")}</option>
+                                                        <option value="bridge">Red Privada Protegida (VPC)</option>
+                                                        <option value="none">Sin red (aislado)</option>
                                                         {availableNetworks.filter((n) => !['bridge', 'host', 'none'].includes(n.Name)).map((net) =>
                         <option key={net.Id} value={net.Name}>{net.Name}</option>
                         )}
                                                     </select>
+
+                                                    {/* Contenedor privado (sin salida a internet) */}
+                                                    <div className="mt-4 flex items-center justify-between rounded border border-gray-200 dark:border-slate-700 bg-gray-50/70 dark:bg-slate-900/40 px-3 py-2">
+                                                      <div>
+                                                        <p className="text-xs font-medium text-gray-800 dark:text-slate-100 flex items-center gap-1">
+                                                          <Lock size={12} className="text-red-500" />
+                                                          Contenedor privado
+                                                        </p>
+                                                        <p className="text-[11px] text-gray-500 dark:text-slate-400">
+                                                          Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.
+                                                        </p>
+                                                      </div>
+                                                      <label className="relative inline-flex items-center cursor-pointer ml-3">
+                                                        <input
+                                                          type="checkbox"
+                                                          checked={!c.enableInternet}
+                                                          onChange={(e) => updateContainer(c.id, 'enableInternet', !e.target.checked)}
+                                                          className="sr-only peer"
+                                                        />
+                                                        <div className="w-9 h-5 bg-gray-300 peer-focus:outline-none rounded-full peer dark:bg-slate-600 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-red-500"></div>
+                                                      </label>
+                                                    </div>
 
                                                     {/* ── Additional Networks ───────────────────── */}
                                                     {c.networkMode !== 'none' && (

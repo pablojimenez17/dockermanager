@@ -15,8 +15,8 @@ const Marketplace = () => {const { t } = useTranslation();
   const [availableSecrets, setAvailableSecrets] = useState([]);
 
   // Deployment state
-  const [domainBase, setDomainBase] = useState('');
   const [customAppName, setCustomAppName] = useState('');
+  const [portHostValues, setPortHostValues] = useState({});
 
   // Unified env inputs: { KEY: { type: 'raw'|'secret', value: '' } }
   const [envFields, setEnvFields] = useState({});
@@ -203,7 +203,14 @@ const Marketplace = () => {const { t } = useTranslation();
 
     setSelectedTemplate(template);
     setCustomAppName('');
-    setDomainBase('');
+    // Initialize port mappings (host -> container)
+    const initialPorts = {};
+    template.containers.forEach((c, cIdx) => {
+      (c.ports || []).forEach((p) => {
+        initialPorts[`${cIdx}_${p.container}`] = p.host || '';
+      });
+    });
+    setPortHostValues(initialPorts);
     setMemoryLimit(512);
     setCpuLimit(1);
     setEnableInternet(false);
@@ -216,7 +223,7 @@ const Marketplace = () => {const { t } = useTranslation();
     setCustomAppName('');
     setEnvFields({});
     setVolumeMounts([]);
-    setDomainBase('');
+    setPortHostValues({});
     setEnableInternet(false);
     setExtraNetworks([]);
   };
@@ -233,7 +240,7 @@ const Marketplace = () => {const { t } = useTranslation();
     setDeploying(true);
     try {
       // Transform the template containers into the precise format expected by POST /api/containers (the "CreateContainer" style)
-      const stack = selectedTemplate.containers.map((cDef) => {
+      const stack = selectedTemplate.containers.map((cDef, cIdx) => {
         // Generate a unique name for this node
         let nodeName = `${cDef.name_prefix}-${Math.random().toString(36).substring(7)}`;
         if (customAppName && customAppName.trim() !== '') {
@@ -253,12 +260,8 @@ const Marketplace = () => {const { t } = useTranslation();
                 finalEnv.push(`${e.key}={{SECRET:${vaultSecretName}}}`);
               }
             } else if (e.type === 'input') {
-              if (e.key === 'url' && domainBase) {
-                finalEnv.push(`${e.key}=https://${domainBase}`);
-              } else {
-                const rawValue = envFields[e.key]?.value || e.value;
-                if (rawValue !== undefined) finalEnv.push(`${e.key}=${rawValue}`);
-              }
+              const rawValue = envFields[e.key]?.value || e.value;
+              if (rawValue !== undefined) finalEnv.push(`${e.key}=${rawValue}`);
             } else if (e.value) {
               finalEnv.push(`${e.key}=${e.value}`);
             }
@@ -276,14 +279,14 @@ const Marketplace = () => {const { t } = useTranslation();
           }
         });
 
-        // If this is the primary web app, apply domain specifics
-        const isWebApp = cDef.ports?.some((p) => p.container === 80 || p.container === 2368 || p.container === 8080);
-
         return {
           name: nodeName,
           image: cDef.image,
           replicas: 1,
-          ports: cDef.ports?.map((p) => `${p.host || ''}:${p.container}`),
+          ports: cDef.ports?.map((p) => {
+            const host = portHostValues[`${cIdx}_${p.container}`] ?? '';
+            return `${host}:${p.container}`;
+          }),
           env: finalEnv,
           volumes: finalVolumes,
           memory: memoryLimit.toString(),
@@ -292,9 +295,6 @@ const Marketplace = () => {const { t } = useTranslation();
           enableInternet, // VPC internet toggle
           extraNetworks,  // additional networks to join
           restartPolicy: "unless-stopped",
-          exposeDomain: isWebApp && domainBase ? true : false,
-          domain: isWebApp && domainBase ? domainBase : undefined,
-          domainPort: isWebApp && domainBase ? cDef.ports[0].container.toString() : undefined
         };
       });
 
@@ -481,20 +481,53 @@ const Marketplace = () => {const { t } = useTranslation();
                                         </div>
 
                                         <div>
-                                            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("auto.base_domain_optional_")}</label>
-                                            <div className="flex rounded-sm shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden focus-within:ring-2 focus-within:ring-brand-500/50 transition-all">
-                                                <span className="inline-flex items-center px-4 rounded-l-md border-r bg-slate-50 dark:bg-slate-800 dark:border-slate-700 text-slate-500 dark:text-slate-400 sm:text-sm">
-                                                    {t("auto.https_")}
-                                                </span>
-                                                <input
-                        type="text"
-                        value={domainBase}
-                        onChange={(e) => setDomainBase(e.target.value)}
-                        className="flex-1 block w-full min-w-0 sm:text-sm px-3 py-2.5 bg-white dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none"
-                        placeholder={t("auto.app_yourdomain_com")} />
-                      
-                                            </div>
-                                            <p className="text-xs text-slate-500 mt-2">{t("auto.traefik_will_automatically_route_traffic")}</p>
+                                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                                            {t("auto.ports")} (HOST:CONTENEDOR)
+                                          </label>
+                                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 mb-3">
+                                            Configura qué puertos del host se enlazan a los puertos del contenedor.
+                                            Si dejas Host vacío, el puerto del contenedor no se expondrá al host.
+                                          </p>
+
+                                          <div className="space-y-3">
+                                            {selectedTemplate.containers.map((cDef, cIdx) => (
+                                              <div key={cDef.name_prefix} className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-sm p-3">
+                                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2 font-mono">
+                                                  {cDef.name_prefix}
+                                                </div>
+
+                                                {(cDef.ports || []).length === 0 ? (
+                                                  <div className="text-xs text-slate-500 dark:text-slate-400">
+                                                    No hay puertos definidos en este contenedor.
+                                                  </div>
+                                                ) : (
+                                                  <div className="space-y-2">
+                                                    {(cDef.ports || []).map((p) => (
+                                                      <div key={`${cIdx}_${p.container}`} className="flex items-center gap-3">
+                                                        <div className="text-xs text-slate-500 dark:text-slate-400 w-16">Host</div>
+                                                        <input
+                                                          type="number"
+                                                          value={portHostValues[`${cIdx}_${p.container}`] ?? ''}
+                                                          onChange={(e) => {
+                                                            const v = e.target.value;
+                                                            setPortHostValues((prev) => ({
+                                                              ...prev,
+                                                              [`${cIdx}_${p.container}`]: v
+                                                            }));
+                                                          }}
+                                                          placeholder="(opcional)"
+                                                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm"
+                                                        />
+                                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+                                                          :{p.container}
+                                                        </div>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            ))}
+                                          </div>
                                         </div>
                                     </div>
                                 </div>
