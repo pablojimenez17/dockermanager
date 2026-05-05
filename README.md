@@ -574,3 +574,316 @@ A excepción del login y verificación, todos los endpoints exigen el header `Au
 --- 
 
 _Documentación estructurada y consolidada para OrbitCloud SaaS_
+
+---
+
+## 🧩 Apéndice: Cómo se despliega (docker-compose / Dockerfiles / HAProxy / networks / volumes)
+
+Este apéndice documenta **cómo funciona realmente el stack de contenedores en producción**, basándose en:
+
+- `docker-compose.yml` (producción)
+- `docker-compose.dev.yml` (override desarrollo)
+- `backend/Dockerfile` y `frontend/Dockerfile`
+- `config/edge-fw.sh` (Suricata edge firewall + iptables DNAT + NFQUEUE)
+- `config/haproxy.cfg` (Storage firewall hacia MinIO)
+- `config/prometheus.yml`
+- `infrastructure/loki/loki.yaml` y `infrastructure/promtail/promtail.yaml`
+- `networks` y `volumes` declarados en `docker-compose.yml`
+
+> Nota: este README ya explica la arquitectura conceptual por capas. Aquí bajamos al “detalle operativo”: qué contenedor hace qué, por qué redes pasa cada uno y qué datos persisten.
+
+---
+
+### 1) `docker-compose.yml`: servicios y propósito
+
+En producción el fichero `docker-compose.yml` define una “columna vertebral” con 3 objetivos:
+
+1. **Interceptar tráfico público (80/443) con Suricata** antes de que llegue a cualquier proxy.
+2. **Separar la DMZ (core de plataforma) del storage (backups) y del monitoring** mediante redes aisladas.
+3. **Proteger el acceso al Docker Engine** del backend a través de `socket-proxy`.
+
+#### 1.1 Edge Firewall: `edge-fw` (Suricata)
+- Servicio: **`edge-fw`**
+- Imagen: `jasonish/suricata:latest`
+- Puertos publicados en el host:
+  - `80:80`
+  - `443:443`
+
+**Qué hace al arrancar (ver `config/edge-fw.sh`)**:
+1. Asegura que exista `iptables`.
+2. (Opcional) Intenta cargar/actualizar rules vía `suricata-update`.
+3. **Resuelve por DNS** la IP del contenedor `proxy-inverso` (Traefik DMZ) dentro de la red `transit_proxy_inverso`. Si no lo consigue, hace *hard fail* (`exit 1`) para que Docker lo reinicie.
+4. Configura reglas `iptables`:
+   - **DNAT (PREROUTING)**: redirige el tráfico TCP entrante a los puertos `80` y `443` hacia `proxy-inverso` en la red `transit_proxy_inverso`.
+   - **MASQUERADE (POSTROUTING)**: garantiza que la vuelta del tráfico funcione correctamente.
+5. Configura **NFQUEUE (IPS)** en reglas `FORWARD`:
+   - Inserta tráfico con `--dport 80/443` y con `--sport 80/443` a un NFQUEUE (`queue-num 0`), con `--queue-bypass`.
+6. Ejecuta Suricata en modo IDS/IPS usando:
+   - `/etc/suricata/suricata.yaml` si existe (en este repo se define `config/suricata.yaml`)
+   - o configuración por defecto si no.
+
+**Resultado**: todo el tráfico web público entra al host → pasa por Suricata → sólo si el veredicto no lo bloquea, llega al proxy.
+
+---
+
+#### 1.2 Traefik DMZ: `proxy-inverso`
+- Servicio: **`proxy-inverso`**
+- Imagen: `traefik:v2`
+- Conecta a redes:
+  - `transit_proxy_inverso`
+  - `dmz_net`
+- No publica puertos al host (en este diseño **los puertos 80/443 “los controla” Suricata**).
+
+Traefik se configura con:
+- `providers.docker=true`
+- `providers.docker.exposedbydefault=false`
+- `providers.docker.endpoint=tcp://socket-proxy:2375` (obtiene metadatos de contenedores vía `socket-proxy`)
+- Constraints por etiquetas:
+  - `traefik.constraint-label=dmz-proxy`
+
+Además:
+- TLS con Let’s Encrypt:
+  - `--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json`
+
+**Ruteo por labels del propio compose**:
+- `backend` expone `/api` y `/socket.io` en `orbitcloud.app` / `www.orbitcloud.app`
+- `frontend` expone la SPA en esos mismos hosts
+- `prometheus` y `grafana` usan hosts dedicados con BasicAuth en prometheus
+
+---
+
+#### 1.3 Traefik LAN: `lan-proxy`
+- Servicio: **`lan-proxy`**
+- Imagen: `traefik:v2`
+- Redes:
+  - `transit_proxy_forward`
+  - `lan_net`
+- Constraint: `traefik.constraint-label=lan-proxy`
+
+Este proxy sirve para el enrutamiento web hacia contenedores de usuario (las apps) que viven detrás de la red “LAN”.
+
+---
+
+#### 1.4 Docker Engine Shield: `socket-proxy`
+- Servicio: **`socket-proxy`**
+- Imagen: `tecnativa/docker-socket-proxy`
+- Monta el socket Docker del host en modo **read-only**:
+  - `/var/run/docker.sock:/var/run/docker.sock:ro`
+
+Permite sólo ciertas operaciones con variables de entorno:
+- Permisos típicos habilitados: `CONTAINERS`, `IMAGES`, `NETWORKS`, `VOLUMES`, `EXEC`, `POST`, `DELETE`, etc.
+- Esto es el “Socket Shield”: el backend **no** habla directamente con el Docker socket, sino a través de este proxy con permisos limitados.
+
+---
+
+#### 1.5 Backend y Frontend (Core DMZ)
+**Backend (`backend`)**
+- Build: `./backend` (ver `backend/Dockerfile`)
+- Env relevantes:
+  - `MONGO_URI=mongodb://mongodb:27017/dockermanager`
+  - `DOCKER_HOST=tcp://socket-proxy:2375`
+  - MinIO (`MINIO_ENDPOINT=storage-fw`, etc.)
+- Redes:
+  - `dmz_net`
+  - `storage_transit_net` (para llegar a `storage-fw`)
+
+Traefik lo publica con:
+- Regla: `Host(orbitcloud.app/www.orbitcloud.app) && (PathPrefix(/api) || PathPrefix(/socket.io))`
+- EntryPoints: `web,websecure`
+- Port Traefik: `5000`
+
+**Frontend (`frontend`)**
+- Build: `./frontend` (ver `frontend/Dockerfile`)
+- Se sirve como SPA estática en Nginx
+- Redes:
+  - `dmz_net`
+- Traefik publica en:
+  - `orbitcloud.app` / `www.orbitcloud.app`
+- Port: `80`
+
+**MongoDB (`mongodb`)**
+- Imagen: `mongo:latest`
+- Volumen persistente:
+  - `mongo-data:/data/db`
+- Red:
+  - `dmz_net`
+
+---
+
+#### 1.6 Storage Zero-Trust: HAProxy + MinIO
+**Storage firewall (`storage-fw`)**
+- Servicio: **`storage-fw`**
+- Imagen: `haproxy:alpine`
+- Monta el config real:
+  - `./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro`
+- Redes:
+  - `storage_transit_net`
+  - `storage_net` (pero como gateway hacia MinIO)
+
+**HAProxy (ver `config/haproxy.cfg`)**
+- Usa modo TCP
+- Frontend:
+  - `bind *:9000`
+  - `default_backend minio_back`
+- Backend:
+  - `server backend_minio dockermanager-minio:9000 check`
+
+**Resultado**: la única forma “natural” de llegar a MinIO desde la DMZ es a través del `storage-fw` en el puerto interno 9000.
+
+**MinIO (`minio`)**
+- Imagen: `minio/minio:latest`
+- Redes:
+  - **solo** `storage_net`
+- Volumen persistente:
+  - `minio-data:/data`
+
+**Esto es importante**: MinIO no está en `dmz_net`, así que la DMZ no puede hablar con MinIO directamente (evitas que un atacante comprometa almacenamiento sin pasar por el HAProxy).
+
+---
+
+#### 1.7 Observabilidad: Prometheus + Grafana + Loki + Promtail + Exporters
+**Prometheus (`prometheus`)**
+- Networks: `dmz_net` + `monitoring_net`
+- Config: `./config/prometheus.yml`
+- Labels para Traefik:
+  - `prometheus.orbitcloud.app`
+  - protegido con middleware BasicAuth (por label `prometheus-auth`)
+
+**Grafana (`grafana`)**
+- Networks: `dmz_net` + `monitoring_net`
+- Volumen persistente:
+  - `grafana-data:/var/lib/grafana`
+
+**Loki (`loki`)**
+- Network aislada: `monitoring_net` (internal)
+- Volumen:
+  - `loki-data:/loki`
+- Config:
+  - `./infrastructure/loki/loki.yaml`
+
+**Promtail (`promtail`)**
+- Networks: `monitoring_net`
+- Monta el fichero de logs:
+  - `suricata-logs:/var/log/suricata:ro`
+- Envía a Loki:
+  - `http://dockermanager-loki:3100/loki/api/v1/push`
+
+**Node Exporter (`node-exporter`)**
+- `pid: host`, expone métricas host
+- Network: `monitoring_net`
+
+**cAdvisor (`cadvisor`)**
+- Métricas por contenedor
+- Network: `monitoring_net` (aislado del DMZ)
+- Volúmenes montados:
+  - `/:/rootfs:ro`, `/var/run`, `/sys`, `/var/lib/docker`, `/dev/disk`
+
+---
+
+### 2) `docker-compose.dev.yml`: qué cambia en desarrollo
+
+`docker-compose.dev.yml` no reescribe la arquitectura; solo adapta ejecución:
+
+- `backend`:
+  - comando: `npm run dev`
+  - monta el código `./backend:/usr/src/app`
+  - publica `5000:5000` en host (para desarrollo)
+- `frontend`:
+  - usa build target `build`
+  - comando: `npm run dev -- --host 0.0.0.0 --port 80`
+  - monta `./frontend:/app`
+- `minio`:
+  - publica puertos `9000:9000` y `9001:9001` para facilitar consola en local
+  - redes: `storage_net` + `dmz_net`
+
+---
+
+### 3) Dockerfiles: backend y frontend
+
+#### `backend/Dockerfile`
+- Base: `node:20-alpine`
+- `WORKDIR /usr/src/app`
+- `npm ci` desde `package*.json`
+- `EXPOSE 5000`
+- `CMD ["npm","start"]`
+
+#### `frontend/Dockerfile`
+- Multi-stage:
+  1) build en `node:20-alpine` → genera `dist`
+  2) runtime con `nginx:alpine`
+     - `nginx.conf` definido en `frontend/nginx.conf` (serve SPA con `try_files ... /index.html`)
+
+---
+
+### 4) Networks en producción (qué red usa quién)
+
+En `docker-compose.yml` se declaran networks con `driver: bridge` y algunas como `internal: true`.
+
+Resumen por intención:
+
+- **`public_net`**: `edge-fw` (entrada real 80/443)
+- **`transit_proxy_inverso`**: conecta `edge-fw` ↔ `proxy-inverso`
+- **`transit_proxy_forward`**: conecta `lan-proxy` con el path de apps de usuario
+- **`dmz_net`**: DMZ “core”
+  - backend, frontend, mongodb, prometheus, grafana
+- **`lan_net` (internal:true)**: aislamiento para el path de apps detrás de `lan-proxy`
+- **`storage_transit_net`**: DMZ → `storage-fw`
+- **`storage_net` (internal:true)**: donde vive MinIO (aislado)
+- **`monitoring_net (internal:true)`**: prometheus scraping interno + loki + promtail + exporters
+
+**Idea clave**:  
+- DMZ no “ve” storage directamente.
+- Monitoring no “se mezcla” con DMZ de forma directa.
+- El único puente hacia MinIO es el HAProxy.
+
+---
+
+### 5) Volumes en producción (persistencia)
+
+En `docker-compose.yml` se declaran volúmenes nombrados:
+
+- `mongo-data` → `/data/db` de MongoDB
+- `minio-data` → `/data` de MinIO
+- `letsencrypt-data` → `/letsencrypt` para certificados Traefik
+- `suricata-logs` → `/var/log/suricata` (eve.json para Promtail/Loki)
+- `suricata-rules` → `/var/lib/suricata`
+- `prometheus-data` → `/prometheus`
+- `grafana-data` → `/var/lib/grafana`
+- `loki-data` → `/loki`
+
+**Uso funcional**:
+- `suricata-logs` conecta Suricata con Loki vía Promtail.
+- `mongo-data` y `minio-data` son el estado persistente del sistema.
+- `letsencrypt-data` mantiene certificados y evita regeneraciones constantes.
+
+---
+
+### 6) Flujo completo de tráfico (de principio a fin)
+
+1. **Internet** → llega a `edge-fw` en el host por `80/443`.
+2. `edge-fw`:
+   - DNAT redirige a `proxy-inverso` (Traefik) en `transit_proxy_inverso`
+   - IPS/NFQUEUE inspecciona y decide (accept/drop)
+3. `proxy-inverso` en `dmz_net` enruta:
+   - `/api` y `/socket.io` → `backend:5000`
+   - `/` → `frontend`
+4. `backend` accede a:
+   - Mongo en `mongodb` (por `dmz_net`)
+   - MinIO sólo vía `storage-fw` en puerto interno 9000
+5. `promtail` toma `suricata-logs/eve.json` → lo empuja a `loki` → Grafana lo consulta
+6. `prometheus` scrapea `node-exporter` y `cadvisor` en `monitoring_net` (red aislada)
+
+--- 
+
+### 7) Punto importante: por qué esta separación existe
+
+Esta topología no es “decorativa”. Está diseñada para que:
+
+- **Un fallo/compromiso en DMZ no dé acceso directo al storage** (Zero-Trust MinIO).
+- **Un atacante no pueda forzar cambios peligrosos del Docker host** desde el backend (Socket Shield).
+- **El tráfico público siempre pase por Suricata** antes de tocar proxies (IPS en la puerta).
+- **La observabilidad no altere el aislamiento** (monitoring en `internal` separado).
+
+---
+
+
