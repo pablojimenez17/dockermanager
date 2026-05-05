@@ -1,4 +1,5 @@
-import { useTranslation } from "react-i18next";import React, { useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import React, { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
@@ -7,6 +8,7 @@ import { X } from 'lucide-react';
 import 'xterm/css/xterm.css';
 
 const TerminalModal = ({ containerId, containerName, onClose }) => {
+  const { t } = useTranslation();
   const terminalRef = useRef(null);
   const socketRef = useRef(null);
   const xtermRef = useRef(null);

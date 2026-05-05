@@ -1,33 +1,17 @@
-import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Copy, Check, Download, Terminal } from 'lucide-react';
 import { io } from 'socket.io-client';
 
 const LiveLogsModal = ({ containerId, containerName, onClose }) => {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState([]);
   const [copied, setCopied] = useState(false);
   const logsEndRef = useRef(null);
   const socketRef = useRef(null);
   const containerRef = useRef(null);
   const autoScrollRef = useRef(true);
-
-  useEffect(() => {
-    // Initialize socket connection using HTTP-Only cookies (credentials: true)
-    // Or if using Bearer tokens: io('...', { auth: { token: localStorage.getItem(...) } })
-
-    socketRef.current = io('', {
-      withCredentials: true // Important for HTTP-Only cookie auth if supported by backend io logic
-      // Note: Our backend websocket.js currently expects handshake.auth.token for React
-      // let's grab it if it still exists in a cookie/localstorage, or if your auth architecture
-      // completely moved to cookies, the backend 'withCredentials' will pass the cookie natively.
-    });
-
-    // For this project, to ensure auth passes through WebSocket:
-    // we'll rely on the fact that if auth was via cookie, it's sent automatically, 
-    // BUT our websockets.js specifically looks for `socket.handshake.auth.token`
-    // Wait, since we moved to HTTP-Only cookies, we can't read the token from JS to put in handshake.auth.
-    // Let's modify the socket connection to send a request, but we need backend to read cookies.
-  }, []);
 
   useEffect(() => {
     // Connect and subscribe to logs

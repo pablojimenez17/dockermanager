@@ -547,7 +547,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             }
 
             // Keep OS base images alive so they don't appear as "exited" instantly
-            const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos'];
+            const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos', 'kalilinux/kali-rolling', 'kali'];
             if (keepsAlive.some(img => image.includes(img))) {
                 containerConfig.Cmd = ['tail', '-f', '/dev/null'];
             }
@@ -709,6 +709,13 @@ router.post('/:id/start', checkPermission('manageContainers'), async (req, res) 
             dbContainer.status = 'running';
             await dbContainer.save();
             return res.json({ message: 'Container is already running' });
+        }
+
+        if (currentState === 'restarting') {
+            // Docker restart loop is already active; calling start() here returns HTTP 304.
+            dbContainer.status = 'restarting';
+            await dbContainer.save();
+            return res.json({ message: 'Container is currently restarting' });
         }
 
         if (currentState === 'paused') {
