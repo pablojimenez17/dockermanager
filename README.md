@@ -628,6 +628,222 @@ La cuota de RAM de cada plan **no** compara el techo declarado con el límite de
 
 ---
 
+## 🧩 Despliegue (puntos por punto: docker-compose, networks, volúmenes, proxy y Dockerfiles)
+
+A continuación va el despliegue **operativo** de la infraestructura en producción, explicado **servicio por servicio**, con qué networks usa, qué volúmenes persisten, qué hace cada proxy y qué Dockerfiles se usan.
+
+---
+
+### 0) Punto de partida
+La arquitectura en producción se coordina con:
+- `docker-compose.yml`
+- `docker-compose.dev.yml` (solo para desarrollo/local)
+- Proxies: **Suricata (edge-fw)** + **Traefik (proxy-inverso y lan-proxy)** + **HAProxy (storage-fw)**
+- Docker Engine controlado por `socket-proxy`
+- Observabilidad: **Prometheus/Grafana/Loki/Promtail** + exporters
+
+---
+
+### 1) Networks (en producción) y para qué sirven
+
+En `docker-compose.yml` hay estos `networks:` (todas con driver `bridge`):
+
+1. **`public_net`**
+   - Conecta: `edge-fw`
+   - Rol: red “de entrada” para el firewall por el host (conceptualmente la puerta del perimetro).
+
+2. **`transit_proxy_inverso`**
+   - Conecta: `edge-fw` ↔ `proxy-inverso`
+   - Rol: “corredor” interno donde Suricata redirige tráfico web hacia Traefik DMZ.
+
+3. **`transit_proxy_forward`**
+   - Conecta: `lan-proxy` (y por diseño el flujo LAN hacia apps)
+   - Rol: pasarela para enrutamiento web de apps de usuario detrás del proxy LAN.
+
+4. **`dmz_net`**
+   - Conecta: `proxy-inverso`, `backend`, `frontend`, `mongodb`, `prometheus`, `grafana`
+   - Rol: “Core DMZ” de la plataforma (servicios centrales accesibles por el stack web).
+
+5. **`lan_net` (internal: true)**
+   - Conecta: `lan-proxy`
+   - Rol: aislamiento interno del path LAN hacia apps (sin salida directa “a internet” desde esa red).
+
+6. **`storage_transit_net`**
+   - Conecta: `storage-fw` (HAProxy) ↔ (gateway al storage)
+   - Rol: paso hacia el firewall de storage.
+
+7. **`storage_net` (internal: true)**
+   - Conecta: `minio` (solo)
+   - Rol: red aislada donde vive MinIO (no en `dmz_net`).
+
+8. **`monitoring_net` (internal: true)**
+   - Conecta: `loki`, `promtail`, `node-exporter`, `cadvisor` (y algunos con `dmz_net`)
+   - Rol: aislamiento del scraping/telemetría respecto al “core”.
+
+> Nota: En `docker-compose.yml` **no se definen subnets/IPs estáticas** a nivel de Compose; Docker asigna IPs dinámicas dentro de cada bridge network.
+
+---
+
+### 2) Volúmenes (persistencia) y qué guardan
+
+En `docker-compose.yml` hay estos `volumes:`:
+
+- `mongo-data` → `/data/db` de `mongodb` (persistencia de estado)
+- `minio-data` → `/data` de `minio` (persistencia de backups)
+- `letsencrypt-data` → `/letsencrypt` de Traefik (certificados ACME)
+- `suricata-logs` → `/var/log/suricata` (eventos para Loki/Promtail)
+- `suricata-rules` → `/var/lib/suricata` (reglas)
+- `prometheus-data` → `/prometheus` (TSDB de métricas)
+- `grafana-data` → `/var/lib/grafana` (config/dashboards/usuarios)
+- `loki-data` → `/loki` (logs persistentes)
+
+---
+
+### 3) Contenedores (servicio por servicio)
+
+#### 3.1 `edge-fw` (Suricata Edge Firewall / IPS)
+- Imagen: `jasonish/suricata:latest`
+- Puertos en host: `80:80` y `443:443`
+- Volúmenes:
+  - `./config/edge-fw.sh:/docker-entrypoint.sh:ro`
+  - `suricata-logs`, `suricata-rules`
+- Networks: `public_net`, `transit_proxy_inverso`, `transit_proxy_forward`
+- Qué hace:
+  - DNAT: redirige tráfico web hacia `proxy-inverso`
+  - NFQUEUE/IPS: intercepta/verifica paquetes (modo prevención)
+
+#### 3.2 `proxy-inverso` (Traefik DMZ)
+- Imagen: `traefik:v2`
+- Networks: `transit_proxy_inverso`, `dmz_net`
+- Volumen:
+  - `letsencrypt-data:/letsencrypt` (ACME storage)
+- Descubre servicios vía Docker, restringido por label:
+  - `traefik.constraint-label=dmz-proxy`
+- Ruteo TLS:
+  - `certificatesResolvers.letsencrypt...`
+
+#### 3.3 `lan-proxy` (Traefik LAN)
+- Imagen: `traefik:v2`
+- Networks: `transit_proxy_forward`, `lan_net`
+- Constraint:
+  - `traefik.constraint-label=lan-proxy`
+- Rol: ruteo web hacia apps de usuario en el “lado LAN”.
+
+#### 3.4 `socket-proxy` (Docker Socket Shield)
+- Imagen: `tecnativa/docker-socket-proxy`
+- Montaje:
+  - `/var/run/docker.sock:/var/run/docker.sock:ro`
+- Networks: `dmz_net`
+- Rol:
+  - El backend solo gestiona Docker a través de este proxy con permisos acotados (CONTAINERS/NETWORKS/VOLUMES/EXEC/POST/DELETE, etc.).
+
+#### 3.5 `backend`
+- Build: `./backend` → `backend/Dockerfile`
+- Networks: `dmz_net`, `storage_transit_net`
+- Depende de: `mongodb`, `socket-proxy`, `minio`
+- Traefik labels:
+  - router backend para `Host(orbitcloud.app/www.orbitcloud.app)` con `PathPrefix(/api)` o `PathPrefix(/socket.io)`
+  - entrypoints: `web,websecure`
+- Rol:
+  - API REST + WebSockets/terminal
+  - Inicializa proxy/servicios internos y orquesta recursos vía `socket-proxy`.
+
+#### 3.6 `frontend`
+- Build: `./frontend` → `frontend/Dockerfile`
+- Networks: `dmz_net`
+- Traefik labels:
+  - router frontend para `Host(orbitcloud.app)` / `www.orbitcloud.app`
+- Rol:
+  - sirve la SPA (build estático generado por Vite, servido por Nginx).
+
+#### 3.7 `mongodb`
+- Imagen: `mongo:latest`
+- Volumen: `mongo-data:/data/db`
+- Networks: `dmz_net`
+- Rol: persistencia de usuarios, contenedores, planes, etc.
+
+#### 3.8 `storage-fw` (HAProxy Storage Firewall)
+- Imagen: `haproxy:alpine`
+- Montaje config:
+  - `./config/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro`
+- Networks: `storage_transit_net`, `storage_net`
+- Rol:
+  - permite el paso TCP controlado hacia MinIO (en el compose se ve modo TCP).
+
+#### 3.9 `minio`
+- Imagen: `minio/minio:latest`
+- Networks: **solo** `storage_net` (internal: true)
+- Volumen: `minio-data:/data`
+- Rol:
+  - almacenamiento de backups (y buckets de logs/backups según lógica del backend).
+
+#### 3.10 Observabilidad
+- `prometheus`
+  - Networks: `dmz_net`, `monitoring_net`
+  - Volumen: `prometheus-data`
+  - Traefik labels con BasicAuth.
+- `grafana`
+  - Networks: `dmz_net`, `monitoring_net`
+  - Volumen: `grafana-data`
+- `loki`
+  - Network: `monitoring_net`
+  - Volumen: `loki-data`
+- `promtail`
+  - Network: `monitoring_net`
+  - Monta `suricata-logs` en read-only y empuja a Loki.
+- `node-exporter`
+  - Network: `monitoring_net`
+  - `pid: host`, métricas del host.
+- `cadvisor`
+  - Network: `monitoring_net`
+  - métricas por contenedor + montaje de `/sys`, `/var/lib/docker`, etc.
+
+---
+
+### 4) Flujo de red (alto nivel)
+1. Internet → `edge-fw` (80/443)
+2. `edge-fw` DNAT/NFQUEUE → `proxy-inverso`
+3. `proxy-inverso` enruta:
+   - `/api` + `/socket.io` → `backend`
+   - `/` → `frontend`
+4. `backend` accede a storage solo vía `storage-fw` → `minio`
+5. `suricata-logs` → `promtail` → `loki` → `grafana`
+6. `node-exporter`/`cadvisor` → `prometheus` → `grafana`
+
+---
+
+### 5) Dockerfiles relevantes
+
+#### 5.1 `backend/Dockerfile`
+- Base: `node:20-alpine`
+- `npm ci`
+- `EXPOSE 5000`
+- `CMD ["npm", "start"]`
+
+#### 5.2 `frontend/Dockerfile`
+- Multi-stage:
+  - build con Node → `npm run build`
+  - runtime con `nginx:alpine`
+- Copia `nginx.conf` de `frontend/` a `/etc/nginx/conf.d/default.conf`
+- `EXPOSE 80`
+
+> Importante: no existe `nginx/nginx.conf` en el repo (en tu workspace fallaba “File not found”); el correcto es `frontend/nginx.conf`.
+
+---
+
+### 6) configs de proxy relevantes
+
+#### 6.1 `config/haproxy.cfg`
+- Modo TCP
+- Frontend bind `*:9000`
+- Backend apunta a `dockermanager-minio:9000`
+
+#### 6.2 `frontend/nginx.conf`
+- Serve SPA con:
+  - `try_files $uri $uri/ /index.html;`
+
+---
+ 
 ## 🧩 Apéndice: Cómo se despliega (docker-compose / Dockerfiles / HAProxy / networks / volumes)
 
 Este apéndice documenta **cómo funciona realmente el stack de contenedores en producción**, basándose en:
@@ -936,5 +1152,3 @@ Esta topología no es “decorativa”. Está diseñada para que:
 - **La observabilidad no altere el aislamiento** (monitoring en `internal` separado).
 
 ---
-
-
