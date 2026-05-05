@@ -72,47 +72,71 @@ export const setupSockets = (server) => {
                     return;
                 }
 
-                // 2. Cleanup previous streams if the user switches containers without disconnecting
+                // 2. Cleanup previous streams
                 if (logStream) {
-                    logStream.destroy();
+                    try { logStream.destroy(); } catch (_) {}
                     logStream = null;
                 }
 
-                socket.emit('log_stdout', `\\033[36m[*] Connected to live logs for ${dbContainer.name}...\\033[0m\r\n\r\n`);
-
-                // 3. Attach to Docker Stream
                 const container = docker.getContainer(dbContainer.dockerId);
 
-                logStream = await container.logs({
-                    follow: true,     // Keep connection open
-                    stdout: true,     // Get standard output
-                    stderr: true,     // Get error output
-                    tail: 100         // Get last 100 lines initially
-                });
+                // 3. Check real Docker state
+                let containerInfo;
+                try {
+                    containerInfo = await container.inspect();
+                } catch (inspectErr) {
+                    socket.emit('log_error', `Container not found in Docker: ${inspectErr.message}`);
+                    return;
+                }
 
-                // Dockerode streams multiplex stdout and stderr, we use docker.modem to demux it
-                container.modem.demuxStream(logStream,
-                    {
-                        write: (chunk) => {
-                            // Convert NodeJS buffer to text and emit to frontend
-                            socket.emit('log_stdout', chunk.toString('utf8'));
+                const isRunning = containerInfo.State.Status === 'running';
+                const isTty = containerInfo.Config.Tty;
+
+                socket.emit('log_stdout', `\x1b[36m[*] ${isRunning ? 'Live logs' : 'Historical logs (container stopped)'} for ${dbContainer.name}...\x1b[0m\r\n\r\n`);
+
+                // 4. CRITICAL: use callback API, NOT await.
+                // await container.logs({ follow: true }) hangs forever on running containers
+                // because the Promise waits for the stream to END — which never happens.
+                // The callback API returns the stream immediately without waiting for it to close.
+                container.logs(
+                    { follow: isRunning, stdout: true, stderr: true, tail: 200 },
+                    (err, stream) => {
+                        if (err) {
+                            socket.emit('log_error', `Failed to get logs: ${err.message}`);
+                            return;
                         }
-                    },
-                    {
-                        write: (chunk) => {
-                            // Convert standard error to text
-                            socket.emit('log_stderr', chunk.toString('utf8'));
+                        if (!stream) {
+                            socket.emit('log_error', 'No log stream returned by Docker');
+                            return;
                         }
+
+                        logStream = stream;
+
+                        if (isTty) {
+                            // TTY mode: raw text, no multiplexing header
+                            stream.on('data', (chunk) => {
+                                socket.emit('log_stdout', chunk.toString('utf8'));
+                            });
+                        } else {
+                            // Normal mode: demux the Docker multiplexed stdout/stderr stream
+                            docker.modem.demuxStream(
+                                stream,
+                                { write: (chunk) => socket.emit('log_stdout', chunk.toString('utf8')) },
+                                { write: (chunk) => socket.emit('log_stderr', chunk.toString('utf8')) }
+                            );
+                        }
+
+                        stream.on('end', () => {
+                            socket.emit('log_stdout', '\r\n\x1b[33m[*] Log stream ended.\x1b[0m\r\n');
+                            logStream = null;
+                        });
+
+                        stream.on('error', (streamErr) => {
+                            socket.emit('log_error', `Stream error: ${streamErr.message}`);
+                            logStream = null;
+                        });
                     }
                 );
-
-                logStream.on('end', () => {
-                    socket.emit('log_stdout', '\r\n\\033[31m[*] Container stream closed.\\033[0m\r\n');
-                });
-
-                logStream.on('error', (err) => {
-                    socket.emit('log_error', `Stream Error: ${err.message}`);
-                });
 
             } catch (error) {
                 console.error('[WebSocket Log Error]', error);

@@ -81,15 +81,49 @@ router.get('/:id/logs', async (req, res) => {
 
         const container = docker.getContainer(dbContainer.dockerId);
 
-        const logs = await container.logs({
+        // Verify Docker container still exists
+        let info;
+        try {
+            info = await container.inspect();
+        } catch (inspectErr) {
+            if (inspectErr.statusCode === 404) {
+                return res.status(404).json({ message: 'Docker container no longer exists' });
+            }
+            throw inspectErr;
+        }
+
+        const logsBuffer = await container.logs({
             stdout: true,
             stderr: true,
-            tail: 100, // last 100 lines
+            tail: 200,
             timestamps: true
+            // Note: follow is intentionally omitted (defaults false) — works on both running and stopped containers
         });
 
-        res.send(logs.toString('utf-8'));
+        // Docker multiplexes stdout/stderr with an 8-byte header per chunk.
+        // Strip those header bytes so the frontend receives clean text.
+        if (info.Config.Tty) {
+            // TTY containers: raw text, no header
+            res.send(logsBuffer.toString('utf-8'));
+        } else {
+            // Non-TTY: strip the 8-byte multiplexing header from each chunk
+            const lines = [];
+            let buf = Buffer.isBuffer(logsBuffer) ? logsBuffer : Buffer.from(logsBuffer);
+            let offset = 0;
+            while (offset + 8 <= buf.length) {
+                const size = buf.readUInt32BE(offset + 4);
+                offset += 8;
+                if (offset + size <= buf.length) {
+                    lines.push(buf.slice(offset, offset + size).toString('utf-8'));
+                    offset += size;
+                } else {
+                    break;
+                }
+            }
+            res.send(lines.join(''));
+        }
     } catch (error) {
+        console.error('[Logs Error]', error);
         res.status(500).json({ message: 'Error fetching logs', error: error.message });
     }
 });

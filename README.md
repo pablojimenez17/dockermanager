@@ -577,6 +577,57 @@ _Documentación estructurada y consolidada para OrbitCloud SaaS_
 
 ---
 
+## 🐏 14. Gestión de Memoria — Aprovisionamiento Dinámico (Thin Provisioning)
+
+### El comportamiento
+
+Cuando creas un contenedor y le asignas **24 GB de RAM** en un servidor con solo 8 GB físicos, **el contenedor arranca sin problema** y solo utiliza la memoria que realmente necesita en cada momento. Si la aplicación usa 1 GB, consumirá 1 GB. Si usa 3 GB, consumirá 3 GB. El límite de 24 GB es únicamente un **techo de seguridad** que Docker nunca permitirá superar, pero que no reserva ni un byte por adelantado.
+
+Esto funciona exactamente igual que el disco de una máquina virtual con aprovisionamiento dinámico: declares 100 GB pero el archivo `.vmdk` solo ocupa lo que realmente has escrito.
+
+---
+
+### Por qué funciona así (Linux cgroups)
+
+En Linux, los límites de memoria de Docker se implementan a través de **cgroups** (`memory.limit_in_bytes`). Los cgroups son límites del kernel, **no reservas**. Poner un límite de 24 GB significa:
+
+> *"Si este contenedor alguna vez intenta usar más de 24 GB, el kernel lo matará (OOM). Pero hasta entonces, usa la RAM que quieras."*
+
+El sistema operativo gestiona la memoria de forma dinámica: la asigna cuando los procesos la piden y la libera cuando ya no la necesitan. En ningún momento bloquea 24 GB de RAM física al arrancar el contenedor.
+
+---
+
+### El problema real: `MemorySwap` por defecto
+
+Sin configuración adicional, Docker establece automáticamente:
+
+```
+MemorySwap = Memory × 2
+```
+
+Si declaras `Memory = 24 GB`, Docker intenta fijar `MemorySwap = 48 GB` en el kernel. En un servidor con 8 GB de RAM y swap limitado, **el kernel rechaza esto** y el contenedor no arranca.
+
+OrbitCloud resuelve esto configurando `MemorySwap: -1` en todos los contenedores:
+
+| Parámetro | Valor | Efecto |
+|-----------|-------|--------|
+| `Memory` | Valor declarado (ej. 24 GB) | Techo máximo. Solo actúa si se supera. No reserva nada. |
+| `MemorySwap` | `-1` | Sin límite de swap. El kernel gestiona el swap libremente sin rechazar la creación del contenedor. |
+
+---
+
+### El sistema de cuotas (planes)
+
+La cuota de RAM de cada plan **no** compara el techo declarado con el límite del plan (eso haría imposible poner 24 GB en un plan de 8 GB). En su lugar, el sistema contabiliza la **reserva blanda real** de cada contenedor existente (campo `MemoryReservation`, que para contenedores creados sin reserva explícita es `0`), garantizando que la cuota mida lo que realmente se está usando, no lo que teóricamente podría usarse.
+
+> [!TIP]
+> Puedes asignar un techo de 32 GB a un contenedor aunque tu plan tenga 4 GB de cuota. El contenedor usará solo lo que necesite. La cuota solo te impide **desbordar el servidor** acumulando muchos contenedores que realmente consuman mucho, no simplemente declarando límites altos.
+
+> [!NOTE]
+> En producción, el servidor tiene **8 GB de RAM física**. Declarar 24 GB de techo en un contenedor que solo usa 1 GB de forma real es completamente seguro y es el uso previsto del sistema.
+
+---
+
 ## 🧩 Apéndice: Cómo se despliega (docker-compose / Dockerfiles / HAProxy / networks / volumes)
 
 Este apéndice documenta **cómo funciona realmente el stack de contenedores en producción**, basándose en:

@@ -288,12 +288,16 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
         }
 
         // 2. Assess requested RAM vs Limit
+        // We use thin-provisioning: Memory is just a ceiling, MemoryReservation (10%) is what's truly reserved.
+        // Quota is tracked against the soft reservation so users can set high ceilings without hitting plan limits.
         let requestedRamMb = 0;
         let requestedDomainsCount = 0;
 
         stack.forEach(c => {
-            // If they don't specify, we assume 512MB default allocation per container for counting purposes
-            requestedRamMb += c.memory ? parseInt(c.memory) : 512;
+            // Count the soft reservation (10% of declared limit) for quota purposes.
+            // If no memory is declared, assume a 512 MB ceiling → 51 MB soft reservation.
+            const declaredMb = c.memory ? parseInt(c.memory) : 512;
+            requestedRamMb += Math.ceil(declaredMb * 0.1);
             if (c.domain) requestedDomainsCount++;
         });
 
@@ -305,12 +309,15 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             });
         }
 
-        // Sum current allocated RAM across running/existing containers
+        // Sum current SOFT-RESERVED RAM (MemoryReservation) across existing containers.
+        // This reflects actual pre-allocated memory, not the hard ceiling.
         let currentAllocatedRamBytes = 0;
         for (const c of currentContainersDb) {
             try {
                 const info = await docker.getContainer(c.dockerId).inspect();
-                currentAllocatedRamBytes += info.HostConfig.Memory || 0;
+                // Prefer MemoryReservation (soft limit); fall back to 10% of Memory hard limit; then 0
+                const reservation = info.HostConfig.MemoryReservation || Math.floor((info.HostConfig.Memory || 0) * 0.1);
+                currentAllocatedRamBytes += reservation;
             } catch (e) {
                 // container might be missing, ignore
             }
@@ -319,7 +326,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
         const currentAllocatedRamMb = currentAllocatedRamBytes / (1024 * 1024);
         if (currentAllocatedRamMb + requestedRamMb > limits.maxRamMb) {
             return res.status(403).json({
-                message: `Quota Exceeded: Your plan limits you to ${limits.maxRamMb} MB of RAM. You have ${currentAllocatedRamMb} MB allocated, and this deployment requires ${requestedRamMb} MB.`
+                message: `Quota Exceeded: Your plan limits you to ${limits.maxRamMb} MB of RAM (soft reservation). You have ${Math.round(currentAllocatedRamMb)} MB reserved, and this deployment requires ${requestedRamMb} MB more.`
             });
         }
         // ==========================================
@@ -463,9 +470,16 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             }
 
             // Build Advanced Host Configuration
+            // Memory works like a VM dynamic disk — no pre-allocation:
+            //   - Memory: hard ceiling enforced by cgroup only when actually reached (no upfront reservation)
+            //   - MemorySwap: -1 disables Docker's default swap limit (Memory*2) which fails if limit > physical RAM
+            const memoryBytes = memory ? parseInt(memory) * 1024 * 1024 : 0;
             const baseHostConfig = {
                 PortBindings,
-                ...(memory && { Memory: parseInt(memory) * 1024 * 1024 }),
+                ...(memoryBytes > 0 && {
+                    Memory: memoryBytes,
+                    MemorySwap: -1, // CRITICAL: prevents Docker from failing when Memory > physical RAM
+                }),
                 ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
                 ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
                 NetworkMode: safeNetworkMode,
@@ -674,7 +688,35 @@ router.post('/:id/start', checkPermission('manageContainers'), async (req, res) 
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
-        await container.start();
+
+        // Inspect real Docker state before acting — avoids cryptic "container already started" errors
+        let info;
+        try {
+            info = await container.inspect();
+        } catch (inspectErr) {
+            if (inspectErr.statusCode === 404) {
+                // Container was deleted outside the app — clean up DB record
+                await Container.deleteOne({ _id: dbContainer._id });
+                return res.status(404).json({ message: 'Underlying Docker container no longer exists. Record removed.' });
+            }
+            throw inspectErr;
+        }
+
+        const currentState = info.State.Status; // 'running' | 'exited' | 'paused' | 'created' | 'restarting' | 'dead'
+
+        if (currentState === 'running') {
+            // Already running — update DB and return success without calling start()
+            dbContainer.status = 'running';
+            await dbContainer.save();
+            return res.json({ message: 'Container is already running' });
+        }
+
+        if (currentState === 'paused') {
+            await container.unpause();
+        } else {
+            // 'exited', 'created', 'dead' — normal start
+            await container.start();
+        }
 
         dbContainer.status = 'running';
         await dbContainer.save();
@@ -688,6 +730,7 @@ router.post('/:id/start', checkPermission('manageContainers'), async (req, res) 
 
         res.json({ message: 'Container started successfully' });
     } catch (error) {
+        console.error('[Start Container Error]', error);
         res.status(500).json({ message: 'Error starting container', error: error.message });
     }
 });
