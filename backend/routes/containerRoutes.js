@@ -91,8 +91,16 @@ const attachProxyToVpc = async (networkName) => {
             console.log(`[VPC] Attaching proxy to ${networkName} for domain routing`);
             await network.connect({ Container: proxyId });
         }
+        // Verify final membership to fail fast if Docker ignored/failed connect.
+        const verify = await network.inspect();
+        const isConnected = Object.keys(verify.Containers || {}).includes(proxyId);
+        if (!isConnected) {
+            throw new Error(`Proxy was not connected to network ${networkName}`);
+        }
+        return true;
     } catch (err) {
         console.warn(`[VPC] Could not attach proxy to ${networkName}:`, err.message);
+        return false;
     }
 };
 // ============================================================
@@ -259,6 +267,12 @@ const generateUniqueDomain = async ({ name, userScope }) => {
     }
 
     throw new Error('Unable to allocate a unique domain');
+};
+
+const buildTraefikAppId = (domain, fallbackName = 'app') => {
+    const base = (domain || fallbackName || 'app').toString();
+    const id = base.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return id || `app${Date.now()}`;
 };
 
 // Get all containers for the logged-in user or organization
@@ -557,7 +571,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
 
             // Inject generated domain labels only for public containers
             if (publishPublicly && domain && resolvedInternalPort) {
-                const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
+                const appId = buildTraefikAppId(domain, name);
                 containerConfig.Labels = {
                     'traefik.enable': 'true',
                     'traefik.constraint-label': 'dmz-proxy',
@@ -627,7 +641,10 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 // Only attach the lan-proxy if the user intends to expose a domain.
                 // This is the single controlled ingress point into the user's VPC.
                 if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
-                    await attachProxyToVpc(safeNetworkMode);
+                    const proxyAttached = await attachProxyToVpc(safeNetworkMode);
+                    if (!proxyAttached) {
+                        throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
+                    }
                 }
 
                 // ── Extra Networks ──────────────────────────────────────────────

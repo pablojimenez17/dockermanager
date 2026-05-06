@@ -6,6 +6,7 @@ import { useOrg } from '../context/OrgContext';
 import { resolveLimits } from '../utils/planLimits';
 
 const Marketplace = () => {const { t } = useTranslation();
+  const WEB_PORT_CANDIDATES = new Set([80, 443, 3000, 3001, 8080, 8086, 2368, 1337, 5678, 9090, 11434, 15672, 9001]);
   const { activeOrg, userPlan } = useOrg();
   const [templates, setTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -173,11 +174,12 @@ const Marketplace = () => {const { t } = useTranslation();
     ).values()];
 
     allEnvs.forEach((e) => {
+      const optionalByLabel = typeof e.label === 'string' && /optional/i.test(e.label);
       initial[e.key] = {
         type: e.type === 'secret' ? 'secret' : 'raw',
         value: e.value || '',
         label: e.label || e.key,
-        required: e.type === 'secret'
+        required: e.required === true || (e.type === 'secret' && !optionalByLabel)
       };
     });
 
@@ -233,6 +235,7 @@ const Marketplace = () => {const { t } = useTranslation();
 
   const isInvalidEnvField = (field) => {
     const value = (field?.value ?? '').toString().trim();
+    if (!field?.required && value === '') return false;
     if (field?.type === 'secret') return value === '';
     return value === '';
   };
@@ -317,6 +320,28 @@ const Marketplace = () => {const { t } = useTranslation();
   };
 
   const configuredEnvFields = Object.entries(envFields);
+  const getTemplateDisclaimers = (template) => {
+    if (!template) return [];
+    const notes = [];
+    const containers = template.containers || [];
+    const hasPersistentVolumes = containers.some((c) => (c.volumes || []).length > 0);
+    const ports = containers.flatMap((c) => (c.ports || []).map((p) => Number(p.container)));
+    const hasWebPort = ports.some((p) => WEB_PORT_CANDIDATES.has(p));
+    const envKeys = new Set(containers.flatMap((c) => (c.env || []).map((e) => e.key)));
+
+    notes.push(t("auto.public_domain_certificate_notice"));
+    if (hasPersistentVolumes) {
+      notes.push(t("auto.template_notice_volume_persistence_credentials"));
+    }
+    if (template.id === 'grafana' || (envKeys.has('GF_SECURITY_ADMIN_USER') && envKeys.has('GF_SECURITY_ADMIN_PASSWORD'))) {
+      notes.push(t("auto.template_notice_grafana_credentials_first_boot"));
+    }
+    if (!hasWebPort) {
+      notes.push(t("auto.template_notice_non_http_service"));
+    }
+    return notes;
+  };
+  const templateDisclaimers = selectedTemplate ? getTemplateDisclaimers(selectedTemplate) : [];
 
   return (
     <div className="p-8 max-w-7xl mx-auto w-full">
@@ -485,6 +510,19 @@ const Marketplace = () => {const { t } = useTranslation();
                     
                                             <p className="text-xs text-slate-500 mt-2">{t("auto.used_as_a_prefix_for_your_deployed_conta")}</p>
                                         </div>
+
+                                        {templateDisclaimers.length > 0 && (
+                                          <div className="rounded-sm border border-amber-300/60 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/15 p-3">
+                                            <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
+                                              {t("auto.template_deployment_notes")}
+                                            </p>
+                                            <ul className="space-y-1">
+                                              {templateDisclaimers.map((note, idx) => (
+                                                <li key={idx} className="text-xs text-amber-800 dark:text-amber-300 leading-relaxed">- {note}</li>
+                                              ))}
+                                            </ul>
+                                          </div>
+                                        )}
 
                                     </div>
                                 </div>

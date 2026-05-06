@@ -16,6 +16,12 @@ const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_H
 
 router.use(authMiddleware);
 
+const buildTraefikAppId = (domain, fallbackName = 'app') => {
+    const base = (domain || fallbackName || 'app').toString();
+    const id = base.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return id || `app${Date.now()}`;
+};
+
 router.post('/deploy', async (req, res) => {
     let tmpDir = null;
     try {
@@ -87,7 +93,7 @@ router.post('/deploy', async (req, res) => {
         // ==========================================
         // DEPLOY CONTAINER
         // ==========================================
-        const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
+        const appId = buildTraefikAppId(domain, name);
 
         // Prepare Traefik Labels
         const Labels = {};
