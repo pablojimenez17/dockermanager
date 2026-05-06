@@ -588,6 +588,24 @@ Ejemplos:
 - El dominio solo se define en creación del contenedor.
 - El endpoint de edición rechaza cambios de `domain/domainPort`.
 
+**Resolución de certificados TLS (`NET::ERR_CERT_AUTHORITY_INVALID`):**
+- Causa detectada: algunos contenedores públicos antiguos quedaron etiquetados con `traefik.constraint-label=lan-proxy` mientras el TLS público (443) termina en `proxy-inverso` (`dmz-proxy`), generando certificado por defecto/no válido.
+- Estado actual (corregido): los nuevos contenedores públicos se crean con:
+  - `traefik.constraint-label=dmz-proxy`
+  - `traefik.http.routers.<id>.entrypoints=web,websecure`
+  - `traefik.http.routers.<id>.tls.certresolver=letsencrypt`
+- Importante: los contenedores creados antes de este fix no se actualizan solos. Deben recrearse para regenerar labels y certificado correcto.
+
+**Checklist de diagnóstico rápido si persiste:**
+1. Verificar wildcard DNS: `*.orbitcloud.app` apuntando a la IP del VPS.
+2. Verificar que Traefik tenga el resolver ACME `letsencrypt` activo.
+3. Recrear el contenedor público afectado (manteniendo volumen si aplica).
+4. Esperar emisión ACME inicial (puede tardar unos segundos/minutos).
+
+**Marketplace (ajuste de UX):**
+- Se eliminó el mapeo manual `HOST:CONTENEDOR` de la modal de despliegue.
+- Con `Public access`, la exposición se controla únicamente con `Internal app port`.
+
 ### 🌐 Infraestructura (`/api/networks`, `/api/volumes`)
 - `POST /networks`: { `name`, `subnet` (opcional), `isInternal` } -> Genera subnet determinista.
 - `POST /volumes`: **(Punto Crítico de Cuotas)** { `name`, `sizeMb` } -> Bloqueado si excede el `maxVolumes` o la sumatoria global roza `maxVolumeSizeMb`.

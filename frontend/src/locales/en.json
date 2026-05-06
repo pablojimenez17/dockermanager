@@ -579,6 +579,8 @@
     "public_access_auto_domain": "If enabled, Orbit automatically assigns `{name}.{user}.orbitcloud.app`.",
     "public_access_info": "Publishes your service on the Internet using an automatic domain and HTTPS through Traefik. To use it, enable this option and set the internal app port (for example 3000 or 80).",
     "internal_app_port": "Internal app port",
+    "public_domain_certificate_notice": "If you just created a public domain, SSL certificate issuance can take 30 to 90 seconds. If you see a certificate error, wait a moment and reload.",
+    "env_validation_required_value": "You cannot deploy with incomplete environment variables: if Secret is selected you must choose one, and Raw values cannot be empty.",
     "internet_enabled_warning": "When Internet access is enabled, your container can make external connections. Use it at your own risk.",
     "private_container_description": "Your container is fully isolated. It can only communicate with your other services."
   }

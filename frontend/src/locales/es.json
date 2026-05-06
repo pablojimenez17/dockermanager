@@ -585,6 +585,8 @@
     "public_access_auto_domain": "Si lo activas, Orbit asigna automaticamente `{name}.{user}.orbitcloud.app`.",
     "public_access_info": "Publica tu servicio en Internet usando un dominio automatico y HTTPS con Traefik. Para usarlo, activa esta opcion y define el puerto interno donde escucha tu app (por ejemplo 3000 o 80).",
     "internal_app_port": "Puerto interno de la app",
+    "public_domain_certificate_notice": "Si acabas de crear un dominio publico, el certificado SSL puede tardar entre 30 y 90 segundos en emitirse. Si ves error de certificado, espera un momento y recarga.",
+    "env_validation_required_value": "No puedes desplegar con variables incompletas: si eliges Secret debes seleccionar uno, y en Raw el valor no puede estar vacio.",
     "internet_enabled_warning": "Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Usalo bajo tu responsabilidad.",
     "private_container_description": "Tu contenedor esta completamente aislado. Solo puede comunicarse con tus otros servicios."
   }

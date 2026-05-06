@@ -16,7 +16,6 @@ const Marketplace = () => {const { t } = useTranslation();
 
   // Deployment state
   const [customAppName, setCustomAppName] = useState('');
-  const [portHostValues, setPortHostValues] = useState({});
 
   // Unified env inputs: { KEY: { type: 'raw'|'secret', value: '' } }
   const [envFields, setEnvFields] = useState({});
@@ -205,14 +204,6 @@ const Marketplace = () => {const { t } = useTranslation();
 
     setSelectedTemplate(template);
     setCustomAppName('');
-    // Initialize port mappings (host -> container)
-    const initialPorts = {};
-    template.containers.forEach((c, cIdx) => {
-      (c.ports || []).forEach((p) => {
-        initialPorts[`${cIdx}_${p.container}`] = p.host || '';
-      });
-    });
-    setPortHostValues(initialPorts);
     setMemoryLimit(512);
     setCpuLimit(1);
     setEnableInternet(false);
@@ -227,7 +218,6 @@ const Marketplace = () => {const { t } = useTranslation();
     setCustomAppName('');
     setEnvFields({});
     setVolumeMounts([]);
-    setPortHostValues({});
     setEnableInternet(false);
     setIsPublic(false);
     setInternalPort('');
@@ -241,12 +231,23 @@ const Marketplace = () => {const { t } = useTranslation();
     }));
   };
 
+  const isInvalidEnvField = (field) => {
+    const value = (field?.value ?? '').toString().trim();
+    if (field?.type === 'secret') return value === '';
+    return value === '';
+  };
+
   const handleDeploy = async (e) => {
     e.preventDefault();
     setDeploying(true);
     try {
+      const invalidEnvField = configuredEnvFields.find(([, field]) => isInvalidEnvField(field));
+      if (invalidEnvField) {
+        throw new Error(t("auto.env_validation_required_value"));
+      }
+
       // Transform the template containers into the precise format expected by POST /api/containers (the "CreateContainer" style)
-      const stack = selectedTemplate.containers.map((cDef, cIdx) => {
+      const stack = selectedTemplate.containers.map((cDef) => {
         // Generate a unique name for this node
         let nodeName = `${cDef.name_prefix}-${Math.random().toString(36).substring(7)}`;
         if (customAppName && customAppName.trim() !== '') {
@@ -289,10 +290,7 @@ const Marketplace = () => {const { t } = useTranslation();
           name: nodeName,
           image: cDef.image,
           replicas: 1,
-          ports: cDef.ports?.map((p) => {
-            const host = portHostValues[`${cIdx}_${p.container}`] ?? '';
-            return `${host}:${p.container}`;
-          }),
+          ports: [],
           env: finalEnv,
           volumes: finalVolumes,
           memory: memoryLimit.toString(),
@@ -488,55 +486,6 @@ const Marketplace = () => {const { t } = useTranslation();
                                             <p className="text-xs text-slate-500 mt-2">{t("auto.used_as_a_prefix_for_your_deployed_conta")}</p>
                                         </div>
 
-                                        <div>
-                                          <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">
-                                            {t("auto.ports")} (HOST:CONTENEDOR)
-                                          </label>
-                                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1.5 mb-3">
-                                            Configura qué puertos del host se enlazan a los puertos del contenedor.
-                                            Si dejas Host vacío, el puerto del contenedor no se expondrá al host.
-                                          </p>
-
-                                          <div className="space-y-3">
-                                            {selectedTemplate.containers.map((cDef, cIdx) => (
-                                              <div key={cDef.name_prefix} className="bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-sm p-3">
-                                                <div className="text-xs font-semibold text-slate-700 dark:text-slate-200 mb-2 font-mono">
-                                                  {cDef.name_prefix}
-                                                </div>
-
-                                                {(cDef.ports || []).length === 0 ? (
-                                                  <div className="text-xs text-slate-500 dark:text-slate-400">
-                                                    No hay puertos definidos en este contenedor.
-                                                  </div>
-                                                ) : (
-                                                  <div className="space-y-2">
-                                                    {(cDef.ports || []).map((p) => (
-                                                      <div key={`${cIdx}_${p.container}`} className="flex items-center gap-3">
-                                                        <div className="text-xs text-slate-500 dark:text-slate-400 w-16">Host</div>
-                                                        <input
-                                                          type="number"
-                                                          value={portHostValues[`${cIdx}_${p.container}`] ?? ''}
-                                                          onChange={(e) => {
-                                                            const v = e.target.value;
-                                                            setPortHostValues((prev) => ({
-                                                              ...prev,
-                                                              [`${cIdx}_${p.container}`]: v
-                                                            }));
-                                                          }}
-                                                          placeholder="(opcional)"
-                                                          className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-3 py-2 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50 text-sm"
-                                                        />
-                                                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono">
-                                                          :{p.container}
-                                                        </div>
-                                                      </div>
-                                                    ))}
-                                                  </div>
-                                                )}
-                                              </div>
-                                            ))}
-                                          </div>
-                                        </div>
                                     </div>
                                 </div>
 
@@ -557,7 +506,7 @@ const Marketplace = () => {const { t } = useTranslation();
                     
                                                     <span className="text-slate-400 dark:text-slate-500 font-bold hidden sm:inline">=</span>
                                                     {/* Type + Value */}
-                                                    <div className="flex flex-1 bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm overflow-hidden focus-within:ring-1 focus-within:ring-brand-500">
+                                                    <div className={`flex flex-1 bg-white dark:bg-slate-900 border rounded-sm overflow-hidden focus-within:ring-1 focus-within:ring-brand-500 ${isInvalidEnvField(field) ? 'border-red-400 dark:border-red-500' : 'border-slate-300 dark:border-slate-600'}`}>
                                                         <select
                         value={field.type}
                         onChange={(e) => updateEnvField(key, 'type', e.target.value)}

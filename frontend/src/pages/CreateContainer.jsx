@@ -137,6 +137,12 @@ const CreateContainer = () => {
     }
   };
 
+  const isInvalidEnvVar = (env) => {
+    if (env.key.trim() === '') return false;
+    if (env.type === 'secret') return env.value.trim() === '';
+    return env.value.trim() === '';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -144,6 +150,11 @@ const CreateContainer = () => {
 
     try {
       const payload = containers.map((c) => {
+        const invalidEnv = c.envVars.find((env) => isInvalidEnvVar(env));
+        if (invalidEnv) {
+          throw new Error(t("auto.env_validation_required_value"));
+        }
+
         const validEnvVars = c.envVars.
           filter((env) => env.key.trim() !== '').
           map((env) => env.type === 'secret' ? `${env.key.trim()}={{SECRET:${env.value.trim()}}}` : `${env.key.trim()}=${env.value.trim()}`);
@@ -403,17 +414,17 @@ const CreateContainer = () => {
                           {c.envVars.map((env, eIdx) =>
                             <div key={eIdx} className="flex space-x-2">
                               <input type="text" placeholder={t("auto.key")} value={env.key} onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)} className="w-1/3 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
-                              <select value={env.type} onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)} className="w-24 px-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-xs">
+                              <select value={env.type} onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)} className={`w-24 px-2 border rounded bg-white dark:bg-slate-900 text-xs ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`}>
                                 <option value="raw">{t("auto.raw")}</option>
                                 <option value="secret">{t("auto.secret")}</option>
                               </select>
                               {env.type === 'secret' ?
-                                <select value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono">
+                                <select value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className={`flex-1 px-3 py-1.5 border rounded bg-white dark:bg-slate-900 text-sm font-mono ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`}>
                                   <option value="">{t("auto.select_secret")}</option>
                                   {availableSecrets.map((sec) => <option key={sec._id} value={sec.name}>{sec.name}</option>)}
                                 </select> :
 
-                                <input type="text" placeholder={t("auto.value")} value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
+                                <input type="text" placeholder={t("auto.value")} value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className={`flex-1 px-3 py-1.5 border rounded bg-white dark:bg-slate-900 text-sm font-mono ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`} />
                               }
                               <button type="button" onClick={() => removeEnvVar(c.id, eIdx)} className="p-1.5 text-gray-400 hover:text-red-500 rounded"><Trash2 size={16} /></button>
                             </div>
@@ -438,6 +449,11 @@ const CreateContainer = () => {
             {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white rounded-full"></span> : 'Deploy'}
           </button>
         </div>
+
+        <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start">
+          <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+          {t("auto.public_domain_certificate_notice")}
+        </p>
       </form>
     </div>);
 
