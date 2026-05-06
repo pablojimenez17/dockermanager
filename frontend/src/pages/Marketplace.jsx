@@ -30,6 +30,7 @@ const Marketplace = () => {const { t } = useTranslation();
   const [cpuLimit, setCpuLimit] = useState(1); // Cores
   const [isPublic, setIsPublic] = useState(false);
   const [internalPort, setInternalPort] = useState('');
+  const [freshData, setFreshData] = useState(false);
 
   // Volume Mounts State
   const [availableVolumes, setAvailableVolumes] = useState([]);
@@ -211,6 +212,7 @@ const Marketplace = () => {const { t } = useTranslation();
     setEnableInternet(false);
     setIsPublic(false);
     setInternalPort('');
+    setFreshData(false);
     setSelectedNetwork('bridge');
     setExtraNetworks([]);
   };
@@ -223,6 +225,7 @@ const Marketplace = () => {const { t } = useTranslation();
     setEnableInternet(false);
     setIsPublic(false);
     setInternalPort('');
+    setFreshData(false);
     setExtraNetworks([]);
   };
 
@@ -280,14 +283,16 @@ const Marketplace = () => {const { t } = useTranslation();
 
         // Compile volume mounts
         const finalVolumes = [];
-        volumeMounts.filter((m) => m.nodeIndex === selectedTemplate.containers.indexOf(cDef) && m.volumeName !== '').forEach((m) => {
-          if (m.containerPath && m.containerPath.trim() !== '') {
-            finalVolumes.push({
-              source: m.volumeName,
-              target: m.containerPath.trim()
-            });
-          }
-        });
+        if (!freshData) {
+          volumeMounts.filter((m) => m.nodeIndex === selectedTemplate.containers.indexOf(cDef) && m.volumeName !== '').forEach((m) => {
+            if (m.containerPath && m.containerPath.trim() !== '') {
+              finalVolumes.push({
+                source: m.volumeName,
+                target: m.containerPath.trim()
+              });
+            }
+          });
+        }
 
         return {
           name: nodeName,
@@ -433,7 +438,7 @@ const Marketplace = () => {const { t } = useTranslation();
                                 </h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                                     {catTemplates.map((template) =>
-            <div key={template.id} className="bg-white dark:bg-slate-800 rounded-sm border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm hover:shadow-sm transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group" onClick={() => openTemplate(template)}>
+            <div key={template.id} className={`bg-white dark:bg-slate-800 rounded-sm border overflow-hidden shadow-sm hover:shadow-sm transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group ${selectedTemplate?.id === template.id ? 'border-brand-500 ring-1 ring-brand-400/60' : 'border-slate-200 dark:border-slate-700'}`} onClick={() => openTemplate(template)}>
                                             <div className="p-6 flex-1">
                                                 <div className="w-14 h-14 bg-slate-50 dark:bg-slate-900 rounded-sm flex items-center justify-center p-3 mb-4 border border-slate-100 dark:border-slate-800 group-hover:scale-110 transition-transform">
                                                     <img
@@ -467,10 +472,10 @@ const Marketplace = () => {const { t } = useTranslation();
                 </div>
       }
 
-            {/* Deployment Modal */}
+            {/* Deployment Builder */}
             {selectedTemplate &&
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 dark:bg-black/80 backdrop-blur-sm p-4">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-xl rounded-sm shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="mt-8">
+                    <div className="bg-white dark:bg-slate-800 w-full rounded-sm shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
                         {/* Header */}
                         <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-start bg-slate-50 dark:bg-slate-900/50">
                             <div className="flex items-center space-x-4">
@@ -492,7 +497,7 @@ const Marketplace = () => {const { t } = useTranslation();
                         </div>
 
                         {/* Body */}
-                        <div className="p-6 overflow-y-auto">
+                        <div className="p-6">
                             <form onSubmit={handleDeploy} id="deployForm" className="space-y-6">
 
                                 {/* Section 1: App config */}
@@ -776,6 +781,21 @@ const Marketplace = () => {const { t } = useTranslation();
                     
                                             <Plus size={14} className="mr-1" /> {t("auto.add_mount")}
                                         </button>
+                                    </div>
+                                    <div className="mb-4 rounded-sm border border-amber-300/60 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/15 p-3">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <p className="text-sm font-semibold text-amber-700 dark:text-amber-300">{t("auto.fresh_data_mode")}</p>
+                                          <p className="text-xs text-amber-800 dark:text-amber-400">{t("auto.fresh_data_mode_description")}</p>
+                                        </div>
+                                        <button
+                                          type="button"
+                                          onClick={() => setFreshData((v) => !v)}
+                                          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${freshData ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                        >
+                                          <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${freshData ? 'translate-x-6' : 'translate-x-1'}`} />
+                                        </button>
+                                      </div>
                                     </div>
                                     <p className="text-xs text-slate-500 dark:text-slate-400 mb-4">{t("auto.select_existing_disks_to_persist_databas")}</p>
 

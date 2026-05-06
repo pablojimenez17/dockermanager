@@ -590,6 +590,8 @@
     "template_notice_volume_persistence_credentials": "Si reutilizas un volumen persistente, credenciales y configuraciones iniciales pueden no aplicarse otra vez porque el servicio conserva su estado anterior.",
     "template_notice_grafana_credentials_first_boot": "En Grafana, GF_SECURITY_ADMIN_USER y GF_SECURITY_ADMIN_PASSWORD se aplican solo en el primer arranque con almacenamiento vacio. Si el volumen ya tiene datos, usa las credenciales anteriores o un volumen nuevo.",
     "template_notice_non_http_service": "Este servicio no es HTTP puro (ej. base de datos o juego). El dominio publico de Traefik puede no ser suficiente para clientes TCP nativos.",
+    "fresh_data_mode": "Modo datos limpios",
+    "fresh_data_mode_description": "Desactiva reutilizacion de volumenes para este despliegue y fuerza inicializacion limpia (util cuando cambias credenciales iniciales).",
     "env_validation_required_value": "No puedes desplegar con variables incompletas: si eliges Secret debes seleccionar uno, y en Raw el valor no puede estar vacio.",
     "internet_enabled_warning": "Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Usalo bajo tu responsabilidad.",
     "private_container_description": "Tu contenedor esta completamente aislado. Solo puede comunicarse con tus otros servicios."

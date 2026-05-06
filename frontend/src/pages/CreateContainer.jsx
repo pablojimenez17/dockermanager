@@ -19,6 +19,7 @@ const getEmptyContainer = () => ({
   ipv4Address: '',
   isPublic: false,
   internalPort: '',
+  freshData: false,
   envVars: [{ key: '', value: '', type: 'raw' }],
   showAdvanced: false,
   volumeName: '',
@@ -173,8 +174,8 @@ const CreateContainer = () => {
           ipv4Address: c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' ? c.ipv4Address : undefined,
           isPublic: c.isPublic === true,
           internalPort: c.isPublic ? c.internalPort : undefined,
-          volumeName: c.volumeName && c.volumeMountPath ? c.volumeName : undefined,
-          volumeMountPath: c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined
+          volumeName: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeName : undefined),
+          volumeMountPath: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined)
         };
       });
       await axios.post('/api/containers', { stack: payload });
@@ -406,6 +407,22 @@ const CreateContainer = () => {
                             <input type="text" value={c.volumeMountPath || ''} onChange={(e) => updateContainer(c.id, 'volumeMountPath', e.target.value)} placeholder={t("auto._data")} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
                           </div>
                         }
+                      </div>
+
+                      <div className="rounded border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t("auto.fresh_data_mode")}</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400">{t("auto.fresh_data_mode_description")}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateContainer(c.id, 'freshData', !c.freshData)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${c.freshData ? 'bg-amber-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${c.freshData ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
                       </div>
 
                       <div>

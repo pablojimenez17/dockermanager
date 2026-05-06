@@ -584,6 +584,8 @@
     "template_notice_volume_persistence_credentials": "If you reuse a persistent volume, initial credentials and setup variables may not be applied again because the service keeps its previous state.",
     "template_notice_grafana_credentials_first_boot": "In Grafana, GF_SECURITY_ADMIN_USER and GF_SECURITY_ADMIN_PASSWORD are applied only on first boot with empty storage. If the volume already has data, use previous credentials or a new volume.",
     "template_notice_non_http_service": "This service is not pure HTTP (e.g. database or game server). Traefik public domain routing may not be enough for native TCP clients.",
+    "fresh_data_mode": "Fresh data mode",
+    "fresh_data_mode_description": "Disables volume reuse for this deployment and forces a clean initialization (useful when changing first-boot credentials).",
     "env_validation_required_value": "You cannot deploy with incomplete environment variables: if Secret is selected you must choose one, and Raw values cannot be empty.",
     "internet_enabled_warning": "When Internet access is enabled, your container can make external connections. Use it at your own risk.",
     "private_container_description": "Your container is fully isolated. It can only communicate with your other services."
