@@ -30,7 +30,7 @@ const Marketplace = () => {const { t } = useTranslation();
   const [cpuLimit, setCpuLimit] = useState(1); // Cores
   const [isPublic, setIsPublic] = useState(false);
   const [internalPort, setInternalPort] = useState('');
-  const [freshData, setFreshData] = useState(false);
+  
 
   // Volume Mounts State
   const [availableVolumes, setAvailableVolumes] = useState([]);
@@ -212,7 +212,6 @@ const Marketplace = () => {const { t } = useTranslation();
     setEnableInternet(false);
     setIsPublic(false);
     setInternalPort('');
-    setFreshData(false);
     setSelectedNetwork('bridge');
     setExtraNetworks([]);
   };
@@ -225,7 +224,6 @@ const Marketplace = () => {const { t } = useTranslation();
     setEnableInternet(false);
     setIsPublic(false);
     setInternalPort('');
-    setFreshData(false);
     setExtraNetworks([]);
   };
 
@@ -283,16 +281,14 @@ const Marketplace = () => {const { t } = useTranslation();
 
         // Compile volume mounts
         const finalVolumes = [];
-        if (!freshData) {
-          volumeMounts.filter((m) => m.nodeIndex === selectedTemplate.containers.indexOf(cDef) && m.volumeName !== '').forEach((m) => {
-            if (m.containerPath && m.containerPath.trim() !== '') {
-              finalVolumes.push({
-                source: m.volumeName,
-                target: m.containerPath.trim()
-              });
-            }
-          });
-        }
+        volumeMounts.filter((m) => m.nodeIndex === selectedTemplate.containers.indexOf(cDef) && m.volumeName !== '').forEach((m) => {
+          if (m.containerPath && m.containerPath.trim() !== '') {
+            finalVolumes.push({
+              source: m.volumeName,
+              target: m.containerPath.trim()
+            });
+          }
+        });
 
         return {
           name: nodeName,
