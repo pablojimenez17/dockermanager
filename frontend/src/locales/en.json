@@ -574,6 +574,12 @@
     "change_plan_scheduled_note": "This downgrade will be scheduled and applied at the end of the billing cycle.",
     "plan_change_scheduled_title": "Plan change scheduled",
     "plan_cancelled_title": "Plan cancelled",
-    "failed_to_cancel_plan": "Failed to cancel plan"
+    "failed_to_cancel_plan": "Failed to cancel plan",
+    "public_access": "Public access",
+    "public_access_auto_domain": "If enabled, Orbit automatically assigns `{name}.{user}.orbitcloud.app`.",
+    "public_access_info": "Publishes your service on the Internet using an automatic domain and HTTPS through Traefik. To use it, enable this option and set the internal app port (for example 3000 or 80).",
+    "internal_app_port": "Internal app port",
+    "internet_enabled_warning": "When Internet access is enabled, your container can make external connections. Use it at your own risk.",
+    "private_container_description": "Your container is fully isolated. It can only communicate with your other services."
   }
 }

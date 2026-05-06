@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
-import { Server, Play, Square, Trash2, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, Network, Settings, Camera, Search, MoreVertical } from 'lucide-react';
+import { Server, Play, Square, Trash2, RefreshCw, Terminal, Activity, AlertTriangle, MonitorPlay, ChevronDown, ChevronUp, Network, Camera, Search, MoreVertical } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
 import TerminalModal from '../components/TerminalModal';
@@ -22,11 +22,6 @@ const ViewContainers = () => {const { t } = useTranslation();
   const [expandedContainers, setExpandedContainers] = useState({});
   const [containerStats, setContainerStats] = useState({});
 
-  // Edit Modal State
-  const [editModalOpen, setEditModalOpen] = useState(false);
-  const [editingContainer, setEditingContainer] = useState(null);
-  const [editDomain, setEditDomain] = useState('');
-  const [editPort, setEditPort] = useState('');
   const [redeployConfirm, setRedeployConfirm] = useState(null);
 
   // Snapshot Modal State
@@ -125,30 +120,6 @@ const ViewContainers = () => {const { t } = useTranslation();
     }
   };
 
-  const openEditModal = (container) => {
-    setEditingContainer(container);
-    setEditDomain(container.domain || '');
-    const guessedPort = container.ports && Object.keys(container.ports).length > 0 ?
-    Object.keys(container.ports)[0].split('/')[0] :
-    '80';
-    setEditPort(guessedPort);
-    setEditModalOpen(true);
-  };
-
-  const submitEdit = async (e) => {
-    e.preventDefault();
-    try {
-      setEditModalOpen(false);
-      await axios.put(`/api/containers/${editingContainer._id}/edit`, {
-        domain: editDomain,
-        domainPort: editPort
-      });
-      addToast('Success', 'Routing updated.', 'success');
-      fetchContainers();
-    } catch (err) {
-      addToast('Error', err.response?.data?.message || 'Update failed.', 'error');
-    }
-  };
 
   const openSnapshotModal = (container) => {
     if (!userLimits || userLimits.maxSnapshots === 0) {
@@ -347,9 +318,6 @@ const ViewContainers = () => {const { t } = useTranslation();
                                                     </button>
                                                     <div className="origin-top-right absolute right-0 mt-1 w-48 rounded shadow-sm bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 ring-1 ring-black ring-opacity-5 invisible group-hover:visible opacity-0 group-hover:opacity-100 transition-all z-[100]">
                                                         <div className="py-1">
-                                                            <button onClick={() => openEditModal(container)} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700">
-                                                                <Settings size={14} className="mr-2" /> {t("auto.networking")}
-                                                            </button>
                                                             <button onClick={() => openSnapshotModal(container)} className="flex w-full items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-slate-700">
                                                                 <Camera size={14} className="mr-2" /> {t("auto.snapshot")}
                                                             </button>
@@ -410,35 +378,6 @@ const ViewContainers = () => {const { t } = useTranslation();
             {/* Terminal Modal */}
             {activeTerminal &&
       <TerminalModal containerId={activeTerminal.id} containerName={activeTerminal.name} onClose={() => setActiveTerminal(null)} />
-      }
-
-            {/* Edit / Settings Modal */}
-            {editModalOpen && editingContainer &&
-      <div className="fixed inset-0 bg-gray-900/50 dark:bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-                    <div className="bg-white dark:bg-slate-800 w-full max-w-lg rounded shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200 dark:border-slate-700">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t("auto.network_settings")}</h3>
-                        </div>
-                        <form onSubmit={submitEdit} className="p-6">
-                            <div className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.domain")}</label>
-                                    <input type="text" value={editDomain} onChange={(e) => setEditDomain(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-1 focus:ring-brand-500 outline-none text-sm" />
-                                </div>
-                                {editDomain.trim() !== '' &&
-              <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.internal_port")}</label>
-                                        <input type="number" value={editPort} onChange={(e) => setEditPort(e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-gray-900 dark:text-white focus:ring-1 focus:ring-brand-500 outline-none text-sm" />
-                                    </div>
-              }
-                            </div>
-                            <div className="mt-6 flex justify-end space-x-3">
-                                <button type="button" onClick={() => setEditModalOpen(false)} className="btn-secondary">{t("auto.cancel")}</button>
-                                <button type="submit" className="btn-primary">{t("auto.save_changes")}</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
       }
 
             {/* Redeploy Modal */}

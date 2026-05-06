@@ -549,6 +549,45 @@ A excepción del login y verificación, todos los endpoints exigen el header `Au
 - `DELETE /:id`: { `force: true/false` } -> Purgado total en host físico y BD.
 - `POST /:id/snapshot`: **(Punto de Cuota)** Valida `maxSnapshots` y realiza un `docker commit`.
 
+#### Dominios dinámicos por servicio (nuevo)
+
+OrbitCloud ahora genera dominios públicos automáticamente por contenedor solo durante la creación (Create Container y Marketplace):
+
+```txt
+{nombre}.{usuario}.orbitcloud.app
+```
+
+Ejemplos:
+- `grafana.pablo.orbitcloud.app`
+- `minecraft.user123.orbitcloud.app`
+
+**Reglas de generación en backend:**
+- `nombre` se sanitiza (`lowercase`, sin espacios, solo `[a-z0-9-]`, sin vacío).
+- `usuario` se toma del prefijo del email (antes de `@`), con fallback a `userId`.
+- Se bloquean subdominios reservados: `admin`, `api`, `www`.
+- El dominio es único global en BD (`Container.domain` con `unique + index`).
+- Si hay colisión se auto-sufija: `-1`, `-2`, etc.
+
+**Exposición pública controlada (`public access`):**
+- El frontend envía `isPublic` + `internalPort` al crear.
+- Solo si `isPublic=true`, backend:
+  - genera el dominio automático,
+  - inyecta labels de Traefik,
+  - conecta el servicio al flujo de publicación.
+- Si `isPublic=false`, no se generan labels ni dominio.
+
+**Labels Traefik aplicadas:**
+- `traefik.enable=true`
+- `traefik.http.routers.<id>.rule=Host(\`<domain>\`)`
+- `traefik.http.routers.<id>.entrypoints=web,websecure`
+- `traefik.http.routers.<id>.tls.certresolver=letsencrypt`
+- `traefik.http.services.<id>.loadbalancer.server.port=<internalPort>`
+
+**Restricción de UI/UX:**
+- `Instances` ya no permite editar networking/dominio.
+- El dominio solo se define en creación del contenedor.
+- El endpoint de edición rechaza cambios de `domain/domainPort`.
+
 ### 🌐 Infraestructura (`/api/networks`, `/api/volumes`)
 - `POST /networks`: { `name`, `subnet` (opcional), `isInternal` } -> Genera subnet determinista.
 - `POST /volumes`: **(Punto Crítico de Cuotas)** { `name`, `sizeMb` } -> Bloqueado si excede el `maxVolumes` o la sumatoria global roza `maxVolumeSizeMb`.

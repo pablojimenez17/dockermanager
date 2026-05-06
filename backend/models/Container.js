@@ -29,7 +29,17 @@ const containerSchema = new mongoose.Schema({
     },
     domain: {
         type: String,
-        trim: true
+        trim: true,
+        unique: true,
+        sparse: true,
+        index: true
+    },
+    isPublic: {
+        type: Boolean,
+        default: false
+    },
+    internalPort: {
+        type: Number
     },
     deployedViaGit: {
         type: Boolean,

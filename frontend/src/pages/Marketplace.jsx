@@ -28,6 +28,8 @@ const Marketplace = () => {const { t } = useTranslation();
   const [enableInternet, setEnableInternet] = useState(false); // Internet access toggle
   const [memoryLimit, setMemoryLimit] = useState(512); // MB
   const [cpuLimit, setCpuLimit] = useState(1); // Cores
+  const [isPublic, setIsPublic] = useState(false);
+  const [internalPort, setInternalPort] = useState('');
 
   // Volume Mounts State
   const [availableVolumes, setAvailableVolumes] = useState([]);
@@ -214,6 +216,8 @@ const Marketplace = () => {const { t } = useTranslation();
     setMemoryLimit(512);
     setCpuLimit(1);
     setEnableInternet(false);
+    setIsPublic(false);
+    setInternalPort('');
     setSelectedNetwork('bridge');
     setExtraNetworks([]);
   };
@@ -225,6 +229,8 @@ const Marketplace = () => {const { t } = useTranslation();
     setVolumeMounts([]);
     setPortHostValues({});
     setEnableInternet(false);
+    setIsPublic(false);
+    setInternalPort('');
     setExtraNetworks([]);
   };
 
@@ -295,6 +301,8 @@ const Marketplace = () => {const { t } = useTranslation();
           enableInternet, // VPC internet toggle
           extraNetworks,  // additional networks to join
           restartPolicy: "unless-stopped",
+          isPublic,
+          internalPort: isPublic ? internalPort : undefined,
         };
       });
 
@@ -620,6 +628,44 @@ const Marketplace = () => {const { t } = useTranslation();
                                                 {t("auto.la_vpc_te_a_sla_de_otros_usuarios_sin_re")}
                                             </p>
 
+                                            <div className="mt-3 border border-slate-200 dark:border-slate-700 rounded-sm p-3">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center">
+                                                            {t("auto.public_access")}
+                                                            <div className="relative group/tooltip ml-2 flex items-center">
+                                                                <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                                                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-64 text-center z-[100] font-medium shadow-sm leading-relaxed">
+                                                                    {t("auto.public_access_info")}
+                                                                </div>
+                                                            </div>
+                                                        </p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t("auto.public_access_auto_domain")}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setIsPublic((v) => !v)}
+                                                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                                    >
+                                                        <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                                                    </button>
+                                                </div>
+                                                {isPublic && (
+                                                    <div className="mt-3">
+                                                        <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">{t("auto.internal_app_port")}</label>
+                                                        <input
+                                                            type="number"
+                                                            min="1"
+                                                            required={isPublic}
+                                                            value={internalPort}
+                                                            onChange={(e) => setInternalPort(e.target.value)}
+                                                            placeholder={t("auto.e_g_3000")}
+                                                            className="w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-sm px-4 py-2.5 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-500/50"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
+
                                             {/* ── Additional Networks ───────────────────────── */}
                                             {selectedNetwork !== 'none' && (
                                               <div className="mt-3">
@@ -682,8 +728,8 @@ const Marketplace = () => {const { t } = useTranslation();
                                                     </p>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                                         {enableInternet ?
-                                                          '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.' :
-                                                          'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'
+                                                          t("auto.internet_enabled_warning") :
+                                                          t("auto.private_container_description")
                                                         }
                                                     </p>
                                                 </div>
