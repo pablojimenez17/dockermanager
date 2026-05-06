@@ -72,23 +72,27 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
  */
 const attachProxyToVpc = async (networkName) => {
     try {
-        const containers = await docker.listContainers({
-            filters: { name: ['dockermanager-lan-proxy'] }
+        const preferred = await docker.listContainers({
+            filters: { name: ['dockermanager-proxy'] }
         });
-        if (containers.length === 0) {
-            console.warn('[VPC] lan-proxy not found, skipping proxy attach.');
+        const fallback = preferred.length === 0
+            ? await docker.listContainers({ filters: { name: ['dockermanager-lan-proxy'] } })
+            : [];
+        const proxyContainer = preferred[0] || fallback[0];
+        if (!proxyContainer) {
+            console.warn('[VPC] No proxy container found, skipping proxy attach.');
             return;
         }
-        const proxyId = containers[0].Id;
+        const proxyId = proxyContainer.Id;
         const network = docker.getNetwork(networkName);
         const netInfo = await network.inspect();
         const alreadyConnected = Object.keys(netInfo.Containers || {}).includes(proxyId);
         if (!alreadyConnected) {
-            console.log(`[VPC] Attaching lan-proxy to ${networkName} for domain routing`);
+            console.log(`[VPC] Attaching proxy to ${networkName} for domain routing`);
             await network.connect({ Container: proxyId });
         }
     } catch (err) {
-        console.warn(`[VPC] Could not attach lan-proxy to ${networkName}:`, err.message);
+        console.warn(`[VPC] Could not attach proxy to ${networkName}:`, err.message);
     }
 };
 // ============================================================
@@ -556,7 +560,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
                 containerConfig.Labels = {
                     'traefik.enable': 'true',
-                    'traefik.constraint-label': 'lan-proxy',
+                    'traefik.constraint-label': 'dmz-proxy',
                     [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                     [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
                     [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
@@ -921,10 +925,12 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
             newLabels = {
                 ...newLabels,
                 'traefik.enable': 'true',
-                'traefik.constraint-label': 'lan-proxy',
+                'traefik.constraint-label': 'dmz-proxy',
                 [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                 [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
-                'traefik.docker.network': 'lan_net' // default assumption for new architecture
+                'traefik.docker.network': 'lan_net', // fallback if no specific network found
+                [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
+                [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
             };
 
             // If it had a custom network in oldConfig, use it
