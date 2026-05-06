@@ -47,15 +47,27 @@ const PLANS = {
     }
 };
 
+const PLAN_PRIORITY = {
+    enterprise: 0,
+    agency: 1,
+    pro: 2,
+    free: 3
+};
+
+const isValidPlanType = (planType) => Object.prototype.hasOwnProperty.call(PLANS, planType);
+
 router.use(authMiddleware);
 
-// Upgrade user plan
+// Change user plan (upgrade immediate, downgrade scheduled)
 router.post('/upgrade', async (req, res) => {
     try {
         const { planType } = req.body;
 
-        if (!['free', 'pro', 'enterprise', 'agency'].includes(planType)) {
+        if (!isValidPlanType(planType)) {
             return res.status(400).json({ message: 'Invalid plan type selected.' });
+        }
+        if (planType === 'free') {
+            return res.status(400).json({ message: 'Free (Hobby) cannot be selected directly. Use cancel subscription instead.' });
         }
 
         const user = await User.findById(req.user.userId);
@@ -63,20 +75,61 @@ router.post('/upgrade', async (req, res) => {
             return res.status(404).json({ message: 'User not found.' });
         }
 
-        user.planType = planType;
-        user.autoRenew = true; // Ensure autoRenew is on when upgrading
-        // Mock auto-renewal one month from today
-        const expiration = new Date();
-        expiration.setMonth(expiration.getMonth() + 1);
-        user.planExpiresAt = expiration;
+        const currentPlan = user.planType || 'free';
+        const currentPriority = PLAN_PRIORITY[currentPlan];
+        const targetPriority = PLAN_PRIORITY[planType];
 
-        user.limits = PLANS[planType];
+        if (currentPriority === targetPriority) {
+            user.pendingPlanType = null;
+            user.planChangeAt = null;
+            await user.save();
 
+            return res.json({
+                message: `Your current plan is already ${planType}.`,
+                planType: user.planType,
+                pendingPlanType: user.pendingPlanType,
+                planChangeAt: user.planChangeAt,
+                autoRenew: user.autoRenew,
+                limits: user.limits,
+                planExpiresAt: user.planExpiresAt
+            });
+        }
+
+        const isUpgrade = targetPriority < currentPriority;
+
+        if (isUpgrade) {
+            user.planType = planType;
+            user.autoRenew = true;
+            const expiration = new Date();
+            expiration.setMonth(expiration.getMonth() + 1);
+            user.planExpiresAt = expiration;
+            user.pendingPlanType = null;
+            user.planChangeAt = null;
+            user.limits = PLANS[planType];
+            await user.save();
+
+            return res.json({
+                message: `Successfully upgraded to ${planType} plan.`,
+                planType: user.planType,
+                pendingPlanType: user.pendingPlanType,
+                planChangeAt: user.planChangeAt,
+                autoRenew: user.autoRenew,
+                limits: user.limits,
+                planExpiresAt: user.planExpiresAt
+            });
+        }
+
+        const effectiveDate = user.planExpiresAt || new Date();
+        user.pendingPlanType = planType;
+        user.planChangeAt = effectiveDate;
         await user.save();
 
         res.json({
-            message: `Successfully upgraded to ${planType} plan!`,
+            message: `Downgrade to ${planType} scheduled for end of billing cycle.`,
             planType: user.planType,
+            pendingPlanType: user.pendingPlanType,
+            planChangeAt: user.planChangeAt,
+            autoRenew: user.autoRenew,
             limits: user.limits,
             planExpiresAt: user.planExpiresAt
         });
@@ -86,7 +139,7 @@ router.post('/upgrade', async (req, res) => {
     }
 });
 
-// Cancel plan (disable auto-renew)
+// Cancel plan (schedule downgrade to free at cycle end)
 router.post('/cancel', async (req, res) => {
     try {
         const user = await User.findById(req.user.userId);
@@ -98,14 +151,19 @@ router.post('/cancel', async (req, res) => {
             return res.status(400).json({ message: 'You are already on the Free plan.' });
         }
 
-        // Only disable auto-renew. The Reaper Service will take care of downgrading when planExpiresAt passes.
         user.autoRenew = false;
+        user.pendingPlanType = 'free';
+        user.planChangeAt = user.planExpiresAt || new Date();
         await user.save();
 
         res.json({
-            message: 'Your plan has been cancelled and will not renew. You can keep using your resources until the end of the billing period.',
-            autoRenew: false,
-            planExpiresAt: user.planExpiresAt
+            message: 'Subscription cancelled. Your account will move to Hobby at the end of the billing cycle.',
+            planType: user.planType,
+            pendingPlanType: user.pendingPlanType,
+            planChangeAt: user.planChangeAt,
+            autoRenew: user.autoRenew,
+            planExpiresAt: user.planExpiresAt,
+            limits: user.limits
         });
 
     } catch (error) {

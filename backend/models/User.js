@@ -35,6 +35,15 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    pendingPlanType: {
+        type: String,
+        enum: ['free', 'pro', 'enterprise', 'agency', null],
+        default: null
+    },
+    planChangeAt: {
+        type: Date,
+        default: null
+    },
     limits: {
         maxContainers: { type: Number, default: 2 },
         maxRamMb: { type: Number, default: 1024 },

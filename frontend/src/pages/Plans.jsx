@@ -1,12 +1,23 @@
-import { useTranslation } from "react-i18next";import React, { useEffect, useState } from 'react';
+import { useTranslation } from "react-i18next";
+import React, { useEffect, useState } from 'react';
 import { Check, Star, Zap, Shield, AlertCircle, Building2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
 
-const Plans = () => {const { t } = useTranslation();
+const PLAN_PRIORITY = {
+  enterprise: 0,
+  agency: 1,
+  pro: 2,
+  free: 3
+};
+
+const Plans = () => {
+  const { t } = useTranslation();
   const { setUserPlan } = useOrg();
   const [currentPlan, setCurrentPlan] = useState('free');
+  const [pendingPlanType, setPendingPlanType] = useState(null);
+  const [planChangeAt, setPlanChangeAt] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const { addToast } = useToast();
@@ -15,6 +26,8 @@ const Plans = () => {const { t } = useTranslation();
     try {
       const res = await axios.get('/api/auth/me');
       setCurrentPlan(res.data.planType || 'free');
+      setPendingPlanType(res.data.pendingPlanType || null);
+      setPlanChangeAt(res.data.planChangeAt || null);
       // Update local storage just in case
       localStorage.setItem('planType', res.data.planType);
     } catch (error) {
@@ -28,14 +41,23 @@ const Plans = () => {const { t } = useTranslation();
     fetchCurrentPlan();
   }, []);
 
-  const handleUpgrade = async (planType) => {
+  const canSelectPlan = (targetPlan) => {
+    if (targetPlan === 'free') return false;
+    if (targetPlan === currentPlan) return true;
+    return PLAN_PRIORITY[targetPlan] < PLAN_PRIORITY[currentPlan];
+  };
+
+  const handlePlanChange = async (planType) => {
     if (planType === currentPlan) return;
+    if (!canSelectPlan(planType)) return;
 
     setProcessing(true);
     try {
       const res = await axios.post('/api/plans/upgrade', { planType });
 
       setCurrentPlan(res.data.planType);
+      setPendingPlanType(res.data.pendingPlanType || null);
+      setPlanChangeAt(res.data.planChangeAt || null);
       localStorage.setItem('planType', res.data.planType);
       localStorage.setItem('limits', JSON.stringify(res.data.limits));
       setUserPlan(res.data.planType.toLowerCase());
@@ -46,7 +68,27 @@ const Plans = () => {const { t } = useTranslation();
         'success'
       );
     } catch (error) {
-      addToast('Upgrade Failed', error.response?.data?.message || 'There was an error upgrading your plan.', 'error');
+      addToast('Plan change failed', error.response?.data?.message || 'There was an error changing your plan.', 'error');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCancelSubscription = async () => {
+    if (currentPlan === 'free') return;
+
+    setProcessing(true);
+    try {
+      const res = await axios.post('/api/plans/cancel');
+      setPendingPlanType(res.data.pendingPlanType || 'free');
+      setPlanChangeAt(res.data.planChangeAt || null);
+      addToast(
+        'Cancellation scheduled',
+        'Your plan will switch to Hobby at the end of your billing cycle.',
+        'success'
+      );
+    } catch (error) {
+      addToast('Cancel failed', error.response?.data?.message || 'There was an error cancelling your subscription.', 'error');
     } finally {
       setProcessing(false);
     }
@@ -148,6 +190,14 @@ const Plans = () => {const { t } = useTranslation();
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-start">
                 {plans.map((plan) => {
           const isActive = currentPlan === plan.id;
+          const selectable = canSelectPlan(plan.id);
+          const isFreePlan = plan.id === 'free';
+
+          let buttonText = `Upgrade to ${plan.name}`;
+          if (isActive) buttonText = t("auto.current_plan");
+          if (isFreePlan) buttonText = 'Available only via cancellation';
+          if (!selectable && !isActive && !isFreePlan) buttonText = 'Downgrade scheduled at cycle end';
+
           return (
             <div key={plan.id} className={`rounded-sm p-8 border ${plan.color} ${plan.id === 'pro' && 'ring-2 ring-brand-500 ring-offset-4 ring-offset-slate-50 dark:ring-offset-slate-900'} transition-all duration-300`}>
                             {plan.id === 'pro' &&
@@ -180,16 +230,15 @@ const Plans = () => {const { t } = useTranslation();
                             </ul>
 
                             <button
-                onClick={() => handleUpgrade(plan.id)}
-                disabled={isActive || processing}
-                className={`w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center ${plan.buttonColor} ${isActive ? 'opacity-50 cursor-not-allowed bg-slate-200 border-slate-300 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : ''}`}>
+                onClick={() => handlePlanChange(plan.id)}
+                disabled={isActive || processing || !selectable}
+                className={`w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center ${plan.buttonColor} ${(isActive || !selectable) ? 'opacity-50 cursor-not-allowed bg-slate-200 border-slate-300 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : ''}`}>
                 
                                 {processing ?
                 <span className="animate-pulse">{t("auto.processing_")}</span> :
                 isActive ?
                 <>{t("auto.current_plan")} <Check className="ml-2" size={18} /></> :
-
-                `Upgrade to ${plan.name}`
+                buttonText
                 }
                             </button>
                         </div>);
@@ -202,8 +251,31 @@ const Plans = () => {const { t } = useTranslation();
                 <div>
                     <h4 className="font-bold mb-1">{t("auto.billing_simulation")}</h4>
                     <p className="text-sm opacity-90">{t("auto.in_this_development_environment_payments")}</p>
+                    {pendingPlanType && (
+                      <p className="text-sm mt-3 opacity-90">
+                        Scheduled change: <strong>{pendingPlanType.toUpperCase()}</strong>
+                        {planChangeAt ? ` on ${new Date(planChangeAt).toLocaleString()}` : ''}.
+                      </p>
+                    )}
+                    {!pendingPlanType && (
+                      <p className="text-sm mt-3 opacity-90">
+                        No pending change scheduled. Your current plan remains active.
+                      </p>
+                    )}
                 </div>
             </div>
+
+            {currentPlan !== 'free' && (
+              <div className="mt-8 max-w-3xl mx-auto flex justify-center">
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={processing}
+                  className="px-6 py-3 rounded-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel subscription (switch to Hobby at cycle end)
+                </button>
+              </div>
+            )}
 
             <div className="max-w-3xl mx-auto mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 text-center">
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">

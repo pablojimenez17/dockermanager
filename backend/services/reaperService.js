@@ -45,6 +45,48 @@ export const pruneUserVpcNetworks = async (userId) => {
 // Reaper checks every 5 minutes by default
 const REAPER_INTERVAL_MS = 5 * 60 * 1000;
 const FREE_TIER_MAX_UPTIME_MS = 24 * 60 * 60 * 1000; // 24 hours
+const PLAN_LIMITS = {
+    free: {
+        maxContainers: 2,
+        maxRamMb: 1024,
+        maxCpuCores: 1,
+        maxDomains: 0,
+        maxVolumes: 1,
+        maxVolumeSizeMb: 1024,
+        maxSnapshots: 0,
+        maxBuckets: 1
+    },
+    pro: {
+        maxContainers: 10,
+        maxRamMb: 8192,
+        maxCpuCores: 4,
+        maxDomains: 3,
+        maxVolumes: 5,
+        maxVolumeSizeMb: 10240,
+        maxSnapshots: 5,
+        maxBuckets: 5
+    },
+    enterprise: {
+        maxContainers: 50,
+        maxRamMb: 32768,
+        maxCpuCores: 16,
+        maxDomains: 999,
+        maxVolumes: 20,
+        maxVolumeSizeMb: 102400,
+        maxSnapshots: 999,
+        maxBuckets: 999
+    },
+    agency: {
+        maxContainers: 999,
+        maxRamMb: 131072,
+        maxCpuCores: 64,
+        maxDomains: 999,
+        maxVolumes: 100,
+        maxVolumeSizeMb: 1048576,
+        maxSnapshots: 999,
+        maxBuckets: 999
+    }
+};
 
 export const startReaper = () => {
     console.log(`[Reaper] Service started. Checking for idle/expired containers every ${REAPER_INTERVAL_MS / 1000}s`);
@@ -54,45 +96,32 @@ export const startReaper = () => {
             console.log('[Reaper] Running cycle...');
             const now = new Date();
 
-            // 1. Find users whose plan has expired 
-            // OR who are on the 'free' plan (which might need uptime enforcement)
+            // 1. Find users with a scheduled plan change to apply
+            const usersWithScheduledChanges = await User.find({
+                pendingPlanType: { $ne: null },
+                planChangeAt: { $ne: null, $lte: now }
+            });
+
+            for (const user of usersWithScheduledChanges) {
+                const nextPlan = user.pendingPlanType;
+                if (!nextPlan || !PLAN_LIMITS[nextPlan]) {
+                    continue;
+                }
+
+                console.log(`[Reaper] Applying scheduled plan change for ${user.email}: ${user.planType} -> ${nextPlan}`);
+                user.planType = nextPlan;
+                user.limits = PLAN_LIMITS[nextPlan];
+                user.pendingPlanType = null;
+                user.planChangeAt = null;
+                await user.save();
+            }
+
+            // 2. Enforce free-tier uptime limits
             const usersToCheck = await User.find({
-                $or: [
-                    { planExpiresAt: { $lt: now } },
-                    { planType: 'free' }
-                ]
+                planType: 'free'
             });
 
             for (const user of usersToCheck) {
-                // Determine if user has fully expired a paid plan
-                let isPaidPlanExpired = user.planType !== 'free' && user.planExpiresAt && new Date(user.planExpiresAt) < now;
-
-                // Process auto-renewal or downgrade
-                if (isPaidPlanExpired) {
-                    if (user.autoRenew) {
-                        console.log(`[Reaper] Auto-renewing plan for user: ${user.email}`);
-                        const newExpiration = new Date();
-                        newExpiration.setMonth(newExpiration.getMonth() + 1);
-                        user.planExpiresAt = newExpiration;
-                        await user.save();
-                        isPaidPlanExpired = false; // Successfully renewed, no longer expired
-                    } else {
-                        console.log(`[Reaper] Plan expired and auto-renew cancelled for user: ${user.email}. Downgrading to Free.`);
-                        user.planType = 'free';
-                        user.limits = {
-                            maxContainers: 2,
-                            maxRamMb: 1024,
-                            maxCpuCores: 1,
-                            maxDomains: 0,
-                            maxVolumes: 1,
-                            maxVolumeSizeMb: 1024,
-                            maxBuckets: 1
-                        };
-                        await user.save();
-                        // isPaidPlanExpired remains true for this cycle to trigger container shutdown below
-                    }
-                }
-
                 // Find all their running containers from DB
                 const userContainers = await Container.find({ userId: user._id, status: 'running' });
 
@@ -111,19 +140,14 @@ export const startReaper = () => {
                         let shouldStop = false;
                         let reason = '';
 
-                        // Rule A: Paid plan is currently expired
-                        if (isPaidPlanExpired) {
-                            shouldStop = true;
-                            reason = 'Plan subscription expired.';
-                        } 
-                        // Rule B: Free tier uptime enforcement (e.g. 24h limit like Heroku)
-                        else if (user.planType === 'free') {
+                        // Rule: Free tier uptime enforcement (e.g. 24h limit like Heroku)
+                        if (user.planType === 'free') {
                             const startedAt = new Date(info.State.StartedAt);
                             const uptimeMs = now.getTime() - startedAt.getTime();
-                            
+
                             if (uptimeMs > FREE_TIER_MAX_UPTIME_MS) {
                                 shouldStop = true;
-                                reason = `Free tier 24h continuous uptime limit reached.`;
+                                reason = 'Free tier 24h continuous uptime limit reached.';
                             }
                         }
 
