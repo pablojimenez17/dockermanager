@@ -48,8 +48,8 @@ const PLANS = {
 };
 
 const PLAN_PRIORITY = {
-    enterprise: 0,
-    agency: 1,
+    agency: 0,
+    enterprise: 1,
     pro: 2,
     free: 3
 };

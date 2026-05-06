@@ -5,12 +5,12 @@ import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 
 const PLAN_PRIORITY = {
-  enterprise: 0,
-  agency: 1,
+  agency: 0,
+  enterprise: 1,
   pro: 2,
   free: 3
 };
-const PAID_PLANS_SORTED = ['enterprise', 'agency', 'pro'];
+const PAID_PLANS_SORTED = ['agency', 'enterprise', 'pro'];
 
 const Settings = () => {
   const { t } = useTranslation();
