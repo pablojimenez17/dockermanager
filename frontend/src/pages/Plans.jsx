@@ -74,26 +74,6 @@ const Plans = () => {
     }
   };
 
-  const handleCancelSubscription = async () => {
-    if (currentPlan === 'free') return;
-
-    setProcessing(true);
-    try {
-      const res = await axios.post('/api/plans/cancel');
-      setPendingPlanType(res.data.pendingPlanType || 'free');
-      setPlanChangeAt(res.data.planChangeAt || null);
-      addToast(
-        'Cancellation scheduled',
-        'Your plan will switch to Hobby at the end of your billing cycle.',
-        'success'
-      );
-    } catch (error) {
-      addToast('Cancel failed', error.response?.data?.message || 'There was an error cancelling your subscription.', 'error');
-    } finally {
-      setProcessing(false);
-    }
-  };
-
   const plans = [
   {
     id: 'free',
@@ -264,18 +244,6 @@ const Plans = () => {
                     )}
                 </div>
             </div>
-
-            {currentPlan !== 'free' && (
-              <div className="mt-8 max-w-3xl mx-auto flex justify-center">
-                <button
-                  onClick={handleCancelSubscription}
-                  disabled={processing}
-                  className="px-6 py-3 rounded-sm font-semibold border border-red-300 text-red-700 hover:bg-red-50 dark:border-red-500/40 dark:text-red-300 dark:hover:bg-red-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel subscription (switch to Hobby at cycle end)
-                </button>
-              </div>
-            )}
 
             <div className="max-w-3xl mx-auto mt-12 pt-8 border-t border-slate-200 dark:border-slate-800 text-center">
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed max-w-2xl mx-auto">
