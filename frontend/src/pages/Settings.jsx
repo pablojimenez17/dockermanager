@@ -1,9 +1,19 @@
-import { useTranslation } from "react-i18next";import React, { useState, useEffect } from 'react';
+import { useTranslation } from "react-i18next";
+import React, { useState, useEffect } from 'react';
 import { User, Shield, Bell, Save, AlertCircle, CreditCard, CalendarX2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 
-const Settings = () => {const { t } = useTranslation();
+const PLAN_PRIORITY = {
+  enterprise: 0,
+  agency: 1,
+  pro: 2,
+  free: 3
+};
+const PAID_PLANS_SORTED = ['enterprise', 'agency', 'pro'];
+
+const Settings = () => {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [theme, setTheme] = useState('dark');
@@ -15,6 +25,9 @@ const Settings = () => {const { t } = useTranslation();
   const [planData, setPlanData] = useState(null);
   const [cancelling, setCancelling] = useState(false);
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
+  const [showChangePlan, setShowChangePlan] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState('');
+  const [changingPlan, setChangingPlan] = useState(false);
   const [cancelStep, setCancelStep] = useState(1);
   const [cancelConfirmText, setCancelConfirmText] = useState('');
   const [cancelReason, setCancelReason] = useState('');
@@ -33,10 +46,13 @@ const Settings = () => {const { t } = useTranslation();
     const fetchUserData = async () => {
       try {
         const res = await axios.get('/api/auth/me');
+        const normalizedPlan = (res.data.planType || 'free').toLowerCase();
         setPlanData({
-          planType: res.data.planType,
+          planType: normalizedPlan,
           planExpiresAt: res.data.planExpiresAt,
-          autoRenew: res.data.autoRenew
+          autoRenew: res.data.autoRenew,
+          pendingPlanType: res.data.pendingPlanType || null,
+          planChangeAt: res.data.planChangeAt || null
         });
       } catch (err) {
         console.error("Failed to fetch user data for settings", err);
@@ -69,13 +85,58 @@ const Settings = () => {const { t } = useTranslation();
     setCancelling(true);
     try {
       const res = await axios.post('/api/plans/cancel');
-      setPlanData((prev) => ({ ...prev, autoRenew: false, planExpiresAt: res.data.planExpiresAt }));
-      addToast('Plan Cancelled', res.data.message, 'success');
+      setPlanData((prev) => ({
+        ...prev,
+        autoRenew: false,
+        planExpiresAt: res.data.planExpiresAt,
+        pendingPlanType: res.data.pendingPlanType || 'free',
+        planChangeAt: res.data.planChangeAt || null
+      }));
+      addToast(t("auto.plan_cancelled_title"), res.data.message, 'success');
       setIsCancelModalOpen(false);
     } catch (error) {
-      addToast('Error', error.response?.data?.message || 'Failed to cancel plan', 'error');
+      addToast(t("common.error"), error.response?.data?.message || t("auto.failed_to_cancel_plan"), 'error');
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const availableDowngradePlans = (() => {
+    if (!planData?.planType || planData.planType === 'free') return [];
+    const currentPriority = PLAN_PRIORITY[planData.planType];
+    return PAID_PLANS_SORTED.filter((plan) =>
+      PLAN_PRIORITY[plan] > currentPriority && plan !== 'free'
+    );
+  })();
+
+  useEffect(() => {
+    if (!showChangePlan) return;
+    if (availableDowngradePlans.length === 0) {
+      setSelectedPlan('');
+      return;
+    }
+    setSelectedPlan((prev) => (prev && availableDowngradePlans.includes(prev) ? prev : availableDowngradePlans[0]));
+  }, [showChangePlan, planData?.planType]);
+
+  const executePlanChange = async () => {
+    if (!selectedPlan) return;
+    setChangingPlan(true);
+    try {
+      const res = await axios.post('/api/plans/upgrade', { planType: selectedPlan });
+      setPlanData((prev) => ({
+        ...prev,
+        planType: (res.data.planType || prev.planType).toLowerCase(),
+        pendingPlanType: res.data.pendingPlanType || null,
+        planChangeAt: res.data.planChangeAt || null,
+        autoRenew: res.data.autoRenew
+      }));
+      addToast(t("auto.plan_change_scheduled_title"), t("auto.plan_change_success_to", { plan: selectedPlan.toUpperCase() }), 'success');
+      setShowChangePlan(false);
+      setSelectedPlan('');
+    } catch (error) {
+      addToast(t("auto.plan_change_failed_title"), error.response?.data?.message || t("auto.plan_change_failed_message"), 'error');
+    } finally {
+      setChangingPlan(false);
     }
   };
 
@@ -174,31 +235,75 @@ const Settings = () => {const { t } = useTranslation();
                                         <h4 className="text-2xl font-black text-slate-900 dark:text-white capitalize">{planData.planType}</h4>
                                         {planData.planType !== 'free' &&
                   <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${planData.autoRenew ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400' : 'bg-amber-100 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'}`}>
-                                                {planData.autoRenew ? 'Auto-Renews' : 'Cancels Automatically'}
+                                                {planData.autoRenew ? t("auto.auto_renews") : t("auto.cancels_automatically")}
                                             </span>
                   }
                                     </div>
                                     <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
-                                        {planData.planType === 'free' ? 'You are on the permanently free hobby tier.' : `Your billing cycle ends on ${new Date(planData.planExpiresAt).toLocaleDateString()}.`}
+                                        {planData.planType === 'free' ? t("auto.you_are_on_hobby_forever") : t("auto.billing_cycle_ends_on", { date: new Date(planData.planExpiresAt).toLocaleDateString() })}
                                     </p>
+                                    {planData.pendingPlanType && (
+                                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        {t("auto.scheduled_change_to")} {String(planData.pendingPlanType).toUpperCase()}
+                                        {planData.planChangeAt ? ` ${t("auto.on_date")} ${new Date(planData.planChangeAt).toLocaleDateString()}` : ''}
+                                      </p>
+                                    )}
                                 </div>
                                 
-                                {planData.planType !== 'free' && planData.autoRenew &&
-              <button
-                type="button"
-                disabled={cancelling}
-                onClick={startCancelProcess}
-                className="shrink-0 flex items-center justify-center space-x-2 py-2.5 px-6 rounded-sm text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95">
-                
-                                        <CalendarX2 size={18} />
-                                        <span>{cancelling ? 'Cancelling...' : 'Cancel Plan'}</span>
+                                {planData.planType !== 'free' &&
+                                  <div className="shrink-0 flex flex-col sm:flex-row gap-2">
+                                    <button
+                                      type="button"
+                                      disabled={changingPlan || cancelling || availableDowngradePlans.length === 0}
+                                      onClick={() => setShowChangePlan((prev) => !prev)}
+                                      className="flex items-center justify-center space-x-2 py-2.5 px-6 rounded-sm text-sm font-bold border border-amber-200 text-amber-700 bg-amber-50 hover:bg-amber-100 dark:border-amber-500/20 dark:text-amber-300 dark:bg-amber-500/10 dark:hover:bg-amber-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                      <span>{t("auto.change_plan_button")}</span>
                                     </button>
-              }
+                                    {planData.autoRenew &&
+                                      <button
+                                        type="button"
+                                        disabled={cancelling || changingPlan}
+                                        onClick={startCancelProcess}
+                                        className="flex items-center justify-center space-x-2 py-2.5 px-6 rounded-sm text-sm font-bold border border-red-200 text-red-600 bg-red-50 hover:bg-red-100 dark:border-red-500/20 dark:text-red-400 dark:bg-red-500/10 dark:hover:bg-red-500/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <CalendarX2 size={18} />
+                                        <span>{cancelling ? t("auto.cancelling_") : t("auto.cancel_plan_button")}</span>
+                                      </button>
+                                    }
+                                  </div>
+                                }
                             </div> :
 
             <div className="animate-pulse text-sm text-slate-500">{t("auto.loading_subscription_data_")}</div>
             }
                     </div>
+                    {planData?.planType !== 'free' && showChangePlan && (
+                      <div className="mt-4 border border-slate-200 dark:border-slate-700 rounded-sm p-4 bg-slate-50 dark:bg-slate-900">
+                        <p className="text-sm font-semibold mb-3">{t("auto.choose_lower_plan")}</p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <select
+                            value={selectedPlan}
+                            onChange={(e) => setSelectedPlan(e.target.value)}
+                            className="flex-1 px-3 py-2 rounded-sm border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800"
+                          >
+                            <option value="">{t("auto.select_a_plan")}</option>
+                            {availableDowngradePlans.map((plan) => (
+                              <option key={plan} value={plan}>{plan.toUpperCase()}</option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            onClick={executePlanChange}
+                            disabled={!selectedPlan || changingPlan}
+                            className="px-4 py-2 rounded-sm border border-amber-300 text-amber-700 dark:text-amber-300 dark:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {changingPlan ? t("auto.processing_") : t("auto.confirm_change")}
+                          </button>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{t("auto.change_plan_scheduled_note")}</p>
+                      </div>
+                    )}
 
                     <div className="pt-6">
                         <button

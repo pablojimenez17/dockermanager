@@ -25,11 +25,12 @@ const Plans = () => {
   const fetchCurrentPlan = async () => {
     try {
       const res = await axios.get('/api/auth/me');
-      setCurrentPlan(res.data.planType || 'free');
+      const normalizedPlan = (res.data.planType || 'free').toLowerCase();
+      setCurrentPlan(normalizedPlan);
       setPendingPlanType(res.data.pendingPlanType || null);
       setPlanChangeAt(res.data.planChangeAt || null);
       // Update local storage just in case
-      localStorage.setItem('planType', res.data.planType);
+      localStorage.setItem('planType', normalizedPlan);
     } catch (error) {
       console.error('Failed to fetch user profile:', error);
     } finally {
@@ -55,20 +56,21 @@ const Plans = () => {
     try {
       const res = await axios.post('/api/plans/upgrade', { planType });
 
-      setCurrentPlan(res.data.planType);
+      const normalizedPlan = (res.data.planType || 'free').toLowerCase();
+      setCurrentPlan(normalizedPlan);
       setPendingPlanType(res.data.pendingPlanType || null);
       setPlanChangeAt(res.data.planChangeAt || null);
-      localStorage.setItem('planType', res.data.planType);
+      localStorage.setItem('planType', normalizedPlan);
       localStorage.setItem('limits', JSON.stringify(res.data.limits));
-      setUserPlan(res.data.planType.toLowerCase());
+      setUserPlan(normalizedPlan);
 
       addToast(
-        'Plan Upgraded',
-        `Successfully changed your subscription to ${planType.toUpperCase()}`,
+        t("auto.upgrade_success_title"),
+        t("auto.plan_change_success_to", { plan: planType.toUpperCase() }),
         'success'
       );
     } catch (error) {
-      addToast('Plan change failed', error.response?.data?.message || 'There was an error changing your plan.', 'error');
+      addToast(t("auto.plan_change_failed_title"), error.response?.data?.message || t("auto.plan_change_failed_message"), 'error');
     } finally {
       setProcessing(false);
     }
@@ -173,10 +175,10 @@ const Plans = () => {
           const selectable = canSelectPlan(plan.id);
           const isFreePlan = plan.id === 'free';
 
-          let buttonText = `Upgrade to ${plan.name}`;
+          let buttonText = t("auto.upgrade_to_plan", { plan: plan.name });
           if (isActive) buttonText = t("auto.current_plan");
-          if (isFreePlan) buttonText = 'Available only via cancellation';
-          if (!selectable && !isActive && !isFreePlan) buttonText = 'Downgrade scheduled at cycle end';
+          if (isFreePlan) buttonText = t("auto.available_only_via_cancellation");
+          if (!selectable && !isActive && !isFreePlan) buttonText = t("auto.change_available_in_settings");
 
           return (
             <div key={plan.id} className={`rounded-sm p-8 border ${plan.color} ${plan.id === 'pro' && 'ring-2 ring-brand-500 ring-offset-4 ring-offset-slate-50 dark:ring-offset-slate-900'} transition-all duration-300`}>
@@ -233,13 +235,13 @@ const Plans = () => {
                     <p className="text-sm opacity-90">{t("auto.in_this_development_environment_payments")}</p>
                     {pendingPlanType && (
                       <p className="text-sm mt-3 opacity-90">
-                        Scheduled change: <strong>{pendingPlanType.toUpperCase()}</strong>
-                        {planChangeAt ? ` on ${new Date(planChangeAt).toLocaleString()}` : ''}.
+                        {t("auto.scheduled_change_to")} <strong>{pendingPlanType.toUpperCase()}</strong>
+                        {planChangeAt ? ` ${t("auto.on_date")} ${new Date(planChangeAt).toLocaleString()}` : ''}.
                       </p>
                     )}
                     {!pendingPlanType && (
                       <p className="text-sm mt-3 opacity-90">
-                        No pending change scheduled. Your current plan remains active.
+                        {t("auto.no_pending_change_current_plan_active")}
                       </p>
                     )}
                 </div>
