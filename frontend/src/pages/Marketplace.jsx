@@ -25,11 +25,11 @@ const Marketplace = () => {
 
   // Advanced Resource State
   const [networks, setNetworks] = useState([]);
-  const [selectedNetwork, setSelectedNetwork] = useState('bridge'); // 'bridge' = auto-VPC, 'none' = air-gapped
-  const [extraNetworks, setExtraNetworks] = useState([]); // additional networks to connect after creation
-  const [enableInternet, setEnableInternet] = useState(false); // Internet access toggle
-  const [memoryLimit, setMemoryLimit] = useState(512); // MB
-  const [cpuLimit, setCpuLimit] = useState(1); // Cores
+  const [selectedNetwork, setSelectedNetwork] = useState('bridge');
+  const [extraNetworks, setExtraNetworks] = useState([]); 
+  const [enableInternet, setEnableInternet] = useState(false);
+  const [memoryLimit, setMemoryLimit] = useState(512);
+  const [cpuLimit, setCpuLimit] = useState(1);
   const [isPublic, setIsPublic] = useState(false);
   const [internalPort, setInternalPort] = useState('');
   
@@ -49,7 +49,6 @@ const Marketplace = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // INSTANT LIMITS
         const role = localStorage.getItem('role');
         const planType = activeOrg ? activeOrg.plan : userPlan;
         const newLimits = resolveLimits({ planType, role });
@@ -299,6 +298,8 @@ const Marketplace = () => {
   };
 
   const configuredEnvFields = Object.entries(envFields);
+  
+  // ---> AQUÍ SE AÑADE EL CAMBIO PARA LOS DISCLAIMERS <---
   const getTemplateDisclaimers = (template) => {
     if (!template) return [];
     const notes = [];
@@ -318,6 +319,12 @@ const Marketplace = () => {
     if (!hasWebPort) {
       notes.push(t("auto.template_notice_non_http_service"));
     }
+    
+    // Si la plantilla tiene un disclaimer personalizado en el JSON, lo añadimos
+    if (template.disclaimer) {
+      notes.push(template.disclaimer);
+    }
+    
     return notes;
   };
   const templateDisclaimers = selectedTemplate ? getTemplateDisclaimers(selectedTemplate) : [];
@@ -409,11 +416,9 @@ const Marketplace = () => {
                 </span>
               </h3>
               
-              {/* Aquí aplicamos el cambio: Usamos React.Fragment para poder insertar el creador dinámicamente debajo de la fila */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {catTemplates.map((template) =>
                   <React.Fragment key={template.id}>
-                    {/* La Tarjeta de la Plantilla */}
                     <div 
                       className={`bg-white dark:bg-slate-800 rounded-sm border overflow-hidden shadow-sm hover:shadow-sm transition-all duration-300 hover:-translate-y-1 flex flex-col cursor-pointer group ${selectedTemplate?.id === template.id ? 'border-brand-500 ring-1 ring-brand-400/60' : 'border-slate-200 dark:border-slate-700'}`} 
                       onClick={() => openTemplate(template)}
@@ -439,12 +444,10 @@ const Marketplace = () => {
                       </div>
                     </div>
 
-                    {/* El Creador / Builder Inline */}
                     {selectedTemplate?.id === template.id && (
                       <div className="col-span-full mt-4 mb-8">
                         <div className="bg-white dark:bg-slate-800 w-full rounded-sm shadow-md border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col transition-all duration-300 animate-in fade-in slide-in-from-top-4">
                           
-                          {/* Header */}
                           <div className="p-6 border-b border-slate-200 dark:border-slate-700 flex justify-between items-start bg-slate-50 dark:bg-slate-900/50">
                             <div className="flex items-center space-x-4">
                               <div className="w-12 h-12 bg-white dark:bg-slate-800 rounded-sm flex items-center justify-center p-2.5 shadow-sm border border-slate-200 dark:border-slate-700">
@@ -463,11 +466,9 @@ const Marketplace = () => {
                             </button>
                           </div>
 
-                          {/* Body */}
                           <div className="p-6">
                             <form onSubmit={handleDeploy} id="deployForm" className="space-y-6">
 
-                              {/* Section 1: App config */}
                               <div>
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{t("auto.1_app_configuration")}</h3>
                                 <div className="space-y-4">
@@ -497,7 +498,6 @@ const Marketplace = () => {
                                 </div>
                               </div>
 
-                              {/* Section 2: Env vars (unified raw/secret) */}
                               {configuredEnvFields.length > 0 &&
                                 <div>
                                   <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-1">{t("auto.2_environment_variables")}</h3>
@@ -505,7 +505,6 @@ const Marketplace = () => {
                                   <div className="space-y-3">
                                     {configuredEnvFields.map(([key, field]) =>
                                       <div key={key} className="flex flex-col space-y-2 sm:flex-row sm:space-y-0 sm:items-center sm:space-x-3">
-                                        {/* KEY */}
                                         <input
                                           type="text"
                                           value={key}
@@ -513,7 +512,6 @@ const Marketplace = () => {
                                           className="flex-1 px-4 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded-sm text-slate-500 dark:text-slate-400 font-mono text-sm cursor-default" />
                                         
                                         <span className="text-slate-400 dark:text-slate-500 font-bold hidden sm:inline">=</span>
-                                        {/* Type + Value */}
                                         <div className={`flex flex-1 bg-white dark:bg-slate-900 border rounded-sm overflow-hidden focus-within:ring-1 focus-within:ring-brand-500 ${isInvalidEnvField(field) ? 'border-red-400 dark:border-red-500' : 'border-slate-300 dark:border-slate-600'}`}>
                                           <select
                                             value={field.type}
@@ -550,11 +548,9 @@ const Marketplace = () => {
                                 </div>
                               }
 
-                              {/* Section 3: Resources & Network */}
                               <div>
                                 <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-4">{t("auto.3_resources_network")}</h3>
                                 <div className="space-y-4">
-                                  {/* Network Selector */}
                                   <div>
                                     <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5 flex items-center">
                                       {t("auto.network_mode")}
@@ -617,7 +613,6 @@ const Marketplace = () => {
                                       )}
                                     </div>
 
-                                    {/* Additional Networks */}
                                     {selectedNetwork !== 'none' && (
                                       <div className="mt-3">
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1">
@@ -655,7 +650,6 @@ const Marketplace = () => {
                                     )}
                                   </div>
 
-                                  {/* Internet Access Toggle */}
                                   {selectedNetwork !== 'none' &&
                                     <div
                                       className={`flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-sm border transition-all ${enableInternet ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700/50' : 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700'}`}
@@ -719,7 +713,6 @@ const Marketplace = () => {
                                 </div>
                               </div>
 
-                              {/* Section 4: Output Volumes (Fresh Data eliminado) */}
                               <div>
                                 <div className="flex justify-between items-center mb-4 mt-6">
                                   <h3 className="text-lg font-bold text-slate-900 dark:text-white">{t("auto.4_persistent_volumes")}</h3>
@@ -823,7 +816,6 @@ const Marketplace = () => {
                             </form>
                           </div>
 
-                          {/* Footer */}
                           <div className="p-6 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-4">
                             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                               <span className="font-semibold text-slate-600 dark:text-slate-300">{t("auto._shared_responsibility_")}</span>{' '}

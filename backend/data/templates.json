@@ -5,6 +5,7 @@
         "icon": "https://cdn.simpleicons.org/wordpress/21759B",
         "description": "The world's most popular open-source content management system.",
         "category": "CMS",
+        "disclaimer": "Remember to complete the WordPress installation through the web interface on first run.",
         "containers": [
             {
                 "image": "wordpress:latest",
@@ -89,6 +90,7 @@
         "icon": "https://cdn.simpleicons.org/postgresql/4169E1",
         "description": "A powerful, open source object-relational database system.",
         "category": "Database",
+        "disclaimer": "The default database and user are created automatically on the first boot.",
         "containers": [
             {
                 "image": "postgres:15-alpine",
@@ -130,6 +132,7 @@
         "icon": "https://cdn.simpleicons.org/mysql/4479A1",
         "description": "The world's most popular open source relational database.",
         "category": "Database",
+        "disclaimer": "The default database and user are created automatically on the first boot.",
         "containers": [
             {
                 "image": "mysql:8.0",
@@ -178,6 +181,7 @@
         "icon": "https://cdn.simpleicons.org/mariadb/003545",
         "description": "Open source relational database, a fork of MySQL.",
         "category": "Database",
+        "disclaimer": "The default database and user are created automatically on the first boot.",
         "containers": [
             {
                 "image": "mariadb:10.11",
@@ -325,6 +329,7 @@
         "icon": "https://cdn.simpleicons.org/influxdb/22ADF6",
         "description": "Open source time series database.",
         "category": "Database",
+        "disclaimer": "Admin setup is executed on first boot. Make sure to keep your admin credentials safe.",
         "containers": [
             {
                 "image": "influxdb:2",
@@ -383,6 +388,7 @@
         "icon": "https://cdn.simpleicons.org/ghost/15171A",
         "description": "The creator network platform inside a powerful CMS.",
         "category": "CMS",
+        "disclaimer": "Ghost requires the exact public URL to be set to function properly, including the http/https protocol.",
         "containers": [
             {
                 "image": "ghost:5-alpine",
@@ -459,6 +465,7 @@
         "icon": "https://cdn.simpleicons.org/drupal/0678BE",
         "description": "Content management software used to make many of the websites and applications you use every day.",
         "category": "CMS",
+        "disclaimer": "Complete the Drupal installation through the web interface on first run.",
         "containers": [
             {
                 "image": "drupal:10",
@@ -530,6 +537,7 @@
         "icon": "https://cdn.simpleicons.org/joomla/5091CD",
         "description": "Free and open-source content management system.",
         "category": "CMS",
+        "disclaimer": "Complete the Joomla installation through the web interface on first run.",
         "containers": [
             {
                 "image": "joomla:latest",
@@ -606,6 +614,7 @@
         "icon": "https://cdn.simpleicons.org/strapi/2F2E8B",
         "description": "The leading open-source headless CMS. 100% JavaScript, fully customizable.",
         "category": "CMS",
+        "disclaimer": "The Strapi image might take a minute or two to compile and start on its first run.",
         "containers": [
             {
                 "image": "strapi/strapi",
@@ -705,6 +714,7 @@
         "icon": "https://cdn.simpleicons.org/moodle/F98012",
         "description": "Open-source learning management system.",
         "category": "CMS",
+        "disclaimer": "Complete the Moodle installation through the web interface on first run.",
         "containers": [
             {
                 "image": "bitnami/moodle:latest",
@@ -797,6 +807,7 @@
         "icon": "https://cdn.simpleicons.org/grafana/F46800",
         "description": "The open observability platform. Create beautiful dashboards and metrics.",
         "category": "Monitoring",
+        "disclaimer": "On your very first login, Grafana might prompt you to update your password even if you set it here.",
         "containers": [
             {
                 "image": "grafana/grafana:latest",
@@ -894,6 +905,7 @@
         "icon": "https://cdn.simpleicons.org/nextcloud/0082C9",
         "description": "A safe home for all your data. Open source file sync and share.",
         "category": "Productivity",
+        "disclaimer": "Complete the Nextcloud installation through the web interface on first run.",
         "containers": [
             {
                 "image": "nextcloud:latest",
@@ -976,6 +988,7 @@
         "icon": "https://cdn.simpleicons.org/bitwarden/175DDC",
         "description": "Unofficial Bitwarden compatible server written in Rust, perfect for self-hosted deployments.",
         "category": "Productivity",
+        "disclaimer": "For Bitwarden apps and browser extensions to connect, Vaultwarden MUST be served over HTTPS.",
         "containers": [
             {
                 "image": "vaultwarden/server:latest",
@@ -1020,6 +1033,7 @@
         "icon": "https://cdn.simpleicons.org/n8n/FF6D5A",
         "description": "Free and open fair-code licensed node based Workflow Automation Tool.",
         "category": "Productivity",
+        "disclaimer": "Basic auth is enabled by default. Set secure credentials to prevent unauthorized access to your workflows.",
         "containers": [
             {
                 "image": "n8nio/n8n",
@@ -1145,6 +1159,7 @@
         "icon": "https://cdn.simpleicons.org/jenkins/D24939",
         "description": "The leading open source automation server.",
         "category": "Dev Tools",
+        "disclaimer": "Wait for Jenkins to initialize fully. The initial setup requires patience and an initial admin password.",
         "containers": [
             {
                 "image": "jenkins/jenkins:lts",
@@ -1232,6 +1247,7 @@
         "icon": "https://cdn.simpleicons.org/rabbitmq/FF6600",
         "description": "The most widely deployed open source message broker.",
         "category": "Dev Tools",
+        "disclaimer": "The default 'guest' user can only log in from localhost by default. Use a custom user for remote access.",
         "containers": [
             {
                 "image": "rabbitmq:3-management",
@@ -1339,6 +1355,7 @@
         "icon": "https://ollama.com/public/icon-64x64.png",
         "description": "Get up and running with large language models locally.",
         "category": "AI",
+        "disclaimer": "LLM models are heavy and will be downloaded on first usage. Ensure your volume has enough disk space.",
         "containers": [
             {
                 "image": "ollama/ollama",
@@ -1465,6 +1482,7 @@
         "icon": "https://cdn.simpleicons.org/minecraft/FF5500",
         "description": "Ready-to-play Minecraft Java Server (itzg).",
         "category": "Gaming",
+        "disclaimer": "You MUST accept the Minecraft EULA for the server to start successfully.",
         "containers": [
             {
                 "image": "itzg/minecraft-server",
