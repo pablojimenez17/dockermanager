@@ -36,10 +36,8 @@ services:
       - public_net
       - transit_proxy_inverso
       - transit_proxy_forward
-    # FIX #1: Suricata owns 80/443. Traffic is DNAT-forwarded to Traefik via iptables PREROUTING.
-    ports:
-      - "80:80"
-      - "443:443"
+    # Keep edge firewall running, but do not publish public ports.
+    # Public ingress is handled directly by Traefik to avoid DNAT/NFQUEUE timeouts.
     volumes:
       - ./config/edge-fw.sh:/docker-entrypoint.sh:ro
       - suricata-logs:/var/log/suricata
@@ -96,10 +94,10 @@ services:
       - dmz_net
     volumes:
       - letsencrypt-data:/letsencrypt
-    # FIX #1: Ports removed — Suricata owns 80/443 and DNAT-forwards here
-    # ports:
-    #   - "80:80"
-    #   - "443:443"
+    # Public ingress restored directly to Traefik (stable mode).
+    ports:
+      - "80:80"
+      - "443:443"
     depends_on:
       - socket-proxy
 

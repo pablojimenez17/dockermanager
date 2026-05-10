@@ -14,13 +14,18 @@ const Login = () => {const { t } = useTranslation();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const REQUEST_TIMEOUT_MS = 15000;
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('/api/auth/login', { email, password });
+      const res = await axios.post(
+        '/api/auth/login',
+        { email, password },
+        { timeout: REQUEST_TIMEOUT_MS }
+      );
       if (res.data.requireVerification) {
         setStep('verify');
       } else {
@@ -32,7 +37,11 @@ const Login = () => {const { t } = useTranslation();
         window.location.href = '/app';
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      if (err.code === 'ECONNABORTED') {
+        setError('Login timed out. Please try again in a few seconds.');
+      } else {
+        setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -43,14 +52,22 @@ const Login = () => {const { t } = useTranslation();
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
+      const res = await axios.post(
+        '/api/auth/verify-code',
+        { email, code: verificationCode },
+        { timeout: REQUEST_TIMEOUT_MS }
+      );
       localStorage.setItem('name', res.data.name);
       localStorage.setItem('email', res.data.email);
       localStorage.setItem('role', res.data.role);
       localStorage.setItem('planType', res.data.planType || 'free');
       window.location.href = '/app';
     } catch (err) {
-      setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+      if (err.code === 'ECONNABORTED') {
+        setError('Verification timed out. Please try again.');
+      } else {
+        setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+      }
     } finally {
       setLoading(false);
     }
