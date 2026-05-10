@@ -46,8 +46,10 @@ export const initMinio = async () => {
         return minioClient;
 
     } catch (err) {
-        console.error('[MinIO Service] Initialization failed:', err.message);
-        throw err;
+        // Don't crash the backend if MinIO is temporarily unavailable.
+        // It will be retried on first use via getMinioClient().
+        console.error('[MinIO Service] Initialization failed (non-fatal):', err.message);
+        return null;
     }
 };
 

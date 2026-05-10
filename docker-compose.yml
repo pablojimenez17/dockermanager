@@ -88,6 +88,12 @@ services:
       - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
       - "--providers.docker.endpoint=tcp://socket-proxy:2375"
       - "--providers.docker.constraints=Label(`traefik.constraint-label`, `dmz-proxy`)"
+      # Increase timeouts to prevent 504s on slow operations (container deploys, AI, etc.)
+      - "--entrypoints.websecure.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.writeTimeout=300s"
+      - "--entrypoints.websecure.transport.respondingTimeouts.idleTimeout=300s"
+      - "--entrypoints.web.transport.respondingTimeouts.readTimeout=300s"
+      - "--entrypoints.web.transport.respondingTimeouts.writeTimeout=300s"
     networks:
       - transit_proxy_inverso
       - dmz_net
@@ -165,6 +171,13 @@ services:
       - mongodb
       - socket-proxy
       - minio
+    # Healthcheck: Traefik will only route traffic once the backend is responding
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:5000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"

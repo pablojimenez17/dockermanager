@@ -61,27 +61,48 @@ export const initOllama = async () => {
             await new Promise(resolve => setTimeout(resolve, 3000));
         }
 
-        // Trigger Model Pull (Ollama natively handles ensuring it doesn't re-download if it exists)
-        console.log(`[Ollama Service] Pulling default LLM model: ${DEFAULT_MODEL}. This may take a few minutes if not already downloaded.`);
-
+        // Check if model is already downloaded before pulling (avoids minutes-long wait on every restart)
+        let modelAlreadyPresent = false;
         try {
-            // We execute the `ollama run` or `ollama pull` command inside the container 
             const container = docker.getContainer(OLLAMA_CONTAINER_NAME);
-            const exec = await container.exec({
-                Cmd: ['ollama', 'pull', DEFAULT_MODEL],
+            const listExec = await container.exec({
+                Cmd: ['ollama', 'list'],
                 AttachStdout: true,
                 AttachStderr: true
             });
-
-            await new Promise((resolve, reject) => {
-                exec.start({ hijack: true, stdin: false }, (err, stream) => {
-                    if (err) return reject(err);
-                    stream.on('end', resolve);
+            const listOutput = await new Promise((resolve) => {
+                listExec.start({ hijack: true, stdin: false }, (err, stream) => {
+                    if (err) return resolve('');
+                    let output = '';
+                    stream.on('data', (chunk) => { output += chunk.toString(); });
+                    stream.on('end', () => resolve(output));
                 });
             });
-            console.log(`[Ollama Service] Model ${DEFAULT_MODEL} is ready for use.`);
-        } catch (e) {
-            console.error('[Ollama Service] Warning: Failed to pull the default model automatically. You may need to run `docker exec dockermanager-ollama ollama pull llama3.2:1b` manually.', e.message);
+            if (listOutput.includes(DEFAULT_MODEL.split(':')[0])) {
+                modelAlreadyPresent = true;
+                console.log(`[Ollama Service] Model ${DEFAULT_MODEL} already present. Skipping pull.`);
+            }
+        } catch (_) { /* can't check, will try to pull */ }
+
+        if (!modelAlreadyPresent) {
+            console.log(`[Ollama Service] Pulling model ${DEFAULT_MODEL} for the first time...`);
+            try {
+                const container = docker.getContainer(OLLAMA_CONTAINER_NAME);
+                const exec = await container.exec({
+                    Cmd: ['ollama', 'pull', DEFAULT_MODEL],
+                    AttachStdout: true,
+                    AttachStderr: true
+                });
+                await new Promise((resolve, reject) => {
+                    exec.start({ hijack: true, stdin: false }, (err, stream) => {
+                        if (err) return reject(err);
+                        stream.on('end', resolve);
+                    });
+                });
+                console.log(`[Ollama Service] Model ${DEFAULT_MODEL} downloaded and ready.`);
+            } catch (e) {
+                console.error('[Ollama Service] Failed to pull model. Run manually: docker exec dockermanager-ollama ollama pull ' + DEFAULT_MODEL, e.message);
+            }
         }
 
     } catch (err) {
