@@ -11,7 +11,7 @@ La infraestructura de OrbitCloud ejecuta en producción integrando de forma cont
 | Servicio                                  | Enlace                         | Notas de Acceso |
 |-------------------------------------------|--------------------------------|-----------------|
 | **Plataforma Web (Frontend)**             | https://orbitcloud.app         | Registro abierto público |
-| **Monitorización (Grafana + Loki)**       | https://grafana.orbitcloud.app | Requiere credenciales Admin generadas en `.env` |
+| **Monitorización (Grafana + Loki)**       | https://grafana.orbitcloud.app | |
 | **Bóveda de Backups (MinIO)**             | *Sin acceso público*           | Solo accesible vía SSH Tunnel al puerto 9001 del VPS |
 
 > [!TIP]
