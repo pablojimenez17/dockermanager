@@ -5,34 +5,41 @@ import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
 
-const PLAN_PRIORITY = {
-  agency: 0,
-  enterprise: 1,
-  pro: 2,
-  free: 3
-};
-
 const Plans = () => {
   const { t } = useTranslation();
   const { setUserPlan } = useOrg();
   const [currentPlan, setCurrentPlan] = useState('free');
   const [pendingPlanType, setPendingPlanType] = useState(null);
   const [planChangeAt, setPlanChangeAt] = useState(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState(null);
+  const [currentPeriodEnd, setCurrentPeriodEnd] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
+  const [openingPortal, setOpeningPortal] = useState(false);
   const { addToast } = useToast();
 
   const fetchCurrentPlan = async () => {
     try {
-      const res = await axios.get('/api/auth/me');
+      const res = await axios.get('/api/billing/subscription');
       const normalizedPlan = (res.data.planType || 'free').toLowerCase();
       setCurrentPlan(normalizedPlan);
       setPendingPlanType(res.data.pendingPlanType || null);
       setPlanChangeAt(res.data.planChangeAt || null);
+      setSubscriptionStatus(res.data.subscriptionStatus || null);
+      setCurrentPeriodEnd(res.data.currentPeriodEnd || res.data.planExpiresAt || null);
       // Update local storage just in case
       localStorage.setItem('planType', normalizedPlan);
-    } catch (error) {
-      console.error('Failed to fetch user profile:', error);
+      setUserPlan(normalizedPlan);
+    } catch {
+      const fallbackRes = await axios.get('/api/auth/me');
+      const fallbackPlan = (fallbackRes.data.planType || 'free').toLowerCase();
+      setCurrentPlan(fallbackPlan);
+      setPendingPlanType(fallbackRes.data.pendingPlanType || null);
+      setPlanChangeAt(fallbackRes.data.planChangeAt || null);
+      setSubscriptionStatus(fallbackRes.data.subscriptionStatus || null);
+      setCurrentPeriodEnd(fallbackRes.data.currentPeriodEnd || fallbackRes.data.planExpiresAt || null);
+      localStorage.setItem('planType', fallbackPlan);
+      setUserPlan(fallbackPlan);
     } finally {
       setLoading(false);
     }
@@ -44,31 +51,20 @@ const Plans = () => {
 
   const canSelectPlan = (targetPlan) => {
     if (targetPlan === 'free') return false;
-    if (targetPlan === currentPlan) return true;
-    return PLAN_PRIORITY[targetPlan] < PLAN_PRIORITY[currentPlan];
+    if (targetPlan === currentPlan) return false;
+    return true;
   };
 
   const handlePlanChange = async (planType) => {
-    if (planType === currentPlan) return;
     if (!canSelectPlan(planType)) return;
 
     setProcessing(true);
     try {
-      const res = await axios.post('/api/plans/upgrade', { planType });
-
-      const normalizedPlan = (res.data.planType || 'free').toLowerCase();
-      setCurrentPlan(normalizedPlan);
-      setPendingPlanType(res.data.pendingPlanType || null);
-      setPlanChangeAt(res.data.planChangeAt || null);
-      localStorage.setItem('planType', normalizedPlan);
-      localStorage.setItem('limits', JSON.stringify(res.data.limits));
-      setUserPlan(normalizedPlan);
-
-      addToast(
-        t("auto.upgrade_success_title"),
-        t("auto.plan_change_success_to", { plan: planType.toUpperCase() }),
-        'success'
-      );
+      const res = await axios.post('/api/billing/checkout-session', { planType });
+      if (!res.data?.url) {
+        throw new Error('Stripe checkout URL not returned');
+      }
+      window.location.href = res.data.url;
     } catch (error) {
       addToast(t("auto.plan_change_failed_title"), error.response?.data?.message || t("auto.plan_change_failed_message"), 'error');
     } finally {
@@ -76,11 +72,25 @@ const Plans = () => {
     }
   };
 
+  const handleManageBilling = async () => {
+    setOpeningPortal(true);
+    try {
+      const res = await axios.post('/api/billing/portal-session');
+      if (!res.data?.url) {
+        throw new Error('Stripe portal URL not returned');
+      }
+      window.location.href = res.data.url;
+    } catch (error) {
+      addToast(t("auto.plan_change_failed_title"), error.response?.data?.message || t("auto.plan_change_failed_message"), 'error');
+      setOpeningPortal(false);
+    }
+  };
+
   const plans = [
   {
     id: 'free',
     name: 'Hobby',
-    price: '$0',
+    price: '€0',
     period: '/mo',
     description: 'Perfect for learning Docker and running small personal projects.',
     icon: <Star className="text-slate-400" size={32} />,
@@ -99,7 +109,7 @@ const Plans = () => {
   {
     id: 'pro',
     name: 'Professional',
-    price: '$12',
+    price: '€19.95',
     period: '/mo',
     description: 'For active developers needing more resources and flexibility.',
     icon: <Zap className="text-brand-500" size={32} />,
@@ -119,7 +129,7 @@ const Plans = () => {
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '$45',
+    price: '€59.95',
     period: '/mo',
     description: 'Uncapped potential for heavy applications and production workloads.',
     icon: <Shield className="text-purple-500" size={32} />,
@@ -139,7 +149,7 @@ const Plans = () => {
   {
     id: 'agency',
     name: 'Agency / MSP',
-    price: '$199',
+    price: '€149.95',
     period: '/mo',
     description: 'Provide managed Docker environments to your clients with sub-organizations.',
     icon: <Building2 className="text-amber-500" size={32} />,
@@ -228,11 +238,27 @@ const Plans = () => {
         })}
             </div>
 
-            <div className="mt-16 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-sm p-6 flex items-start text-blue-800 dark:text-blue-300 max-w-3xl mx-auto shadow-sm">
+            <div className="mt-10 flex justify-center">
+                <button
+          onClick={handleManageBilling}
+          disabled={openingPortal}
+          className="px-6 py-3 rounded-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                    {openingPortal ? t("auto.processing_") : t("auto.manage_billing_portal")}
+                </button>
+            </div>
+
+            <div className="mt-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-sm p-6 flex items-start text-blue-800 dark:text-blue-300 max-w-3xl mx-auto shadow-sm">
                 <AlertCircle className="shrink-0 mr-4 mt-0.5" />
                 <div>
-                    <h4 className="font-bold mb-1">{t("auto.billing_simulation")}</h4>
-                    <p className="text-sm opacity-90">{t("auto.in_this_development_environment_payments")}</p>
+                    <h4 className="font-bold mb-1">{t("auto.billing_status_title")}</h4>
+                    <p className="text-sm opacity-90">
+                        {t("auto.billing_status_value")} <strong>{(subscriptionStatus || 'inactive').toUpperCase()}</strong>
+                    </p>
+                    {currentPeriodEnd && (
+                      <p className="text-sm mt-2 opacity-90">
+                        {t("auto.billing_cycle_ends_on", { date: new Date(currentPeriodEnd).toLocaleString() })}
+                      </p>
+                    )}
                     {pendingPlanType && (
                       <p className="text-sm mt-3 opacity-90">
                         {t("auto.scheduled_change_to")} <strong>{pendingPlanType.toUpperCase()}</strong>

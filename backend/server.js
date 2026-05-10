@@ -19,6 +19,7 @@ import templateRoutes from './routes/templateRoutes.js';
 // import bucketRoutes from './routes/bucketRoutes.js';
 import snapshotRoutes from './routes/snapshotRoutes.js';
 import orgRoutes from './routes/orgRoutes.js';
+import billingRoutes, { billingWebhookHandler } from './routes/billingRoutes.js';
 import { setupSockets } from './websockets.js';
 import { initProxyService } from './proxyService.js';
 import { initMinio } from './services/minioService.js';
@@ -53,16 +54,19 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// 3. Body parser, reading data from body into req.body
+// 3. Stripe webhook must receive the raw body to validate signatures.
+app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingWebhookHandler);
+
+// 4. Body parser, reading data from body into req.body
 app.use(express.json({ limit: '10kb' }));
 
-// 4. Data sanitization against NoSQL query injection
+// 5. Data sanitization against NoSQL query injection
 app.use(mongoSanitize());
 
-// 5. Data sanitization against XSS
+// 6. Data sanitization against XSS
 app.use(xss());
 
-// 6. Prevent parameter pollution
+// 7. Prevent parameter pollution
 app.use(hpp());
 
 // Set up HTTPS Server
@@ -109,6 +113,7 @@ app.use('/api/templates', templateRoutes);
 // app.use('/api/buckets', bucketRoutes);
 app.use('/api/snapshots', snapshotRoutes);
 app.use('/api/organizations', orgRoutes);
+app.use('/api/billing', billingRoutes);
 
 // Database Connection
 mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanager')

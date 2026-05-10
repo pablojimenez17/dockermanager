@@ -102,7 +102,7 @@ const Welcome = () => {
   // Pricing Plans Array
   const plans = [
   {
-    name: 'Hobby', price: '$0', desc: 'Perfect for learning Docker and running small personal projects.',
+    name: 'Hobby', price: '€0', desc: 'Perfect for learning Docker and running small personal projects.',
     features: [
     { text: 'Up to 2 Containers limit', included: true },
     { text: '1 GB RAM quota', included: true },
@@ -114,7 +114,7 @@ const Welcome = () => {
     cta: 'Start Free', highlighted: false
   },
   {
-    name: 'Professional', price: '$12', desc: 'For active developers needing more resources and flexibility.',
+    name: 'Professional', price: '€19.95', desc: 'For active developers needing more resources and flexibility.',
     tag: 'Most Popular',
     features: [
     { text: 'Up to 10 Containers limit', included: true },
@@ -128,7 +128,7 @@ const Welcome = () => {
     cta: 'Upgrade Now', highlighted: true
   },
   {
-    name: 'Enterprise', price: '$45', desc: 'Uncapped potential for heavy applications and production workloads.',
+    name: 'Enterprise', price: '€59.95', desc: 'Uncapped potential for heavy applications and production workloads.',
     features: [
     { text: 'Up to 50 Containers limit', included: true },
     { text: '32 GB RAM quota', included: true },
@@ -141,7 +141,7 @@ const Welcome = () => {
     cta: 'Upgrade Now', highlighted: false
   },
   {
-    name: 'Agency / MSP', price: '$199', desc: 'Provide managed Docker environments to your clients with sub-organizations.',
+    name: 'Agency / MSP', price: '€149.95', desc: 'Provide managed Docker environments to your clients with sub-organizations.',
     tag: 'For Teams',
     features: [
     { text: 'Unlimited Containers limit', included: true },
@@ -152,7 +152,7 @@ const Welcome = () => {
     { text: 'Custom Roles & RBAC', included: true },
     { text: 'White-glove 24/7 Support', included: true }],
 
-    cta: 'Contact Sales', highlighted: false
+    cta: 'Upgrade Now', highlighted: false
   }];
 
 

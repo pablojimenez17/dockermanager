@@ -1,60 +1,9 @@
 import express from 'express';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
+import { PLAN_LIMITS as PLANS, PLAN_PRIORITY, isValidPlanType } from '../config/plans.js';
 
 const router = express.Router();
-
-// Define plans
-const PLANS = {
-    free: {
-        maxContainers: 2,
-        maxRamMb: 1024,
-        maxCpuCores: 1,
-        maxDomains: 0,
-        maxVolumes: 1,
-        maxVolumeSizeMb: 1024, // 1GB
-        maxBuckets: 1
-    },
-    pro: {
-        maxContainers: 10,
-        maxRamMb: 8192,
-        maxCpuCores: 4,
-        maxDomains: 3,
-        maxVolumes: 5,
-        maxVolumeSizeMb: 10240, // 10GB
-        maxSnapshots: 5,
-        maxBuckets: 5
-    },
-    enterprise: {
-        maxContainers: 50,
-        maxRamMb: 32768, // 32 GB
-        maxCpuCores: 16,
-        maxDomains: 999,
-        maxVolumes: 20,
-        maxVolumeSizeMb: 102400, // 100GB
-        maxSnapshots: 999,
-        maxBuckets: 999
-    },
-    agency: {
-        maxContainers: 999,
-        maxRamMb: 131072, // 128 GB
-        maxCpuCores: 64,
-        maxDomains: 999,
-        maxVolumes: 100,
-        maxVolumeSizeMb: 1048576, // 1TB
-        maxSnapshots: 999,
-        maxBuckets: 999
-    }
-};
-
-const PLAN_PRIORITY = {
-    agency: 0,
-    enterprise: 1,
-    pro: 2,
-    free: 3
-};
-
-const isValidPlanType = (planType) => Object.prototype.hasOwnProperty.call(PLANS, planType);
 
 router.use(authMiddleware);
 

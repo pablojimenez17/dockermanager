@@ -44,6 +44,29 @@ const userSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    stripeCustomerId: {
+        type: String,
+        default: null,
+        index: true
+    },
+    stripeSubscriptionId: {
+        type: String,
+        default: null,
+        index: true
+    },
+    stripePriceId: {
+        type: String,
+        default: null
+    },
+    subscriptionStatus: {
+        type: String,
+        enum: ['active', 'trialing', 'past_due', 'unpaid', 'canceled', 'incomplete', 'incomplete_expired', null],
+        default: null
+    },
+    currentPeriodEnd: {
+        type: Date,
+        default: null
+    },
     limits: {
         maxContainers: { type: Number, default: 2 },
         maxRamMb: { type: Number, default: 1024 },

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
 import { sendWelcomeEmail, sendVerificationCode, sendPasswordResetEmail } from '../services/emailService.js';
+import { PLAN_LIMITS } from '../config/plans.js';
 
 const router = express.Router();
 
@@ -263,13 +264,6 @@ router.get('/me', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        const PLANS = {
-            free: { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1, maxDomains: 0, maxVolumes: 1, maxVolumeSizeMb: 1024, maxBuckets: 1, maxSnapshots: 0 },
-            pro: { maxContainers: 10, maxRamMb: 8192, maxCpuCores: 4, maxDomains: 3, maxVolumes: 5, maxVolumeSizeMb: 10240, maxSnapshots: 5, maxBuckets: 5 },
-            enterprise: { maxContainers: 50, maxRamMb: 32768, maxCpuCores: 16, maxDomains: 999, maxVolumes: 20, maxVolumeSizeMb: 102400, maxSnapshots: 999, maxBuckets: 999 },
-            agency: { maxContainers: 999, maxRamMb: 131072, maxCpuCores: 64, maxDomains: 999, maxVolumes: 100, maxVolumeSizeMb: 1048576, maxSnapshots: 999, maxBuckets: 999 }
-        };
-
         const planType = (req.organization ? req.organization.plan : user.planType) || 'free';
         let resolvedLimits = user.limits;
 
@@ -279,8 +273,8 @@ router.get('/me', authMiddleware, async (req, res) => {
                 maxDomains: 999, maxVolumes: 999, maxVolumeSizeMb: 999999,
                 maxSnapshots: 999, maxBuckets: 999
             };
-        } else if (PLANS[planType]) {
-             resolvedLimits = PLANS[planType];
+        } else if (PLAN_LIMITS[planType]) {
+             resolvedLimits = PLAN_LIMITS[planType];
         }
 
         const responseObj = user.toObject();
