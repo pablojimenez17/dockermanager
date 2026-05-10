@@ -1,9 +1,18 @@
 import { useTranslation } from "react-i18next";
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Check, Star, Zap, Shield, AlertCircle, Building2 } from 'lucide-react';
 import axios from 'axios';
 import { useToast } from '../components/ToastContext';
 import { useOrg } from '../context/OrgContext';
+
+// Lower number = higher tier (must match backend/config/plans.js PLAN_PRIORITY).
+const PLAN_PRIORITY = {
+  agency: 0,
+  enterprise: 1,
+  pro: 2,
+  free: 3
+};
 
 const Plans = () => {
   const { t } = useTranslation();
@@ -49,14 +58,23 @@ const Plans = () => {
     fetchCurrentPlan();
   }, []);
 
-  const canSelectPlan = (targetPlan) => {
+  /** True only for upgrades: paid tier strictly higher than current (Checkout / Stripe). */
+  const canUpgradeViaCheckout = (targetPlan) => {
     if (targetPlan === 'free') return false;
     if (targetPlan === currentPlan) return false;
-    return true;
+    const currentP = PLAN_PRIORITY[currentPlan] ?? PLAN_PRIORITY.free;
+    const targetP = PLAN_PRIORITY[targetPlan];
+    return targetP < currentP;
   };
 
+  /** Lower or equal paid tier than current → user must use Settings / Portal, not Checkout. */
+  const isPlanDowngradeOrSameTierBlocked = (targetPlan) =>
+    targetPlan !== 'free' &&
+    targetPlan !== currentPlan &&
+    !canUpgradeViaCheckout(targetPlan);
+
   const handlePlanChange = async (planType) => {
-    if (!canSelectPlan(planType)) return;
+    if (!canUpgradeViaCheckout(planType)) return;
 
     setProcessing(true);
     try {
@@ -90,7 +108,7 @@ const Plans = () => {
   {
     id: 'free',
     name: 'Hobby',
-    price: '€0',
+    price: '$0',
     period: '/mo',
     description: 'Perfect for learning Docker and running small personal projects.',
     icon: <Star className="text-slate-400" size={32} />,
@@ -109,7 +127,7 @@ const Plans = () => {
   {
     id: 'pro',
     name: 'Professional',
-    price: '€19.95',
+    price: '$19.95',
     period: '/mo',
     description: 'For active developers needing more resources and flexibility.',
     icon: <Zap className="text-brand-500" size={32} />,
@@ -129,7 +147,7 @@ const Plans = () => {
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '€59.95',
+    price: '$59.95',
     period: '/mo',
     description: 'Uncapped potential for heavy applications and production workloads.',
     icon: <Shield className="text-purple-500" size={32} />,
@@ -149,7 +167,7 @@ const Plans = () => {
   {
     id: 'agency',
     name: 'Agency / MSP',
-    price: '€149.95',
+    price: '$149.95',
     period: '/mo',
     description: 'Provide managed Docker environments to your clients with sub-organizations.',
     icon: <Building2 className="text-amber-500" size={32} />,
@@ -167,6 +185,17 @@ const Plans = () => {
     buttonColor: 'bg-brand-600 hover:bg-brand-700 border-transparent text-white hover:from-amber-500 hover:to-orange-500 shadow-sm shadow-amber-500/30 hover:-translate-y-0.5'
   }];
 
+  const currentPlanDisplayName = plans.find((p) => p.id === currentPlan)?.name || currentPlan;
+
+  const stripeSubscriptionStatusDisplay = (() => {
+    if (subscriptionStatus) {
+      return subscriptionStatus.replace(/_/g, ' ').toUpperCase();
+    }
+    if (currentPlan === 'free') {
+      return t('auto.billing_stripe_free_tier');
+    }
+    return t('auto.billing_stripe_status_unavailable');
+  })();
 
   if (loading) return <div className="p-8 text-center animate-pulse text-slate-500">{t("auto.loading_plans_")}</div>;
 
@@ -182,13 +211,14 @@ const Plans = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-start">
                 {plans.map((plan) => {
           const isActive = currentPlan === plan.id;
-          const selectable = canSelectPlan(plan.id);
+          const canCheckout = canUpgradeViaCheckout(plan.id);
+          const downgradeBlocked = isPlanDowngradeOrSameTierBlocked(plan.id);
           const isFreePlan = plan.id === 'free';
 
           let buttonText = t("auto.upgrade_to_plan", { plan: plan.name });
           if (isActive) buttonText = t("auto.current_plan");
           if (isFreePlan) buttonText = t("auto.available_only_via_cancellation");
-          if (!selectable && !isActive && !isFreePlan) buttonText = t("auto.change_available_in_settings");
+          if (downgradeBlocked) buttonText = t("auto.change_available_in_settings");
 
           return (
             <div key={plan.id} className={`rounded-sm p-8 border ${plan.color} ${plan.id === 'pro' && 'ring-2 ring-brand-500 ring-offset-4 ring-offset-slate-50 dark:ring-offset-slate-900'} transition-all duration-300`}>
@@ -221,10 +251,17 @@ const Plans = () => {
                 )}
                             </ul>
 
+                            {downgradeBlocked ? (
+                <Link
+                  to="/app/settings"
+                  className="w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center opacity-90 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
+                  {buttonText}
+                </Link>
+              ) :
                             <button
                 onClick={() => handlePlanChange(plan.id)}
-                disabled={isActive || processing || !selectable}
-                className={`w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center ${plan.buttonColor} ${(isActive || !selectable) ? 'opacity-50 cursor-not-allowed bg-slate-200 border-slate-300 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : ''}`}>
+                disabled={isActive || processing || !canCheckout}
+                className={`w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center ${plan.buttonColor} ${(isActive || !canCheckout) ? 'opacity-50 cursor-not-allowed bg-slate-200 border-slate-300 text-slate-500 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-500' : ''}`}>
                 
                                 {processing ?
                 <span className="animate-pulse">{t("auto.processing_")}</span> :
@@ -233,6 +270,7 @@ const Plans = () => {
                 buttonText
                 }
                             </button>
+              }
                         </div>);
 
         })}
@@ -252,7 +290,13 @@ const Plans = () => {
                 <div>
                     <h4 className="font-bold mb-1">{t("auto.billing_status_title")}</h4>
                     <p className="text-sm opacity-90">
-                        {t("auto.billing_status_value")} <strong>{(subscriptionStatus || 'inactive').toUpperCase()}</strong>
+                        {t("auto.billing_your_plan_label")}{' '}
+                        <strong>{currentPlanDisplayName}</strong>
+                        {' '}({t("auto.billing_plan_tier_label")}: <strong>{currentPlan}</strong>)
+                    </p>
+                    <p className="text-sm mt-2 opacity-90">
+                        {t("auto.billing_stripe_status_label")}{' '}
+                        <strong>{stripeSubscriptionStatusDisplay}</strong>
                     </p>
                     {currentPeriodEnd && (
                       <p className="text-sm mt-2 opacity-90">

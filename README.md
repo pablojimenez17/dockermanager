@@ -437,6 +437,30 @@ OrbitCloud incorpora un robusto sistema de autenticación multifactor (2FA) y no
 
 ---
 
+## 🔌 9.1 Integración de APIs Externas (Producción Real)
+
+OrbitCloud integra servicios de terceros de forma nativa en el Backend para cubrir flujos críticos de negocio (identidad, cobros recurrentes y comunicaciones transaccionales), manteniendo un diseño desacoplado por rutas + servicios + webhooks.
+
+- **Stripe Billing API (Suscripciones):**
+  - Checkout Session para alta/cambio de plan de pago.
+  - Customer Portal para gestión autónoma de facturación por parte del usuario.
+  - Webhooks firmados para sincronizar el estado real de suscripción (`active`, `past_due`, `canceled`, etc.) y aplicar automáticamente los límites de plan en base de datos.
+  - Idempotencia de eventos para evitar dobles procesados cuando Stripe reintenta entregas.
+  - **Datos sensibles de pago:** OrbitCloud **no almacena ni procesa** números de tarjeta completos, CVC ni datos equivalentes de método de pago. Esa información la captura y custodia **Stripe** (cumplimiento PCI DSS). En nuestra base de datos solo persistimos identificadores técnicos necesarios para la integración (por ejemplo `stripeCustomerId`, `stripeSubscriptionId`, estado de suscripción y plan aplicado).
+
+- **SendGrid API (Email transaccional):**
+  - OTP de verificación de acceso (2FA por email).
+  - Recuperación de contraseña con códigos efímeros.
+  - Envío asíncrono para no bloquear latencia de login/registro cuando el proveedor de correo responde lento.
+
+- **Arquitectura de integración API-first:**
+  - `routes` para exponer endpoints limpios,
+  - `services` para encapsular lógica externa (sin acoplarla a controladores),
+  - validaciones de entorno (`.env`) para claves y secretos,
+  - sincronización de estado orientada a eventos (webhooks) en vez de procesos manuales.
+
+---
+
 ## ⚖️ 10. Modelo de Responsabilidad Compartida
 
 | Resonsabilidad / Capa | ¿Quién se hace cargo? | Comportamiento en OrbitCloud |
