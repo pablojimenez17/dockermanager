@@ -64,8 +64,18 @@ router.post('/register', async (req, res) => {
         user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        await sendWelcomeEmail(user.email, user.name);
-        await sendVerificationCode(user.email, code);
+        // Do not block signup response on email provider latency/failures.
+        Promise.allSettled([
+            sendWelcomeEmail(user.email, user.name),
+            sendVerificationCode(user.email, code)
+        ]).then((results) => {
+            results.forEach((result, idx) => {
+                if (result.status === 'rejected') {
+                    const label = idx === 0 ? 'welcome email' : 'verification email';
+                    console.error(`Register ${label} failed:`, result.reason?.message || result.reason);
+                }
+            });
+        });
 
         res.status(201).json({ 
             message: 'User created successfully. Verification required.', 
@@ -116,7 +126,10 @@ router.post('/login', async (req, res) => {
         user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        await sendVerificationCode(user.email, code);
+        // Do not block login response on email provider latency/failures.
+        sendVerificationCode(user.email, code).catch((error) => {
+            console.error('Login verification email failed:', error.message || error);
+        });
 
         res.json({
             message: 'Verification required.',
@@ -187,7 +200,10 @@ router.post('/forgot-password', async (req, res) => {
         user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        await sendPasswordResetEmail(user.email, code);
+        // Do not block password reset response on email provider latency/failures.
+        sendPasswordResetEmail(user.email, code).catch((error) => {
+            console.error('Password reset email failed:', error.message || error);
+        });
 
         res.json({ message: 'If that email is in our database, we will send a recovery code.', success: true });
     } catch (error) {
