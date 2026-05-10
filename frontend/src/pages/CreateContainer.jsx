@@ -17,6 +17,9 @@ const getEmptyContainer = () => ({
   enableInternet: false,
   extraNetworks: [],       // additional networks to connect after creation
   ipv4Address: '',
+  isPublic: false,
+  internalPort: '',
+  freshData: false,
   envVars: [{ key: '', value: '', type: 'raw' }],
   showAdvanced: false,
   volumeName: '',
@@ -135,6 +138,12 @@ const CreateContainer = () => {
     }
   };
 
+  const isInvalidEnvVar = (env) => {
+    if (env.key.trim() === '') return false;
+    if (env.type === 'secret') return env.value.trim() === '';
+    return env.value.trim() === '';
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -142,6 +151,11 @@ const CreateContainer = () => {
 
     try {
       const payload = containers.map((c) => {
+        const invalidEnv = c.envVars.find((env) => isInvalidEnvVar(env));
+        if (invalidEnv) {
+          throw new Error(t("auto.env_validation_required_value"));
+        }
+
         const validEnvVars = c.envVars.
           filter((env) => env.key.trim() !== '').
           map((env) => env.type === 'secret' ? `${env.key.trim()}={{SECRET:${env.value.trim()}}}` : `${env.key.trim()}=${env.value.trim()}`);
@@ -158,10 +172,10 @@ const CreateContainer = () => {
           enableInternet: c.enableInternet === true,
           extraNetworks: c.extraNetworks || [],
           ipv4Address: c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' ? c.ipv4Address : undefined,
-          domain: undefined,
-          domainPort: undefined,
-          volumeName: c.volumeName && c.volumeMountPath ? c.volumeName : undefined,
-          volumeMountPath: c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined
+          isPublic: c.isPublic === true,
+          internalPort: c.isPublic ? c.internalPort : undefined,
+          volumeName: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeName : undefined),
+          volumeMountPath: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined)
         };
       });
       await axios.post('/api/containers', { stack: payload });
@@ -251,6 +265,44 @@ const CreateContainer = () => {
                   <p className="text-xs text-gray-500 mt-1">{t("auto.format_host_container")}</p>
                 </div>
 
+                <div className="border border-gray-200 dark:border-slate-700 rounded p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800 dark:text-slate-100 flex items-center">
+                        {t("auto.public_access")}
+                        <div className="relative group/tooltip ml-2 flex items-center">
+                          <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-64 text-center z-[100] font-medium shadow-sm leading-relaxed">
+                            {t("auto.public_access_info")}
+                          </div>
+                        </div>
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400">{t("auto.public_access_auto_domain")}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => updateContainer(c.id, 'isPublic', !c.isPublic)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${c.isPublic ? 'bg-brand-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${c.isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  {c.isPublic && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.internal_app_port")}</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required={c.isPublic}
+                        value={c.internalPort}
+                        onChange={(e) => updateContainer(c.id, 'internalPort', e.target.value)}
+                        placeholder={t("auto.e_g_3000")}
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-brand-500 outline-none text-sm font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="border border-gray-200 dark:border-slate-700 rounded overflow-hidden">
                   <button type="button" onClick={() => toggleAdvanced(c.id)} className="w-full flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 dark:bg-slate-800/50 dark:hover:bg-slate-800 transition-colors">
                     <span className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center">
@@ -315,8 +367,8 @@ const CreateContainer = () => {
                                   </p>
                                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">
                                     {c.enableInternet
-                                      ? '⚠️ Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Úsalo bajo tu responsabilidad.'
-                                      : 'Tu contenedor está completamente aislado. Solo puede comunicarse con tus otros servicios.'}
+                                      ? t("auto.internet_enabled_warning")
+                                      : t("auto.private_container_description")}
                                   </p>
                                 </div>
                               </div>
@@ -357,23 +409,39 @@ const CreateContainer = () => {
                         }
                       </div>
 
+                      <div className="rounded border border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/10 p-3">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">{t("auto.fresh_data_mode")}</p>
+                            <p className="text-xs text-amber-700 dark:text-amber-400">{t("auto.fresh_data_mode_description")}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => updateContainer(c.id, 'freshData', !c.freshData)}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${c.freshData ? 'bg-amber-500' : 'bg-gray-300 dark:bg-slate-600'}`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${c.freshData ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t("auto.environment_variables")}</label>
                         <div className="space-y-2">
                           {c.envVars.map((env, eIdx) =>
                             <div key={eIdx} className="flex space-x-2">
                               <input type="text" placeholder={t("auto.key")} value={env.key} onChange={(e) => updateEnvVar(c.id, eIdx, 'key', e.target.value)} className="w-1/3 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
-                              <select value={env.type} onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)} className="w-24 px-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-xs">
+                              <select value={env.type} onChange={(e) => updateEnvVar(c.id, eIdx, 'type', e.target.value)} className={`w-24 px-2 border rounded bg-white dark:bg-slate-900 text-xs ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`}>
                                 <option value="raw">{t("auto.raw")}</option>
                                 <option value="secret">{t("auto.secret")}</option>
                               </select>
                               {env.type === 'secret' ?
-                                <select value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono">
+                                <select value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className={`flex-1 px-3 py-1.5 border rounded bg-white dark:bg-slate-900 text-sm font-mono ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`}>
                                   <option value="">{t("auto.select_secret")}</option>
                                   {availableSecrets.map((sec) => <option key={sec._id} value={sec.name}>{sec.name}</option>)}
                                 </select> :
 
-                                <input type="text" placeholder={t("auto.value")} value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className="flex-1 px-3 py-1.5 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
+                                <input type="text" placeholder={t("auto.value")} value={env.value} onChange={(e) => updateEnvVar(c.id, eIdx, 'value', e.target.value)} className={`flex-1 px-3 py-1.5 border rounded bg-white dark:bg-slate-900 text-sm font-mono ${isInvalidEnvVar(env) ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-slate-600'}`} />
                               }
                               <button type="button" onClick={() => removeEnvVar(c.id, eIdx)} className="p-1.5 text-gray-400 hover:text-red-500 rounded"><Trash2 size={16} /></button>
                             </div>
@@ -398,6 +466,11 @@ const CreateContainer = () => {
             {loading ? <span className="animate-spin w-4 h-4 border-2 border-white/20 border-t-white rounded-full"></span> : 'Deploy'}
           </button>
         </div>
+
+        <p className="text-xs text-amber-700 dark:text-amber-400 flex items-start">
+          <Info size={14} className="mr-1.5 shrink-0 mt-0.5" />
+          {t("auto.public_domain_certificate_notice")}
+        </p>
       </form>
     </div>);
 

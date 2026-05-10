@@ -14,6 +14,8 @@ import fs from 'fs';
 const router = express.Router();
 // Use Dockerode connected to local socket
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const ORBIT_BASE_DOMAIN = process.env.ORBIT_BASE_DOMAIN || 'orbitcloud.app';
+const RESERVED_SUBDOMAINS = ['admin', 'api', 'www'];
 
 router.use(authMiddleware);
 
@@ -70,23 +72,35 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
  */
 const attachProxyToVpc = async (networkName) => {
     try {
-        const containers = await docker.listContainers({
-            filters: { name: ['dockermanager-lan-proxy'] }
+        const preferred = await docker.listContainers({
+            filters: { name: ['dockermanager-proxy'] }
         });
-        if (containers.length === 0) {
-            console.warn('[VPC] lan-proxy not found, skipping proxy attach.');
+        const fallback = preferred.length === 0
+            ? await docker.listContainers({ filters: { name: ['dockermanager-lan-proxy'] } })
+            : [];
+        const proxyContainer = preferred[0] || fallback[0];
+        if (!proxyContainer) {
+            console.warn('[VPC] No proxy container found, skipping proxy attach.');
             return;
         }
-        const proxyId = containers[0].Id;
+        const proxyId = proxyContainer.Id;
         const network = docker.getNetwork(networkName);
         const netInfo = await network.inspect();
         const alreadyConnected = Object.keys(netInfo.Containers || {}).includes(proxyId);
         if (!alreadyConnected) {
-            console.log(`[VPC] Attaching lan-proxy to ${networkName} for domain routing`);
+            console.log(`[VPC] Attaching proxy to ${networkName} for domain routing`);
             await network.connect({ Container: proxyId });
         }
+        // Verify final membership to fail fast if Docker ignored/failed connect.
+        const verify = await network.inspect();
+        const isConnected = Object.keys(verify.Containers || {}).includes(proxyId);
+        if (!isConnected) {
+            throw new Error(`Proxy was not connected to network ${networkName}`);
+        }
+        return true;
     } catch (err) {
-        console.warn(`[VPC] Could not attach lan-proxy to ${networkName}:`, err.message);
+        console.warn(`[VPC] Could not attach proxy to ${networkName}:`, err.message);
+        return false;
     }
 };
 // ============================================================
@@ -219,6 +233,48 @@ const resolveRegistryAuth = async (image, userId) => {
     return authconfig;
 };
 
+const sanitizeLabelPart = (value) => (value || '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const buildUserScope = (email, userId) => {
+    const emailPrefix = email && email.includes('@') ? email.split('@')[0] : '';
+    const sanitized = sanitizeLabelPart(emailPrefix);
+    return sanitized || sanitizeLabelPart(userId?.toString() || '') || 'user';
+};
+
+const generateUniqueDomain = async ({ name, userScope }) => {
+    const baseSubdomain = sanitizeLabelPart(name);
+    if (!baseSubdomain) {
+        throw new Error('Container name cannot generate a valid subdomain');
+    }
+    if (RESERVED_SUBDOMAINS.includes(baseSubdomain)) {
+        throw new Error(`Subdomain "${baseSubdomain}" is reserved`);
+    }
+
+    let attempt = 0;
+    while (attempt < 200) {
+        const suffix = attempt === 0 ? '' : `-${attempt}`;
+        const subdomain = `${baseSubdomain}${suffix}`;
+        const domain = `${subdomain}.${userScope}.${ORBIT_BASE_DOMAIN}`;
+        const exists = await Container.findOne({ domain }).lean();
+        if (!exists) return domain;
+        attempt += 1;
+    }
+
+    throw new Error('Unable to allocate a unique domain');
+};
+
+const buildTraefikAppId = (domain, fallbackName = 'app') => {
+    const base = (domain || fallbackName || 'app').toString();
+    const id = base.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+    return id || `app${Date.now()}`;
+};
+
 // Get all containers for the logged-in user or organization
 router.get('/', async (req, res) => {
     try {
@@ -305,7 +361,7 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             // If no memory is declared, assume a 512 MB ceiling → 51 MB soft reservation.
             const declaredMb = c.memory ? parseInt(c.memory) : 512;
             requestedRamMb += Math.ceil(declaredMb * 0.1);
-            if (c.domain) requestedDomainsCount++;
+            if (c.isPublic === true) requestedDomainsCount++;
         });
 
         // 3. Domain limits
@@ -357,7 +413,18 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
         // Deploy sequentially to respect implicit dependencies
         for (const config of stack) {
             console.log(`[DEBUG] Processing config for image: ${config.image} `);
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, domain, domainPort, volumeName, volumeMountPath } = config;
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, isPublic, internalPort, volumeName, volumeMountPath } = config;
+            const publishPublicly = isPublic === true;
+            const resolvedInternalPort = publishPublicly ? parseInt(internalPort, 10) : undefined;
+            if (publishPublicly && (!resolvedInternalPort || Number.isNaN(resolvedInternalPort) || resolvedInternalPort <= 0)) {
+                throw new Error(`Container "${name}" requires a valid internalPort when public access is enabled`);
+            }
+
+            let domain;
+            if (publishPublicly) {
+                const userScope = buildUserScope(user.email, ownerId);
+                domain = await generateUniqueDomain({ name, userScope });
+            }
 
             // Ensure image exists or pull it using private registry if available
             try {
@@ -469,10 +536,10 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
             }
             console.log(`[VPC] Container '${name}' will use network: ${safeNetworkMode} (internet=${enableInternet})`);
 
-            // Expose domain port if not otherwise exposed
-            if (domain && domain.trim() !== '' && domainPort) {
-                if (!PortBindings[`${domainPort}/tcp`]) {
-                    ExposedPorts[`${domainPort}/tcp`] = {};
+            // Expose app port for reverse proxy if not otherwise exposed
+            if (publishPublicly && resolvedInternalPort) {
+                if (!PortBindings[`${resolvedInternalPort}/tcp`]) {
+                    ExposedPorts[`${resolvedInternalPort}/tcp`] = {};
                 }
             }
 
@@ -502,16 +569,17 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 Labels: {}
             };
 
-            // Inject Custom Domain (Traefik Reverse Proxy labels)
-            if (domain && domain.trim() !== '' && domainPort) {
-                const appId = name.replace(/[^a-zA-Z0-9]/g, ''); // Ensure safe router name
+            // Inject generated domain labels only for public containers
+            if (publishPublicly && domain && resolvedInternalPort) {
+                const appId = buildTraefikAppId(domain, name);
                 containerConfig.Labels = {
                     'traefik.enable': 'true',
-                    'traefik.constraint-label': 'lan-proxy',
+                    'traefik.constraint-label': 'dmz-proxy',
                     [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
-                    [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
+                    [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
+                    [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
+                    [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${resolvedInternalPort}`,
                     'traefik.docker.network': safeNetworkMode,
-                    [`traefik.http.routers.${appId}.tls.certresolver`]: 'myresolver'
                 };
             }
 
@@ -572,8 +640,11 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                 // ── VPC Proxy Attach ────────────────────────────────────────────
                 // Only attach the lan-proxy if the user intends to expose a domain.
                 // This is the single controlled ingress point into the user's VPC.
-                if (domain && domain.trim() !== '' && domainPort && safeNetworkMode !== 'none') {
-                    await attachProxyToVpc(safeNetworkMode);
+                if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
+                    const proxyAttached = await attachProxyToVpc(safeNetworkMode);
+                    if (!proxyAttached) {
+                        throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
+                    }
                 }
 
                 // ── Extra Networks ──────────────────────────────────────────────
@@ -614,7 +685,9 @@ router.post('/', checkPermission('manageContainers'), async (req, res) => {
                     dockerId: container.id,
                     userId: req.user.userId,
                     status: 'running',
-                    domain: domain && domainPort ? domain.trim() : undefined
+                    domain: publishPublicly && domain ? domain.trim() : undefined,
+                    isPublic: publishPublicly,
+                    internalPort: publishPublicly ? resolvedInternalPort : undefined
                 };
                 if (req.organization) {
                     containerData.organizationId = req.organization._id;
@@ -834,6 +907,11 @@ router.put('/:id/redeploy', async (req, res) => {
 router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { domain, domainPort } = req.body;
+        if (domain !== undefined || domainPort !== undefined) {
+            return res.status(400).json({
+                message: 'Domain settings can only be configured during container creation'
+            });
+        }
 
         const query = req.organization
             ? { _id: req.params.id, organizationId: req.organization._id }
@@ -864,10 +942,12 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
             newLabels = {
                 ...newLabels,
                 'traefik.enable': 'true',
-                'traefik.constraint-label': 'lan-proxy',
+                'traefik.constraint-label': 'dmz-proxy',
                 [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
                 [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${domainPort}`,
-                'traefik.docker.network': 'lan_net' // default assumption for new architecture
+                'traefik.docker.network': 'lan_net', // fallback if no specific network found
+                [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
+                [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
             };
 
             // If it had a custom network in oldConfig, use it
