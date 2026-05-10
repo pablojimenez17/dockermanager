@@ -56,6 +56,13 @@ const Login = () => {const { t } = useTranslation();
     }
   };
 
+  const handleBackToLogin = () => {
+    setStep('login');
+    setVerificationCode('');
+    setError('');
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 flex selection:bg-brand-500/30 overflow-hidden transition-colors duration-200">
 
@@ -335,7 +342,7 @@ const Login = () => {const { t } = useTranslation();
                             
                             <button
               type="button"
-              onClick={() => setStep('login')}
+              onClick={handleBackToLogin}
               className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
                                 {t("auto.back_to_login")}
                             

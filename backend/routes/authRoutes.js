@@ -64,8 +64,8 @@ router.post('/register', async (req, res) => {
         user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        sendWelcomeEmail(user.email, user.name);
-        sendVerificationCode(user.email, code);
+        await sendWelcomeEmail(user.email, user.name);
+        await sendVerificationCode(user.email, code);
 
         res.status(201).json({ 
             message: 'User created successfully. Verification required.', 
@@ -116,7 +116,7 @@ router.post('/login', async (req, res) => {
         user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        sendVerificationCode(user.email, code);
+        await sendVerificationCode(user.email, code);
 
         res.json({
             message: 'Verification required.',
@@ -187,7 +187,7 @@ router.post('/forgot-password', async (req, res) => {
         user.resetPasswordExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        sendPasswordResetEmail(user.email, code);
+        await sendPasswordResetEmail(user.email, code);
 
         res.json({ message: 'If that email is in our database, we will send a recovery code.', success: true });
     } catch (error) {

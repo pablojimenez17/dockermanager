@@ -3,7 +3,24 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+if (!process.env.SENDGRID_API_KEY) {
+  throw new Error('Missing SENDGRID_API_KEY environment variable');
+}
+
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+
+const sendMailOrThrow = async (msg, contextLabel) => {
+  try {
+    await sgMail.send(msg);
+  } catch (error) {
+    const sendgridMessage =
+      error?.response?.body?.errors?.map((e) => e.message).join(' | ') ||
+      error.message ||
+      'Unknown SendGrid error';
+    console.error(`Error sending ${contextLabel}:`, sendgridMessage);
+    throw new Error(`SendGrid ${contextLabel} failed: ${sendgridMessage}`);
+  }
+};
 
 export const sendWelcomeEmail = async (to, name) => {
   const msg = {
@@ -22,15 +39,8 @@ export const sendWelcomeEmail = async (to, name) => {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    console.log(`Welcome email sent to ${to}`);
-  } catch (error) {
-    console.error('Error sending welcome email:', error);
-    if (error.response) {
-      console.error(error.response.body);
-    }
-  }
+  await sendMailOrThrow(msg, 'welcome email');
+  console.log(`Welcome email sent to ${to}`);
 };
 
 export const sendVerificationCode = async (to, code) => {
@@ -51,12 +61,8 @@ export const sendVerificationCode = async (to, code) => {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    console.log(`Verification code sent to ${to}`);
-  } catch (error) {
-    console.error('Error sending verification code:', error);
-  }
+  await sendMailOrThrow(msg, 'verification code');
+  console.log(`Verification code sent to ${to}`);
 };
 
 export const sendPasswordResetEmail = async (to, code) => {
@@ -77,12 +83,8 @@ export const sendPasswordResetEmail = async (to, code) => {
     `,
   };
 
-  try {
-    await sgMail.send(msg);
-    console.log(`Password reset code sent to ${to}`);
-  } catch (error) {
-    console.error('Error sending password reset code:', error);
-  }
+  await sendMailOrThrow(msg, 'password reset code');
+  console.log(`Password reset code sent to ${to}`);
 };
 
 export default {
