@@ -4,7 +4,7 @@ import User from '../models/User.js';
 import StripeWebhookEvent from '../models/StripeWebhookEvent.js';
 import { isValidPlanType, PAID_PLAN_TYPES } from '../config/plans.js';
 import { PLAN_TO_STRIPE_PRICE, stripe, stripeReady } from '../config/stripe.js';
-import { syncFromCheckoutSession, syncFromStripeSubscription } from '../services/subscriptionSyncService.js';
+import { syncFromCheckoutSession, syncFromStripeSubscription, setUserFreePlan } from '../services/subscriptionSyncService.js';
 
 const router = express.Router();
 
@@ -157,12 +157,38 @@ export const billingWebhookHandler = async (req, res) => {
                 await syncFromStripeSubscription(subscription);
                 break;
             }
-            case 'invoice.payment_succeeded':
-            case 'invoice.payment_failed': {
+            case 'invoice.payment_succeeded': {
                 const invoice = event.data.object;
                 if (invoice.subscription) {
                     const subscription = await stripe.subscriptions.retrieve(invoice.subscription);
                     await syncFromStripeSubscription(subscription);
+                }
+                break;
+            }
+            case 'invoice.payment_failed': {
+                // Payment failed on renewal → cancel immediately, no retries.
+                const invoice = event.data.object;
+                const subscriptionId = invoice.subscription;
+                if (subscriptionId) {
+                    try {
+                        // Cancel the subscription in Stripe right away to stop retry attempts.
+                        const cancelled = await stripe.subscriptions.cancel(subscriptionId);
+                        console.log(`[Stripe] Subscription ${subscriptionId} cancelled immediately due to payment failure.`);
+                        // Sync user to Free plan using the cancelled subscription data.
+                        await syncFromStripeSubscription(cancelled);
+                    } catch (cancelErr) {
+                        console.error(`[Stripe] Failed to cancel subscription ${subscriptionId}:`, cancelErr.message);
+                        // Fallback: find user by customerId and force free plan.
+                        if (invoice.customer) {
+                            const user = await User.findOne({ stripeCustomerId: invoice.customer });
+                            if (user) {
+                                setUserFreePlan(user);
+                                user.stripeCustomerId = invoice.customer;
+                                await user.save();
+                                console.log(`[Stripe] Fallback: forced user ${user._id} to free plan.`);
+                            }
+                        }
+                    }
                 }
                 break;
             }

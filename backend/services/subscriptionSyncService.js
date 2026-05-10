@@ -1,6 +1,6 @@
 import User from '../models/User.js';
 import { PLAN_LIMITS } from '../config/plans.js';
-import { STRIPE_PRICE_TO_PLAN } from '../config/stripe.js';
+import { STRIPE_PRICE_TO_PLAN, stripe } from '../config/stripe.js';
 
 const FREE_PLAN = 'free';
 
@@ -49,7 +49,9 @@ export const syncFromStripeSubscription = async (subscription, fallbackUserId = 
     user.autoRenew = !cancelAtPeriodEnd;
 
     const paidPlan = getPlanFromPriceId(priceId);
-    const activeStates = new Set(['active', 'trialing', 'past_due', 'unpaid']);
+    // Only truly active or trialing subscriptions keep the paid plan.
+    // past_due / unpaid / canceled → immediate downgrade to free.
+    const activeStates = new Set(['active', 'trialing']);
     const shouldBePaid = activeStates.has(status) && paidPlan !== FREE_PLAN;
 
     if (shouldBePaid) {

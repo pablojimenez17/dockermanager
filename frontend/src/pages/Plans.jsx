@@ -292,12 +292,19 @@ const Plans = () => {
                     <p className="text-sm opacity-90">
                         {t("auto.billing_your_plan_label")}{' '}
                         <strong>{currentPlanDisplayName}</strong>
-                        {' '}({t("auto.billing_plan_tier_label")}: <strong>{currentPlan}</strong>)
                     </p>
-                    <p className="text-sm mt-2 opacity-90">
+                    {currentPlan !== 'free' && (
+                      <p className="text-sm mt-2 opacity-90">
                         {t("auto.billing_stripe_status_label")}{' '}
-                        <strong>{stripeSubscriptionStatusDisplay}</strong>
-                    </p>
+                        <button
+                          onClick={handleManageBilling}
+                          disabled={openingPortal}
+                          className="underline font-semibold hover:opacity-70 transition-opacity disabled:opacity-40"
+                        >
+                          {openingPortal ? t("auto.processing_") : t("auto.manage_billing_portal")}
+                        </button>
+                      </p>
+                    )}
                     {currentPeriodEnd && (
                       <p className="text-sm mt-2 opacity-90">
                         {t("auto.billing_cycle_ends_on", { date: new Date(currentPeriodEnd).toLocaleString() })}
