@@ -89,25 +89,21 @@ const PLAN_LIMITS = {
 };
 
 export const startReaper = () => {
-    console.log(`[Reaper] Service started. Checking for idle/expired containers every ${REAPER_INTERVAL_MS / 1000}s`);
-    
+    console.log(`[Reaper] Service started. Running unified cycle every ${REAPER_INTERVAL_MS / 1000}s`);
+
     setInterval(async () => {
         try {
             console.log('[Reaper] Running cycle...');
             const now = new Date();
 
-            // 1. Find users with a scheduled plan change to apply
+            // 1. Apply scheduled plan changes
             const usersWithScheduledChanges = await User.find({
                 pendingPlanType: { $ne: null },
                 planChangeAt: { $ne: null, $lte: now }
             });
-
             for (const user of usersWithScheduledChanges) {
                 const nextPlan = user.pendingPlanType;
-                if (!nextPlan || !PLAN_LIMITS[nextPlan]) {
-                    continue;
-                }
-
+                if (!nextPlan || !PLAN_LIMITS[nextPlan]) continue;
                 console.log(`[Reaper] Applying scheduled plan change for ${user.email}: ${user.planType} -> ${nextPlan}`);
                 user.planType = nextPlan;
                 user.limits = PLAN_LIMITS[nextPlan];
@@ -117,80 +113,53 @@ export const startReaper = () => {
             }
 
             // 2. Enforce free-tier uptime limits
-            const usersToCheck = await User.find({
-                planType: 'free'
-            });
-
-            for (const user of usersToCheck) {
-                // Find all their running containers from DB
+            const freeUsers = await User.find({ planType: 'free' });
+            for (const user of freeUsers) {
                 const userContainers = await Container.find({ userId: user._id, status: 'running' });
-
                 for (const dbContainer of userContainers) {
                     try {
                         const dockerContainer = docker.getContainer(dbContainer.dockerId);
                         const info = await dockerContainer.inspect();
-
-                        // Skip if already stopped physically but DB somehow said running
                         if (!info.State.Running) {
                             dbContainer.status = 'stopped';
                             await dbContainer.save();
                             continue;
                         }
-
-                        let shouldStop = false;
-                        let reason = '';
-
-                        // Rule: Free tier uptime enforcement (e.g. 24h limit like Heroku)
-                        if (user.planType === 'free') {
-                            const startedAt = new Date(info.State.StartedAt);
-                            const uptimeMs = now.getTime() - startedAt.getTime();
-
-                            if (uptimeMs > FREE_TIER_MAX_UPTIME_MS) {
-                                shouldStop = true;
-                                reason = 'Free tier 24h continuous uptime limit reached.';
-                            }
-                        }
-
-                        if (shouldStop) {
-                            console.log(`[Reaper] Stopping container ${dbContainer.name} (User: ${user.email}). Reason: ${reason}`);
+                        const startedAt = new Date(info.State.StartedAt);
+                        if (now.getTime() - startedAt.getTime() > FREE_TIER_MAX_UPTIME_MS) {
+                            console.log(`[Reaper] Stopping ${dbContainer.name} (${user.email}): 24h free-tier limit.`);
                             await dockerContainer.stop();
-
                             dbContainer.status = 'stopped';
                             await dbContainer.save();
-
                             await AuditLog.create({
                                 userId: user._id,
                                 action: 'STOP_CONTAINER',
                                 resourceName: dbContainer.name,
-                                details: `[Reaper Service] ${reason}`
+                                details: '[Reaper Service] Free tier 24h continuous uptime limit reached.'
                             });
                         }
-
                     } catch (containerErr) {
                         if (containerErr.statusCode === 404) {
-                            // Container deleted externally
                             await Container.deleteOne({ _id: dbContainer._id });
                         } else {
-                            console.error(`[Reaper] Error inspecting container ${dbContainer.dockerId}:`, containerErr.message);
+                            console.error(`[Reaper] Error inspecting ${dbContainer.dockerId}:`, containerErr.message);
                         }
                     }
                 }
             }
-        } catch (err) {
-            console.error('[Reaper] Error during cycle execute:', err);
-        }
-    }, REAPER_INTERVAL_MS);
 
-    // Phase 3: Sweep orphaned VPC networks for ALL users once per reaper cycle
-    setInterval(async () => {
-        try {
-            console.log('[VPC Reaper] Sweeping orphaned VPC networks...');
-            const allUsers = await User.find({}, '_id').lean();
-            for (const u of allUsers) {
-                await pruneUserVpcNetworks(u._id.toString());
+            // 3. Sweep orphaned VPC networks (merged into same cycle — no extra timer)
+            try {
+                const allUsers = await User.find({}, '_id').lean();
+                for (const u of allUsers) {
+                    await pruneUserVpcNetworks(u._id.toString());
+                }
+            } catch (vpcErr) {
+                console.warn('[VPC Reaper] Global sweep error:', vpcErr.message);
             }
+
         } catch (err) {
-            console.warn('[VPC Reaper] Global sweep error:', err.message);
+            console.error('[Reaper] Error during cycle:', err);
         }
     }, REAPER_INTERVAL_MS);
 };

@@ -88,7 +88,14 @@ setupSockets(server);
 
 // Cors
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://localhost:5173', 'http://localhost', 'https://localhost'],
+    origin: [
+        'http://localhost:5173',
+        'https://localhost:5173',
+        'http://localhost',
+        'https://localhost',
+        'https://orbitcloud.app',
+        'https://www.orbitcloud.app'
+    ],
     credentials: true
 }));
 app.use(cookieParser());
@@ -130,12 +137,11 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
             console.error('Failed to initialize MinIO during boot:', minioErr);
         }
 
-        // Boot Ollama Local AI Service
-        try {
-            await initOllama();
-        } catch (ollamaErr) {
-            console.error('Failed to initialize Ollama during boot:', ollamaErr);
-        }
+        // Boot Ollama Local AI Service — fire-and-forget, never blocks startup
+        (async () => {
+            try { await initOllama(); }
+            catch (ollamaErr) { console.error('Failed to initialize Ollama during boot:', ollamaErr); }
+        })();
 
         // Start the Reaper Service for enforcing plan limits
         startReaper();
