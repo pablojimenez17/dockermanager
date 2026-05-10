@@ -106,6 +106,69 @@ router.post('/portal-session', ensureStripeReady, async (req, res) => {
     }
 });
 
+router.get('/payment-method', ensureStripeReady, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId).select('stripeCustomerId stripeSubscriptionId');
+        if (!user) return res.status(404).json({ message: 'User not found.' });
+        if (!user.stripeCustomerId) return res.json({ paymentMethod: null });
+
+        let pmId = null;
+
+        // 1. Try to get from the active subscription's default_payment_method
+        if (user.stripeSubscriptionId) {
+            try {
+                const sub = await stripe.subscriptions.retrieve(user.stripeSubscriptionId, {
+                    expand: ['default_payment_method']
+                });
+                if (sub.default_payment_method && typeof sub.default_payment_method === 'object') {
+                    pmId = sub.default_payment_method;
+                } else if (typeof sub.default_payment_method === 'string') {
+                    pmId = sub.default_payment_method;
+                }
+            } catch (_) { /* subscription may not exist */ }
+        }
+
+        // 2. Fallback to customer's invoice_settings.default_payment_method
+        if (!pmId) {
+            const customer = await stripe.customers.retrieve(user.stripeCustomerId, {
+                expand: ['invoice_settings.default_payment_method']
+            });
+            if (customer && !customer.deleted) {
+                pmId = customer.invoice_settings?.default_payment_method || null;
+            }
+        }
+
+        if (!pmId) return res.json({ paymentMethod: null });
+
+        // Resolve string id to full object if needed
+        const pm = typeof pmId === 'string'
+            ? await stripe.paymentMethods.retrieve(pmId)
+            : pmId;
+
+        // Build a clean response
+        const result = { type: pm.type };
+
+        if (pm.type === 'card' && pm.card) {
+            result.brand = pm.card.brand;       // visa, mastercard, amex…
+            result.last4 = pm.card.last4;
+            result.wallet = pm.card.wallet?.type || null; // google_pay, apple_pay, link…
+        } else if (pm.type === 'paypal' && pm.paypal) {
+            result.email = pm.paypal.payer_email || null;
+        } else if (pm.type === 'sepa_debit' && pm.sepa_debit) {
+            result.last4 = pm.sepa_debit.last4;
+            result.bank = pm.sepa_debit.bank_code || null;
+        } else if (pm.type === 'us_bank_account' && pm.us_bank_account) {
+            result.last4 = pm.us_bank_account.last4;
+            result.bank = pm.us_bank_account.bank_name || null;
+        }
+
+        return res.json({ paymentMethod: result });
+    } catch (error) {
+        console.error('[billing/payment-method]', error.message);
+        return res.status(500).json({ message: 'Failed to retrieve payment method', error: error.message });
+    }
+});
+
 export const billingWebhookHandler = async (req, res) => {
     try {
         if (!stripe) {

@@ -22,6 +22,7 @@ const Plans = () => {
   const [planChangeAt, setPlanChangeAt] = useState(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState(null);
   const [currentPeriodEnd, setCurrentPeriodEnd] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState(null);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [openingPortal, setOpeningPortal] = useState(false);
@@ -36,9 +37,15 @@ const Plans = () => {
       setPlanChangeAt(res.data.planChangeAt || null);
       setSubscriptionStatus(res.data.subscriptionStatus || null);
       setCurrentPeriodEnd(res.data.currentPeriodEnd || res.data.planExpiresAt || null);
-      // Update local storage just in case
       localStorage.setItem('planType', normalizedPlan);
       setUserPlan(normalizedPlan);
+      // Fetch payment method only for paid plans
+      if (normalizedPlan !== 'free') {
+        try {
+          const pmRes = await axios.get('/api/billing/payment-method');
+          setPaymentMethod(pmRes.data.paymentMethod || null);
+        } catch { setPaymentMethod(null); }
+      }
     } catch {
       const fallbackRes = await axios.get('/api/auth/me');
       const fallbackPlan = (fallbackRes.data.planType || 'free').toLowerCase();
@@ -57,6 +64,25 @@ const Plans = () => {
   useEffect(() => {
     fetchCurrentPlan();
   }, []);
+
+  // Build a human-readable payment method label
+  const paymentMethodLabel = (() => {
+    if (!paymentMethod) return null;
+    const { type, brand, last4, wallet, email, bank } = paymentMethod;
+    if (type === 'card') {
+      const walletName = wallet === 'google_pay' ? 'Google Pay'
+        : wallet === 'apple_pay' ? 'Apple Pay'
+        : wallet === 'link' ? 'Link'
+        : null;
+      const brandLabel = brand ? brand.charAt(0).toUpperCase() + brand.slice(1) : 'Card';
+      if (walletName) return `${walletName} (${brandLabel} ••••${last4})`;
+      return `${brandLabel} ••••${last4}`;
+    }
+    if (type === 'paypal') return email ? `PayPal (${email})` : 'PayPal';
+    if (type === 'sepa_debit') return `SEPA Debit ••••${last4}`;
+    if (type === 'us_bank_account') return bank ? `${bank} ••••${last4}` : `Bank ••••${last4}`;
+    return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  })();
 
   /** True only for upgrades: paid tier strictly higher than current (Checkout / Stripe). */
   const canUpgradeViaCheckout = (targetPlan) => {
@@ -287,7 +313,23 @@ const Plans = () => {
                         {t("auto.billing_your_plan_label")}{' '}
                         <strong>{currentPlanDisplayName}</strong>
                     </p>
-
+                    {currentPlan !== 'free' && (
+                      <p className="text-sm mt-2 opacity-90">
+                        {t("auto.billing_stripe_status_label")}{' '}
+                        <strong>{stripeSubscriptionStatusDisplay}</strong>
+                        {paymentMethodLabel && (
+                          <span className="ml-2 text-xs opacity-75 font-normal">({paymentMethodLabel})</span>
+                        )}
+                        {' · '}
+                        <button
+                          onClick={handleManageBilling}
+                          disabled={openingPortal}
+                          className="underline font-semibold hover:opacity-70 transition-opacity disabled:opacity-40"
+                        >
+                          {openingPortal ? t("auto.processing_") : t("auto.manage_billing_portal")}
+                        </button>
+                      </p>
+                    )}
                     {currentPeriodEnd && (
                       <p className="text-sm mt-2 opacity-90">
                         {t("auto.billing_cycle_ends_on", { date: new Date(currentPeriodEnd).toLocaleString() })}
