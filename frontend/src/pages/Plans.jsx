@@ -252,11 +252,12 @@ const Plans = () => {
                             </ul>
 
                             {downgradeBlocked ? (
-                <Link
-                  to="/app/settings"
-                  className="w-full py-4 rounded-sm font-bold border transition-all duration-200 flex justify-center items-center opacity-90 bg-slate-100 border-slate-300 text-slate-600 hover:bg-slate-200 dark:bg-slate-800 dark:border-slate-600 dark:text-slate-300 dark:hover:bg-slate-700">
-                  {buttonText}
-                </Link>
+                <p className="w-full py-3 text-center text-sm text-slate-500 dark:text-slate-400">
+                  {t("auto.to_change_plan_go_to")}{' '}
+                  <Link to="/app/settings" className="underline font-semibold hover:opacity-70 transition-opacity">
+                    Settings
+                  </Link>
+                </p>
               ) :
                             <button
                 onClick={() => handlePlanChange(plan.id)}
@@ -276,14 +277,7 @@ const Plans = () => {
         })}
             </div>
 
-            <div className="mt-10 flex justify-center">
-                <button
-          onClick={handleManageBilling}
-          disabled={openingPortal}
-          className="px-6 py-3 rounded-sm border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all disabled:opacity-60 disabled:cursor-not-allowed">
-                    {openingPortal ? t("auto.processing_") : t("auto.manage_billing_portal")}
-                </button>
-            </div>
+
 
             <div className="mt-6 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-500/20 rounded-sm p-6 flex items-start text-blue-800 dark:text-blue-300 max-w-3xl mx-auto shadow-sm">
                 <AlertCircle className="shrink-0 mr-4 mt-0.5" />
@@ -293,18 +287,7 @@ const Plans = () => {
                         {t("auto.billing_your_plan_label")}{' '}
                         <strong>{currentPlanDisplayName}</strong>
                     </p>
-                    {currentPlan !== 'free' && (
-                      <p className="text-sm mt-2 opacity-90">
-                        {t("auto.billing_stripe_status_label")}{' '}
-                        <button
-                          onClick={handleManageBilling}
-                          disabled={openingPortal}
-                          className="underline font-semibold hover:opacity-70 transition-opacity disabled:opacity-40"
-                        >
-                          {openingPortal ? t("auto.processing_") : t("auto.manage_billing_portal")}
-                        </button>
-                      </p>
-                    )}
+
                     {currentPeriodEnd && (
                       <p className="text-sm mt-2 opacity-90">
                         {t("auto.billing_cycle_ends_on", { date: new Date(currentPeriodEnd).toLocaleString() })}
