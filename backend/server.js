@@ -26,6 +26,7 @@ import { initMinio } from './services/minioService.js';
 import { initOllama } from './services/ollamaService.js';
 import { startReaper } from './services/reaperService.js';
 import { startBackupScheduler } from './services/backupService.js';
+import { repairProxyNetworks } from './services/proxyRepairService.js';
 import User from './models/User.js';
 import { createServer } from 'http';
 import https from 'https';
@@ -141,6 +142,13 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
         (async () => {
             try { await initOllama(); }
             catch (ollamaErr) { console.error('Failed to initialize Ollama during boot:', ollamaErr); }
+        })();
+
+        // Auto-repair proxy ↔ VPC network connections for all public containers.
+        // Fixes Bad Gateway on existing containers without needing VPS access.
+        (async () => {
+            try { await repairProxyNetworks(); }
+            catch (repairErr) { console.warn('ProxyRepair failed (non-fatal):', repairErr.message); }
         })();
 
         // Start the Reaper Service for enforcing plan limits

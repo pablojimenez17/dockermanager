@@ -72,16 +72,16 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
  */
 const attachProxyToVpc = async (networkName) => {
     try {
-        const preferred = await docker.listContainers({
-            filters: { name: ['dockermanager-proxy'] }
-        });
-        const fallback = preferred.length === 0
-            ? await docker.listContainers({ filters: { name: ['dockermanager-lan-proxy'] } })
-            : [];
-        const proxyContainer = preferred[0] || fallback[0];
+        // We need the PUBLIC proxy-inverso (HTTPS, LetsEncrypt) — NOT the lan-proxy.
+        // Docker's name filter is a substring match, so 'dockermanager-proxy' would also
+        // match 'dockermanager-lan-proxy'. We list all and find exact match.
+        const allContainers = await docker.listContainers({ all: false });
+        const proxyContainer = allContainers.find(c =>
+            c.Names.includes('/dockermanager-proxy')
+        );
         if (!proxyContainer) {
-            console.warn('[VPC] No proxy container found, skipping proxy attach.');
-            return;
+            console.warn('[VPC] Public proxy (dockermanager-proxy) not found, skipping proxy attach.');
+            return false;
         }
         const proxyId = proxyContainer.Id;
         const network = docker.getNetwork(networkName);
