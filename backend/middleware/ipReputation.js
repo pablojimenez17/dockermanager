@@ -85,8 +85,15 @@ export async function recordIncident(ip, type, detail = '', penalty = 10) {
  * or with an active blockedUntil date.
  */
 const ipReputationMiddleware = async (req, res, next) => {
-    // Skip internal health checks and Stripe webhooks
-    if (req.path === '/api/health' || req.path === '/api/billing/webhook') {
+    // Skip internal health checks, Stripe webhooks, and socket.io polling
+    // (socket.io sends many frames per second — adding a DB lookup to each would
+    //  add significant latency and the path is already protected by auth middleware)
+    const path = req.path || '';
+    if (
+        path === '/api/health' ||
+        path === '/api/billing/webhook' ||
+        path.startsWith('/socket.io')
+    ) {
         return next();
     }
 

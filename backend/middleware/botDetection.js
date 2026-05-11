@@ -37,12 +37,25 @@ const EXPECTED_BROWSER_HEADERS = [
 ];
 
 /**
+ * Paths that are exempt from ALL bot detection checks.
+ * socket.io polling legitimately fires 10-20 req/s per client → would
+ * always trigger the timing anomaly threshold and break real-time features.
+ */
+const EXEMPT_PATHS = [
+    '/api/health',
+    '/api/billing/webhook',
+    '/socket.io',          // socket.io polling & websocket upgrade
+    '/favicon',
+    '/assets',
+];
+
+/**
  * Per-IP request timing tracker (in-memory, auto-expires).
  * Structure: { [ip]: { lastTs: number, rapidCount: number } }
  */
 const timingTracker = new Map();
 const TIMING_WINDOW_MS = 1000;   // 1 second window
-const RAPID_THRESHOLD = 15;      // >15 requests in 1s = bot behaviour
+const RAPID_THRESHOLD = 40;      // >40 req/s = bot behaviour (raised from 15 to avoid false-positives on SPA navigation)
 const TRACKER_CLEANUP_INTERVAL = 60 * 1000; // cleanup every 60s
 
 // Periodic cleanup to prevent memory leak
@@ -57,14 +70,16 @@ setInterval(() => {
  * Bot Detection middleware.
  *
  * Checks (in order):
- *  1. User-Agent blacklist (known automation tools)
- *  2. Empty/missing User-Agent (always a bot)
- *  3. Missing expected browser headers
- *  4. Request timing anomaly (too many requests in 1 second)
+ *  1. Path exemption (socket.io, health, billing webhook, assets)
+ *  2. User-Agent blacklist (known automation tools)
+ *  3. Empty/missing User-Agent (always a bot)
+ *  4. Missing expected browser headers
+ *  5. Request timing anomaly (too many requests in 1 second)
  */
 const botDetection = async (req, res, next) => {
-    // Skip internal paths
-    if (req.path === '/api/health' || req.path === '/api/billing/webhook') {
+    // Skip exempt paths — socket.io polling especially must not be rate-checked
+    const path = req.path || '';
+    if (EXEMPT_PATHS.some((p) => path.startsWith(p))) {
         return next();
     }
 

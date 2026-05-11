@@ -29,6 +29,18 @@ function detectInjection(obj, depth = 0) {
 }
 
 const securityLogger = (req, res, next) => {
+    const path = req.path || '';
+
+    // Skip socket.io, health check and billing webhook \u2014 no need to wrap
+    // res.json for these high-frequency or special-body paths
+    if (
+        path.startsWith('/socket.io') ||
+        path === '/api/health' ||
+        path === '/api/billing/webhook'
+    ) {
+        return next();
+    }
+
     const ip = req.ip || req.socket?.remoteAddress;
     const originalJson = res.json.bind(res);
 
