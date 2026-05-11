@@ -54,17 +54,83 @@ process.on('unhandledRejection', (reason, promise) => {
     // Docker restart:always will restart if the process exits; we prefer to stay up
     // and serve the requests that ARE working.
     console.error('[Process] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+    requestShutdown('unhandledRejection', 1);
 });
 
 process.on('uncaughtException', (err) => {
     // An uncaught synchronous exception leaves the process in an undefined state,
     // so we DO exit — but gracefully, giving Docker time to restart us.
     console.error('[Process] Uncaught Exception — initiating graceful exit in 1s:', err);
-    setTimeout(() => process.exit(1), 1000);
+    requestShutdown('uncaughtException', 1);
 });
+
+process.on('SIGTERM', () => requestShutdown('SIGTERM', 0));
+process.on('SIGINT', () => requestShutdown('SIGINT', 0));
 
 
 const app = express();
+let server;
+let shuttingDown = false;
+
+const HEALTH_MAX_RSS_MB = parseInt(process.env.HEALTH_MAX_RSS_MB || '700', 10);
+const HEALTH_MAX_HEAP_MB = parseInt(process.env.HEALTH_MAX_HEAP_MB || '384', 10);
+const HEALTH_MAX_EVENT_LOOP_LAG_MS = parseInt(process.env.HEALTH_MAX_EVENT_LOOP_LAG_MS || '1000', 10);
+let eventLoopLagMs = 0;
+
+setInterval(() => {
+    const started = Date.now();
+    setImmediate(() => {
+        eventLoopLagMs = Math.max(0, Date.now() - started);
+    });
+}, 1000).unref();
+
+function requestShutdown(reason, exitCode = 1) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.error(`[Process] Graceful shutdown requested: ${reason}`);
+
+    const forceExit = setTimeout(() => {
+        console.error('[Process] Force exiting after graceful shutdown timeout.');
+        process.exit(exitCode);
+    }, 10000);
+    forceExit.unref();
+
+    if (!server) {
+        process.exit(exitCode);
+        return;
+    }
+
+    server.close(() => {
+        mongoose.connection.close(false).finally(() => process.exit(exitCode));
+    });
+}
+
+function healthHandler(_req, res) {
+    const mem = process.memoryUsage();
+    const rssMb = Math.round(mem.rss / 1024 / 1024);
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+    const reasons = [];
+
+    if (shuttingDown) reasons.push('process_shutting_down');
+    if (mongoose.connection.readyState !== 1) reasons.push('mongodb_not_connected');
+    if (rssMb > HEALTH_MAX_RSS_MB) reasons.push(`rss_above_${HEALTH_MAX_RSS_MB}mb`);
+    if (heapUsedMb > HEALTH_MAX_HEAP_MB) reasons.push(`heap_above_${HEALTH_MAX_HEAP_MB}mb`);
+    if (eventLoopLagMs > HEALTH_MAX_EVENT_LOOP_LAG_MS) reasons.push(`event_loop_lag_above_${HEALTH_MAX_EVENT_LOOP_LAG_MS}ms`);
+
+    res.status(reasons.length ? 503 : 200).json({
+        status: reasons.length ? 'unhealthy' : 'ok',
+        reasons,
+        ts: Date.now(),
+        memory: {
+            rss_mb: rssMb,
+            heap_used_mb: heapUsedMb,
+            heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+        },
+        event_loop_lag_ms: eventLoopLagMs,
+        mongo_ready_state: mongoose.connection.readyState,
+        uptime_s: Math.round(process.uptime()),
+    });
+}
 
 // ── Compression (gzip) ──
 // Reduces response sizes ~70%, critical on a low-bandwidth VPS.
@@ -73,6 +139,9 @@ app.use(compression({ threshold: 1024 }));
 
 // Trust the first proxy (Traefik) so rate-limit & IP detection work correctly
 app.set('trust proxy', 1);
+
+// Health check: keep this before rate limits and bot/security middleware.
+app.get('/api/health', healthHandler);
 
 // ── Security Middlewares ──
 // 1. Set security HTTP headers
@@ -113,7 +182,6 @@ app.use(ipReputationMiddleware);
 app.use(botDetection);
 
 // Set up HTTPS Server
-let server;
 try {
     // FORCE HTTP FOR DEV:
     throw new Error('Forcing HTTP for local dev to avoid ERR_CERT_AUTHORITY_INVALID');
@@ -147,14 +215,27 @@ app.use(cookieParser());
 // Returns memory stats to help diagnose VPS slowness
 app.get('/api/health', (_req, res) => {
     const mem = process.memoryUsage();
-    res.json({
-        status: 'ok',
+    const rssMb = Math.round(mem.rss / 1024 / 1024);
+    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
+    const reasons = [];
+
+    if (shuttingDown) reasons.push('process_shutting_down');
+    if (mongoose.connection.readyState !== 1) reasons.push('mongodb_not_connected');
+    if (rssMb > HEALTH_MAX_RSS_MB) reasons.push(`rss_above_${HEALTH_MAX_RSS_MB}mb`);
+    if (heapUsedMb > HEALTH_MAX_HEAP_MB) reasons.push(`heap_above_${HEALTH_MAX_HEAP_MB}mb`);
+    if (eventLoopLagMs > HEALTH_MAX_EVENT_LOOP_LAG_MS) reasons.push(`event_loop_lag_above_${HEALTH_MAX_EVENT_LOOP_LAG_MS}ms`);
+
+    res.status(reasons.length ? 503 : 200).json({
+        status: reasons.length ? 'unhealthy' : 'ok',
+        reasons,
         ts: Date.now(),
         memory: {
-            rss_mb: Math.round(mem.rss / 1024 / 1024),
-            heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+            rss_mb: rssMb,
+            heap_used_mb: heapUsedMb,
             heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
         },
+        event_loop_lag_ms: eventLoopLagMs,
+        mongo_ready_state: mongoose.connection.readyState,
         uptime_s: Math.round(process.uptime()),
     });
 });

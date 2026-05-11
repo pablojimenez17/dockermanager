@@ -134,6 +134,7 @@ services:
       - VOLUMES=1 # Allow volume create
       - EXEC=1 # Allow exec (terminals)
       - BUILD=1
+      - EVENTS=1 # Allow autoheal to watch Docker health events
       - POST=1 # Allow POST requests like create, start, stop, kill, pull
       - DELETE=1 # Allow DELETE requests like rm
       # Allow system info and df (required for storage calculations)
@@ -153,6 +154,7 @@ services:
     image: dockermanager/backend:local
     container_name: dockermanager-backend
     restart: always
+    stop_grace_period: 20s
     env_file:
       - ./backend/.env
     environment:
@@ -194,6 +196,7 @@ services:
       - "traefik.http.middlewares.global-ratelimit.ratelimit.burst=30"
       - "traefik.http.middlewares.global-ratelimit.ratelimit.period=1m"
       - "traefik.http.middlewares.global-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
+      - "autoheal=true"
 
   # 6. DMZ: Frontend
   # HA: restart:always + healthcheck keep the frontend always available
@@ -212,6 +215,24 @@ services:
       - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
       - "traefik.http.services.frontend.loadbalancer.server.port=80"
       - "traefik.docker.network=dmz_net"
+      - "autoheal=true"
+
+  # Restarts containers that are alive but failing their Docker healthcheck.
+  # Docker's restart policy does not restart "unhealthy" containers by itself.
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: dockermanager-autoheal
+    restart: always
+    environment:
+      - DOCKER_HOST=tcp://socket-proxy:2375
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=10
+      - AUTOHEAL_START_PERIOD=60
+      - AUTOHEAL_DEFAULT_STOP_TIMEOUT=20
+    networks:
+      - dmz_net
+    depends_on:
+      - socket-proxy
 
   # 7. DMZ: MongoDB
   # HA: restart:always keeps MongoDB up after host reboots
