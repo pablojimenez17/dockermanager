@@ -63,7 +63,7 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
         const role = email.toLowerCase() === ADMIN_EMAIL ? 'admin' : 'user';
         const extraLimits = role === 'admin' ? {
             maxContainers: 9999, maxRamMb: 999999, maxCpuCores: 999,
-            maxDomains: 999, maxVolumes: 999, maxVolumeSizeMb: 999999,
+            maxDomains: 999, maxPublicContainers: 9999, maxVolumes: 999, maxVolumeSizeMb: 999999,
             maxSnapshots: 999, maxBuckets: 999
         } : {};
 
@@ -279,7 +279,7 @@ router.get('/me', authMiddleware, async (req, res) => {
         if (user.role === 'admin') {
              resolvedLimits = {
                 maxContainers: 9999, maxRamMb: 999999, maxCpuCores: 999,
-                maxDomains: 999, maxVolumes: 999, maxVolumeSizeMb: 999999,
+                maxDomains: 999, maxPublicContainers: 9999, maxVolumes: 999, maxVolumeSizeMb: 999999,
                 maxSnapshots: 999, maxBuckets: 999
             };
         } else if (PLAN_LIMITS[planType]) {

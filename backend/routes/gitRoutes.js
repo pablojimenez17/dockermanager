@@ -35,7 +35,7 @@ router.post('/deploy', async (req, res) => {
         // QUOTA VALIDATION
         // ==========================================
         const user = await User.findById(req.user.userId);
-        const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1, maxDomains: 0, maxVolumes: 1, maxVolumeSizeMb: 1024 };
+        const limits = user.limits || { maxContainers: 2, maxRamMb: 1024, maxCpuCores: 1, maxPublicContainers: 1, maxDomains: 0, maxVolumes: 1, maxVolumeSizeMb: 1024 };
 
         const currentContainersDb = await Container.find({ userId: req.user.userId });
         if (currentContainersDb.length + 1 > limits.maxContainers) {
@@ -43,9 +43,10 @@ router.post('/deploy', async (req, res) => {
         }
 
         if (domain && domain.trim() !== '') {
-            const currentDomainsDb = currentContainersDb.filter(c => c.domain && c.domain.trim() !== '');
-            if (currentDomainsDb.length + 1 > limits.maxDomains) {
-                return res.status(403).json({ message: `Quota Exceeded: Your plan limits you to ${limits.maxDomains} custom domains.` });
+            const currentPublicDb = currentContainersDb.filter(c => c.isPublic === true);
+            const maxPublic = limits.maxPublicContainers ?? limits.maxDomains ?? 0;
+            if (currentPublicDb.length + 1 > maxPublic) {
+                return res.status(403).json({ message: `Quota Exceeded: Your plan allows ${maxPublic} publicly accessible container${maxPublic === 1 ? '' : 's'}.` });
             }
         }
 

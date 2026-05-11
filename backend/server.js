@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import cookieParser from 'cookie-parser';
+import compression from 'compression';
 import authRoutes from './routes/authRoutes.js';
 import containerRoutes from './routes/containerRoutes.js';
 import statsRoutes from './routes/statsRoutes.js';
@@ -42,7 +43,33 @@ import botDetection from './middleware/botDetection.js';
 import securityLogger from './middleware/securityLogger.js';
 dotenv.config();
 
+// ──────────────────────────────────────────────────────────────────
+// VPS Stability: Process-level error handlers
+// These prevent silent crashes from unhandled promise rejections or
+// synchronous throws that escape all try/catch blocks.
+// On a low-spec VPS these are the #1 cause of "goes slow and needs restart".
+// ──────────────────────────────────────────────────────────────────
+process.on('unhandledRejection', (reason, promise) => {
+    // Log the error but DO NOT crash the process.
+    // Docker restart:always will restart if the process exits; we prefer to stay up
+    // and serve the requests that ARE working.
+    console.error('[Process] Unhandled Promise Rejection at:', promise, 'reason:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    // An uncaught synchronous exception leaves the process in an undefined state,
+    // so we DO exit — but gracefully, giving Docker time to restart us.
+    console.error('[Process] Uncaught Exception — initiating graceful exit in 1s:', err);
+    setTimeout(() => process.exit(1), 1000);
+});
+
+
 const app = express();
+
+// ── Compression (gzip) ──
+// Reduces response sizes ~70%, critical on a low-bandwidth VPS.
+// Skips already-compressed content (images, video, binary) automatically.
+app.use(compression({ threshold: 1024 }));
 
 // Trust the first proxy (Traefik) so rate-limit & IP detection work correctly
 app.set('trust proxy', 1);
@@ -117,7 +144,20 @@ app.use(cors({
 app.use(cookieParser());
 
 // Health check — no auth required, used by Docker healthcheck & load balancers
-app.get('/api/health', (_req, res) => res.json({ status: 'ok', ts: Date.now() }));
+// Returns memory stats to help diagnose VPS slowness
+app.get('/api/health', (_req, res) => {
+    const mem = process.memoryUsage();
+    res.json({
+        status: 'ok',
+        ts: Date.now(),
+        memory: {
+            rss_mb: Math.round(mem.rss / 1024 / 1024),
+            heap_used_mb: Math.round(mem.heapUsed / 1024 / 1024),
+            heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
+        },
+        uptime_s: Math.round(process.uptime()),
+    });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -138,10 +178,44 @@ app.use('/api/snapshots', snapshotRoutes);
 app.use('/api/organizations', orgRoutes);
 app.use('/api/billing', billingRoutes);
 
-// Database Connection
-mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanager')
+// Database Connection — tuned for low-spec VPS
+// maxPoolSize:5  → don't open more than 5 concurrent MongoDB connections
+// serverSelectionTimeoutMS → fail fast on connection loss instead of hanging
+// heartbeatFrequencyMS → detect a dropped connection within 10s
+// socketTimeoutMS → abandon a query that hangs more than 60s
+mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanager', {
+    maxPoolSize: 5,
+    minPoolSize: 1,
+    serverSelectionTimeoutMS: 10000,
+    heartbeatFrequencyMS: 10000,
+    socketTimeoutMS: 60000,
+    connectTimeoutMS: 10000,
+})
     .then(async () => {
         console.log('MongoDB connected...');
+
+        // Reconnect events — log so we know if MongoDB drops/recovers
+        mongoose.connection.on('error', err =>
+            console.error('[MongoDB] Connection error:', err.message)
+        );
+        mongoose.connection.on('disconnected', () =>
+            console.warn('[MongoDB] Disconnected — mongoose will auto-reconnect...')
+        );
+        mongoose.connection.on('reconnected', () =>
+            console.log('[MongoDB] Reconnected successfully.')
+        );
+
+        // Memory watchdog — log a warning every 5 min if RSS is too high.
+        // On a 1-2 GB VPS anything above 400 MB is a red flag for a memory leak.
+        const MEM_WARN_MB = parseInt(process.env.MEM_WARN_MB || '400');
+        setInterval(() => {
+            const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
+            if (rssMb > MEM_WARN_MB) {
+                console.warn(`[Memory] WARNING: RSS is ${rssMb} MB (threshold ${MEM_WARN_MB} MB). Consider restarting if this keeps growing.`);
+            } else {
+                console.log(`[Memory] RSS: ${rssMb} MB — OK`);
+            }
+        }, 5 * 60 * 1000);
 
         // Boot the Proxy Service
         await initProxyService();

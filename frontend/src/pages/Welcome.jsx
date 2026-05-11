@@ -108,6 +108,7 @@ const Welcome = () => {
     { text: '1 GB RAM quota', included: true },
     { text: '1 CPU Core equivalent', included: true },
     { text: '1 GB Persistent Storage (1 Disk)', included: true },
+    { text: '1 Public Access Container', included: true },
     { text: 'Community Support', included: true }],
 
     cta: 'Start Free', highlighted: false
@@ -120,6 +121,7 @@ const Welcome = () => {
     { text: '8 GB RAM quota', included: true },
     { text: '4 CPU Cores equivalent', included: true },
     { text: '10 GB Persistent Storage (5 Disks)', included: true },
+    { text: '8 Public Access Containers', included: true },
     { text: 'Priority Support', included: true },
     { text: 'Advanced Network Modes', included: true }],
 
@@ -132,6 +134,7 @@ const Welcome = () => {
     { text: '32 GB RAM quota', included: true },
     { text: '16 CPU Cores equivalent', included: true },
     { text: '100 GB Persistent Storage (20 Disks)', included: true },
+    { text: '50 Public Access Containers', included: true },
     { text: '24/7 Dedicated Support', included: true },
     { text: 'Custom Node Mapping', included: true }],
 
@@ -145,6 +148,7 @@ const Welcome = () => {
     { text: '128 GB RAM quota', included: true },
     { text: '64 CPU Cores equivalent', included: true },
     { text: '1 TB Persistent Storage', included: true },
+    { text: 'Unlimited Public Access', included: true },
     { text: 'Multi-Tenant Organization Management', included: true },
     { text: 'Custom Roles & RBAC', included: true },
     { text: 'White-glove 24/7 Support', included: true }],
@@ -494,6 +498,7 @@ const Welcome = () => {
               'RAM quota',
               'CPU Cores',
               'Persistent Storage',
+              'Public Access',
               'Support level',
               'Advanced Network Modes',
               'Custom Roles & RBAC'].
@@ -503,6 +508,7 @@ const Welcome = () => {
                   'RAM quota': ['1 GB', '8 GB', '32 GB', '128 GB'],
                   'CPU Cores': ['1 Core', '4 Cores', '16 Cores', '64 Cores'],
                   'Persistent Storage': ['1 GB', '10 GB', '100 GB', '1 TB'],
+                  'Public Access': ['1 Container', '8 Containers', '50 Containers', 'Unlimited'],
                   'Custom Domains': [false, '3 Domains', 'Unlimited', 'Unlimited'],
                   'Support level': ['Community', 'Priority', '24/7 Dedicated', 'White-glove'],
                   'Advanced Network Modes': [false, true, true, true],

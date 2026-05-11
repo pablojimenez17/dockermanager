@@ -365,11 +365,12 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
             if (c.isPublic === true) requestedDomainsCount++;
         });
 
-        // 3. Domain limits
-        const currentDomainsDb = currentContainersDb.filter(c => c.domain && c.domain.trim() !== '');
-        if (currentDomainsDb.length + requestedDomainsCount > limits.maxDomains) {
+        // 3. Public Access container limits (isPublic: true containers)
+        const currentPublicDb = currentContainersDb.filter(c => c.isPublic === true);
+        const maxPublic = limits.maxPublicContainers ?? limits.maxDomains ?? 0;
+        if (currentPublicDb.length + requestedDomainsCount > maxPublic) {
             return res.status(403).json({
-                message: `Quota Exceeded: Your plan limits you to ${limits.maxDomains} custom domains. You have ${currentDomainsDb.length} active and requested ${requestedDomainsCount} more.`
+                message: `Quota Exceeded: Your plan allows ${maxPublic} publicly accessible container${maxPublic === 1 ? '' : 's'}. You have ${currentPublicDb.length} active and requested ${requestedDomainsCount} more.`
             });
         }
 

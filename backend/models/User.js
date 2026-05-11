@@ -72,6 +72,7 @@ const userSchema = new mongoose.Schema({
         maxRamMb: { type: Number, default: 1024 },
         maxCpuCores: { type: Number, default: 1 },
         maxDomains: { type: Number, default: 0 },
+        maxPublicContainers: { type: Number, default: 1 },
         maxVolumes: { type: Number, default: 1 },
         maxVolumeSizeMb: { type: Number, default: 1024 },
         maxSnapshots: { type: Number, default: 0 },

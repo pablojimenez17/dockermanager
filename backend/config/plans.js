@@ -4,6 +4,7 @@ export const PLAN_LIMITS = {
         maxRamMb: 1024,
         maxCpuCores: 1,
         maxDomains: 0,
+        maxPublicContainers: 1,   // containers with public internet access (isPublic: true)
         maxVolumes: 1,
         maxVolumeSizeMb: 1024,
         maxSnapshots: 0,
@@ -14,6 +15,7 @@ export const PLAN_LIMITS = {
         maxRamMb: 8192,
         maxCpuCores: 4,
         maxDomains: 3,
+        maxPublicContainers: 8,
         maxVolumes: 5,
         maxVolumeSizeMb: 10240,
         maxSnapshots: 5,
@@ -24,6 +26,7 @@ export const PLAN_LIMITS = {
         maxRamMb: 32768,
         maxCpuCores: 16,
         maxDomains: 999,
+        maxPublicContainers: 50,
         maxVolumes: 20,
         maxVolumeSizeMb: 102400,
         maxSnapshots: 999,
@@ -34,6 +37,7 @@ export const PLAN_LIMITS = {
         maxRamMb: 131072,
         maxCpuCores: 64,
         maxDomains: 999,
+        maxPublicContainers: 9999, // effectively unlimited
         maxVolumes: 100,
         maxVolumeSizeMb: 1048576,
         maxSnapshots: 999,
