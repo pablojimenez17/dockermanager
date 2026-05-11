@@ -166,6 +166,14 @@ services:
       - MINIO_ROOT_USER=${MINIO_ROOT_USER}
       - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
       - MONGO_CONTAINER_NAME=dockermanager-mongo
+      - API_TIMEOUT_MS=15000
+      - API_LONG_TIMEOUT_MS=120000
+      - API_AI_TIMEOUT_MS=60000
+      - AUTH_DB_TIMEOUT_MS=8000
+      - DOCKER_READ_TIMEOUT_MS=7000
+      - TIMEOUT_RESTART_THRESHOLD=3
+      - TIMEOUT_RESTART_WINDOW_MS=60000
+      - TIMEOUT_RESTART_COOLDOWN_MS=120000
     networks:
       - dmz_net
       - storage_transit_net
@@ -179,7 +187,7 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
-      start_period: 30s
+      start_period: 90s
     labels:
       - "traefik.enable=true"
       - "traefik.constraint-label=dmz-proxy"

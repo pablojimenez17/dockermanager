@@ -9,6 +9,7 @@ import Snapshot from '../models/Snapshot.js';
 import authMiddleware from '../middleware/auth.js';
 import { checkPermission } from '../middleware/rbac.js';
 import { sensitiveOpsLimiter, generalLimiter } from '../middleware/rateLimiters.js';
+import { withTimeout } from '../utils/timeout.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -17,6 +18,7 @@ const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
 const ORBIT_BASE_DOMAIN = process.env.ORBIT_BASE_DOMAIN || 'orbitcloud.app';
 const RESERVED_SUBDOMAINS = ['admin', 'api', 'www'];
+const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
 
 router.use(authMiddleware);
 
@@ -289,7 +291,7 @@ router.get('/', async (req, res) => {
         const enrichedContainers = await Promise.all(userContainers.map(async (c) => {
             try {
                 const dockerContainer = docker.getContainer(c.dockerId);
-                const info = await dockerContainer.inspect();
+                const info = await withTimeout(dockerContainer.inspect(), DOCKER_READ_TIMEOUT_MS, `Inspect ${c.name}`);
                 return {
                     ...c.toObject(),
                     state: info.State.Status,
@@ -312,7 +314,11 @@ router.get('/', async (req, res) => {
                     await Container.deleteOne({ _id: c._id });
                     return null;
                 }
-                return { ...c.toObject(), state: 'error/not_found' };
+                return {
+                    ...c.toObject(),
+                    state: err.message?.includes('timed out') ? 'error/timeout' : 'error/not_found',
+                    statusWarning: err.message
+                };
             }
         }));
 

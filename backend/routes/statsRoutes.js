@@ -2,9 +2,11 @@ import express from 'express';
 import Docker from 'dockerode';
 import Container from '../models/Container.js';
 import authMiddleware from '../middleware/auth.js';
+import { withTimeout } from '../utils/timeout.js';
 
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
 
 router.use(authMiddleware);
 
@@ -20,8 +22,8 @@ router.get('/:id', async (req, res) => {
 
         // Get single stats snapshot (stream: false) and inspect data
         const [stats, info] = await Promise.all([
-            container.stats({ stream: false }),
-            container.inspect()
+            withTimeout(container.stats({ stream: false }), DOCKER_READ_TIMEOUT_MS, 'Docker stats'),
+            withTimeout(container.inspect(), DOCKER_READ_TIMEOUT_MS, 'Docker inspect')
         ]);
 
         let networkMode = info.HostConfig.NetworkMode;
@@ -68,7 +70,8 @@ router.get('/:id', async (req, res) => {
             raw: stats
         });
     } catch (error) {
-        res.status(500).json({ message: 'Error fetching stats', error: error.message });
+        const status = error.message?.includes('timed out') ? 503 : 500;
+        res.status(status).json({ message: 'Error fetching stats', error: error.message });
     }
 });
 
@@ -84,7 +87,7 @@ router.get('/:id/logs', async (req, res) => {
         // Verify Docker container still exists
         let info;
         try {
-            info = await container.inspect();
+            info = await withTimeout(container.inspect(), DOCKER_READ_TIMEOUT_MS, 'Docker inspect');
         } catch (inspectErr) {
             if (inspectErr.statusCode === 404) {
                 return res.status(404).json({ message: 'Docker container no longer exists' });
@@ -92,13 +95,13 @@ router.get('/:id/logs', async (req, res) => {
             throw inspectErr;
         }
 
-        const logsBuffer = await container.logs({
+        const logsBuffer = await withTimeout(container.logs({
             stdout: true,
             stderr: true,
             tail: 200,
             timestamps: true
             // Note: follow is intentionally omitted (defaults false) — works on both running and stopped containers
-        });
+        }), DOCKER_READ_TIMEOUT_MS, 'Docker logs');
 
         // Docker multiplexes stdout/stderr with an 8-byte header per chunk.
         // Strip those header bytes so the frontend receives clean text.
@@ -124,7 +127,8 @@ router.get('/:id/logs', async (req, res) => {
         }
     } catch (error) {
         console.error('[Logs Error]', error);
-        res.status(500).json({ message: 'Error fetching logs', error: error.message });
+        const status = error.message?.includes('timed out') ? 503 : 500;
+        res.status(status).json({ message: 'Error fetching logs', error: error.message });
     }
 });
 

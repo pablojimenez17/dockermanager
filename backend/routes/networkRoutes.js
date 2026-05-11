@@ -3,10 +3,12 @@ import Docker from 'dockerode';
 import authMiddleware from '../middleware/auth.js';
 import { checkPermission } from '../middleware/rbac.js';
 import NetworkModel from '../models/Network.js';
+import { withTimeout } from '../utils/timeout.js';
 
 const router = express.Router();
 // Use Dockerode connected to local socket
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
 
 router.use(authMiddleware);
 
@@ -20,7 +22,7 @@ router.get('/', async (req, res) => {
         const userNetworks = await NetworkModel.find(query);
         const userNetworkIds = userNetworks.map(n => n.dockerId);
 
-        const allNetworks = await docker.listNetworks();
+        const allNetworks = await withTimeout(docker.listNetworks(), DOCKER_READ_TIMEOUT_MS, 'Docker networks');
         // Return only the networks owned by this user/org
         const filteredNetworks = allNetworks.filter(n => userNetworkIds.includes(n.Id));
 

@@ -41,6 +41,7 @@ import rateLimit from 'express-rate-limit';
 import ipReputationMiddleware from './middleware/ipReputation.js';
 import botDetection from './middleware/botDetection.js';
 import securityLogger from './middleware/securityLogger.js';
+import requestTimeout from './middleware/requestTimeout.js';
 dotenv.config();
 
 // ──────────────────────────────────────────────────────────────────
@@ -143,6 +144,24 @@ app.set('trust proxy', 1);
 // Health check: keep this before rate limits and bot/security middleware.
 app.get('/api/health', healthHandler);
 
+// CORS and cookies must run before API security middleware so error responses
+// and preflight requests are visible to the SPA instead of hanging client-side.
+app.use(cors({
+    origin: [
+        'http://localhost:5173',
+        'https://localhost:5173',
+        'http://localhost',
+        'https://localhost',
+        'https://orbitcloud.app',
+        'https://www.orbitcloud.app'
+    ],
+    credentials: true
+}));
+app.use(cookieParser());
+
+// Fail fast for stuck API requests instead of leaving the UI loading for minutes.
+app.use('/api', requestTimeout);
+
 // ── Security Middlewares ──
 // 1. Set security HTTP headers
 app.use(helmet());
@@ -197,49 +216,12 @@ try {
 // Initialize WebSockets for real-time Terminal
 setupSockets(server);
 
-// Cors
-app.use(cors({
-    origin: [
-        'http://localhost:5173',
-        'https://localhost:5173',
-        'http://localhost',
-        'https://localhost',
-        'https://orbitcloud.app',
-        'https://www.orbitcloud.app'
-    ],
-    credentials: true
-}));
-app.use(cookieParser());
+server.requestTimeout = parseInt(process.env.SERVER_REQUEST_TIMEOUT_MS || '130000', 10);
+server.headersTimeout = parseInt(process.env.SERVER_HEADERS_TIMEOUT_MS || '135000', 10);
+server.keepAliveTimeout = parseInt(process.env.SERVER_KEEPALIVE_TIMEOUT_MS || '65000', 10);
 
 // Health check — no auth required, used by Docker healthcheck & load balancers
 // Returns memory stats to help diagnose VPS slowness
-app.get('/api/health', (_req, res) => {
-    const mem = process.memoryUsage();
-    const rssMb = Math.round(mem.rss / 1024 / 1024);
-    const heapUsedMb = Math.round(mem.heapUsed / 1024 / 1024);
-    const reasons = [];
-
-    if (shuttingDown) reasons.push('process_shutting_down');
-    if (mongoose.connection.readyState !== 1) reasons.push('mongodb_not_connected');
-    if (rssMb > HEALTH_MAX_RSS_MB) reasons.push(`rss_above_${HEALTH_MAX_RSS_MB}mb`);
-    if (heapUsedMb > HEALTH_MAX_HEAP_MB) reasons.push(`heap_above_${HEALTH_MAX_HEAP_MB}mb`);
-    if (eventLoopLagMs > HEALTH_MAX_EVENT_LOOP_LAG_MS) reasons.push(`event_loop_lag_above_${HEALTH_MAX_EVENT_LOOP_LAG_MS}ms`);
-
-    res.status(reasons.length ? 503 : 200).json({
-        status: reasons.length ? 'unhealthy' : 'ok',
-        reasons,
-        ts: Date.now(),
-        memory: {
-            rss_mb: rssMb,
-            heap_used_mb: heapUsedMb,
-            heap_total_mb: Math.round(mem.heapTotal / 1024 / 1024),
-        },
-        event_loop_lag_ms: eventLoopLagMs,
-        mongo_ready_state: mongoose.connection.readyState,
-        uptime_s: Math.round(process.uptime()),
-    });
-});
-
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/containers', containerRoutes);

@@ -31,14 +31,42 @@ import ChatAssistant from './components/ChatAssistant';
 // Global Axios config for HTTP-Only Cookies
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = '';
+axios.defaults.timeout = 15000;
 axios.defaults.headers.common['Cache-Control'] = 'no-cache, no-store, must-revalidate';
 axios.defaults.headers.common['Pragma'] = 'no-cache';
 axios.defaults.headers.common['Expires'] = '0';
+
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const LONG_REQUEST_TIMEOUT_MS = 120000;
+const AI_REQUEST_TIMEOUT_MS = 60000;
+
+const getRequestTimeout = (config) => {
+  const url = config.url || '';
+  const method = (config.method || 'get').toLowerCase();
+
+  if (url.startsWith('/api/ai/')) return AI_REQUEST_TIMEOUT_MS;
+  if (url.startsWith('/api/git/deploy')) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.startsWith('/api/admin/backup/')) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.includes('/upload')) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.includes('/redeploy') || url.includes('/snapshot')) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.startsWith('/api/containers') && ['post', 'put', 'delete'].includes(method)) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.startsWith('/api/networks') && ['post', 'delete'].includes(method)) return LONG_REQUEST_TIMEOUT_MS;
+  if (url.startsWith('/api/volumes') && ['post', 'delete'].includes(method)) return LONG_REQUEST_TIMEOUT_MS;
+
+  return DEFAULT_REQUEST_TIMEOUT_MS;
+};
 
 // Interceptor to auto-logout on 401 Unauthorized, excluding auth check endpoints
 axios.interceptors.response.use(
   response => response,
   error => {
+    if (error.code === 'ECONNABORTED') {
+      error.response = error.response || {
+        status: 408,
+        data: { message: 'The request timed out. Please try again in a few seconds.' }
+      };
+    }
+
     // If the error comes from /auth/me or login, do not nuke the session globally
     const url = error.config?.url || '';
 
@@ -61,6 +89,10 @@ axios.interceptors.response.use(
 
 // Interceptor to append organization context header
 axios.interceptors.request.use((config) => {
+  if (!config.timeout || config.timeout === 0) {
+    config.timeout = getRequestTimeout(config);
+  }
+
   const activeOrgId = localStorage.getItem('activeOrgId');
   if (activeOrgId) {
     config.headers['x-organization-id'] = activeOrgId;

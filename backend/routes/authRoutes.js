@@ -1,11 +1,13 @@
 import express from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
 import { sendWelcomeEmail, sendVerificationCode, sendPasswordResetEmail } from '../services/emailService.js';
 import { PLAN_LIMITS } from '../config/plans.js';
 import { authLimiter } from '../middleware/rateLimiters.js';
 import validate from '../middleware/validate.js';
+import { withTimeout } from '../utils/timeout.js';
 import {
     registerSchema,
     loginSchema,
@@ -15,6 +17,16 @@ import {
 } from '../config/schemas/auth.schemas.js';
 
 const router = express.Router();
+const AUTH_DB_TIMEOUT_MS = parseInt(process.env.AUTH_DB_TIMEOUT_MS || '8000', 10);
+
+const requireDatabase = (_req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+        return res.status(503).json({ message: 'Database is temporarily unavailable. Please try again in a few seconds.' });
+    }
+    next();
+};
+
+router.use(requireDatabase);
 
 // Helper to generate OTP
 const generateOTP = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -101,7 +113,11 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        const user = await User.findOne({ email });
+        const user = await withTimeout(
+            User.findOne({ email }).maxTimeMS(AUTH_DB_TIMEOUT_MS),
+            AUTH_DB_TIMEOUT_MS + 1000,
+            'Login user lookup'
+        );
         if (!user) {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
@@ -134,7 +150,7 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
         const code = generateOTP();
         user.verificationCode = code;
         user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-        await user.save();
+        await withTimeout(user.save(), AUTH_DB_TIMEOUT_MS, 'Login verification save');
 
         // Do not block login response on email provider latency/failures.
         sendVerificationCode(user.email, code).catch((error) => {
@@ -147,6 +163,9 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
             email: user.email
         });
     } catch (error) {
+        if (error.message?.includes('timed out')) {
+            return res.status(503).json({ message: 'Login service is temporarily slow. Please try again in a few seconds.' });
+        }
         res.status(500).json({ message: 'Error logging in', error: error.message });
     }
 });

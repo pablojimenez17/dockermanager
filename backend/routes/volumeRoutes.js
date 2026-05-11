@@ -5,12 +5,14 @@ import User from '../models/User.js';
 import AuditLog from '../models/AuditLog.js';
 import authMiddleware from '../middleware/auth.js';
 import { checkPermission } from '../middleware/rbac.js';
+import { withTimeout } from '../utils/timeout.js';
 import { exec } from 'child_process';
 import util from 'util';
 
 const execPromise = util.promisify(exec);
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
+const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
 
 router.use(authMiddleware);
 
@@ -27,7 +29,7 @@ const getDockerDfVolumes = async () => {
         return _dfCache;
     }
     try {
-        const dfData = await docker.df();
+        const dfData = await withTimeout(docker.df(), DOCKER_READ_TIMEOUT_MS, 'Docker disk usage');
         _dfCache = dfData.Volumes || [];
         _dfCacheTime = now;
         return _dfCache;
