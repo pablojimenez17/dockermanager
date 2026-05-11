@@ -10,6 +10,7 @@ const auditLogSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: [
+            // ── Infrastructure events ──────────────────────────────────────
             'CREATE_CONTAINER', 
             'START_CONTAINER', 
             'STOP_CONTAINER', 
@@ -21,7 +22,14 @@ const auditLogSchema = new mongoose.Schema({
             'BACKUP_FAILED',
             'BACKUP_DB_COMPLETED',
             'BACKUP_SERVER_COMPLETED',
-            'BACKUP_WEB_COMPLETED'
+            'BACKUP_WEB_COMPLETED',
+            // ── Security events ────────────────────────────────────────────
+            'FAILED_LOGIN_ATTEMPT',
+            'SECURITY_INJECTION_ATTEMPT',
+            'SECURITY_RATE_LIMIT_HIT',
+            'SECURITY_BOT_DETECTED',
+            'SECURITY_IP_BLOCKED',
+            'SECURITY_IP_UNBLOCKED',
         ]
     },
     resourceName: {

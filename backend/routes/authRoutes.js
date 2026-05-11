@@ -4,6 +4,15 @@ import User from '../models/User.js';
 import authMiddleware from '../middleware/auth.js';
 import { sendWelcomeEmail, sendVerificationCode, sendPasswordResetEmail } from '../services/emailService.js';
 import { PLAN_LIMITS } from '../config/plans.js';
+import { authLimiter } from '../middleware/rateLimiters.js';
+import validate from '../middleware/validate.js';
+import {
+    registerSchema,
+    loginSchema,
+    verifyCodeSchema,
+    forgotPasswordSchema,
+    resetPasswordSchema,
+} from '../config/schemas/auth.schemas.js';
 
 const router = express.Router();
 
@@ -34,7 +43,7 @@ const validatePasswordStrength = (password) => {
     };
 };
 
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, validate(registerSchema), async (req, res) => {
     try {
         const { name, email, password } = req.body;
 
@@ -88,7 +97,7 @@ router.post('/register', async (req, res) => {
     }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -142,7 +151,7 @@ router.post('/login', async (req, res) => {
     }
 });
 
-router.post('/verify-code', async (req, res) => {
+router.post('/verify-code', authLimiter, validate(verifyCodeSchema), async (req, res) => {
     try {
         const { email, code } = req.body;
 
@@ -186,7 +195,7 @@ router.post('/verify-code', async (req, res) => {
     }
 });
 
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', authLimiter, validate(forgotPasswordSchema), async (req, res) => {
     try {
         const { email } = req.body;
         const user = await User.findOne({ email });
@@ -212,7 +221,7 @@ router.post('/forgot-password', async (req, res) => {
     }
 });
 
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', authLimiter, validate(resetPasswordSchema), async (req, res) => {
     try {
         const { email, code, newPassword } = req.body;
 

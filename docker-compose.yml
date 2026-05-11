@@ -187,6 +187,13 @@ services:
       - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
       - "traefik.http.services.backend.loadbalancer.server.port=5000"
       - "traefik.docker.network=dmz_net"
+      # ── Security: Rate limit at proxy level (Capa 1) ──────────────────────────
+      # 100 req/min per IP before requests even reach the Express backend
+      - "traefik.http.routers.backend.middlewares=global-ratelimit@docker"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.average=100"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.burst=30"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.period=1m"
+      - "traefik.http.middlewares.global-ratelimit.ratelimit.sourcecriterion.ipstrategy.depth=1"
 
   # 6. DMZ: Frontend
   # HA: restart:always + healthcheck keep the frontend always available

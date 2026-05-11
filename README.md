@@ -1233,3 +1233,239 @@ Esta topología no es “decorativa”. Está diseñada para que:
 - **La observabilidad no altere el aislamiento** (monitoring en `internal` separado).
 
 ---
+
+## 🔐 15. Sistema de Seguridad en Capas (Defense in Depth — Nivel Aplicación)
+
+Además de la arquitectura de red descrita en la sección 3 (Suricata IPS, VPCs aisladas, Socket Shield), OrbitCloud implementa un segundo anillo de seguridad completo a **nivel de aplicación**. Ninguna capa actúa sola: si una deja pasar algo, la siguiente lo corta.
+
+```
+Internet
+   │
+   ▼
+[Traefik — Capa 1: Proxy]       100 req/min por IP antes de llegar al backend
+   │
+   ▼
+[Suricata IPS — Capa 4: Red]    ~49.500 firmas ET, DDoS, exploits, malware
+   │
+   ▼
+[Express Backend]
+ ├─ securityLogger              Intercepta res.json() → AuditLog + IP score
+ ├─ ipReputation                Bloquea IPs con score < 30 (MongoDB + cache 5min)
+ ├─ botDetection                UA blacklist, timing <1s, headers incompletos
+ ├─ helmet + mongoSanitize      Headers seguros, NoSQL injection blocked
+ ├─ Rate limiters granulares    authLimiter / aiLimiter / sensitiveOpsLimiter
+ ├─ validate(Zod schema)        DTO estricto por endpoint, whitelist de campos
+ └─ route handler
+      │
+      ▼
+   MongoDB ── IpReputation collection + AuditLog con eventos SECURITY_*
+```
+
+---
+
+### 🌐 Capa 1 — Traefik (Rate Limiting a nivel Proxy)
+
+El proxy inverso aplica un límite de tráfico **antes** de que las peticiones lleguen al backend de Node.js, eliminando tráfico inútil lo antes posible en el pipeline:
+
+| Parámetro | Valor |
+|-----------|-------|
+| Peticiones permitidas | 100 req/min por IP |
+| Burst permitido | 30 peticiones instantáneas |
+| Fuente de IP | `X-Forwarded-For` (depth=1, trust proxy 1) |
+
+**Implementación en `docker-compose.yml`** (labels del servicio `backend`):
+```yaml
+- "traefik.http.routers.backend.middlewares=global-ratelimit@docker"
+- "traefik.http.middlewares.global-ratelimit.ratelimit.average=100"
+- "traefik.http.middlewares.global-ratelimit.ratelimit.burst=30"
+- "traefik.http.middlewares.global-ratelimit.ratelimit.period=1m"
+```
+
+---
+
+### ⚙️ Capa 2 — Backend API (Validación, Rate Limits Granulares, Sanitización)
+
+#### Rate Limiters por categoría de endpoint
+
+Los 500 req/hora globales por IP son solo el backstop. Cada tipo de operación tiene su propio límite granular:
+
+| Limiter | Endpoints | Límite | Ventana | Propósito |
+|---------|-----------|--------|---------|-----------|
+| `authLimiter` | `/login`, `/register`, `/forgot-password`, `/reset-password`, `/verify-code` | **10 intentos** | 15 minutos | Anti brute-force |
+| `sensitiveOpsLimiter` | `POST /containers`, `DELETE /containers/*` | **60 ops** | 10 minutos | Evitar abuso de recursos |
+| `aiLimiter` | `POST /ai/chat` | **5 req** | 1 minuto | Proteger inferencia Ollama (costosa) |
+| `adminLimiter` | `GET/POST /admin/*` | **60 req** | 5 minutos | Limitar acceso al panel |
+| Global (Traefik) | Todos los endpoints | **500 req/h** | 1 hora | Backstop general |
+
+Todos los limiters usan `express-rate-limit` en memoria. Si en el futuro se escala horizontalmente, el campo `store` acepta un `RedisStore` sin cambiar ningún código de rutas.
+
+#### Validación estricta con Zod (DTO Whitelist)
+
+Cada endpoint sensible tiene un esquema Zod que:
+1. **Valida** tipos, formatos y longitudes de cada campo.
+2. **Rechaza** cualquier campo no declarado explícitamente (`.strict()`).
+3. **Coerciona** los datos de entrada (ej. `email.toLowerCase()`, `string.trim()`).
+4. **Reemplaza** `req.body` con la salida sanitizada, nunca con el objeto raw del cliente.
+
+**Schemas implementados** (`/backend/config/schemas/`):
+
+| Schema | Endpoint(s) | Validaciones clave |
+|--------|-------------|-------------------|
+| `auth.schemas.js` | register, login, verify-code, forgot/reset-password | Email válido, password con mayúsculas+números+especiales, OTP exactamente 6 dígitos numéricos |
+| `container.schemas.js` | POST `/containers` | Image: solo `[a-zA-Z0-9\-_./:@]`, name: sin caracteres especiales, envVars: max 64, mountPath absoluto |
+| `network.schemas.js` | POST `/networks` | Driver enum, CIDR válido |
+| `volume.schemas.js` | POST `/volumes` | Size entre 1 MB y 100 GB |
+
+**Ejemplo de campo rechazado:**
+```json
+// Request con campo extra → 400 Validation Error
+{ "email": "user@test.com", "password": "Pass123!", "__proto__": {} }
+// → Error: Unrecognized key: "__proto__"
+```
+
+#### Sanitización heredada (capas previas)
+
+- **`express-mongo-sanitize`**: Elimina `$ne`, `$gt` y otros operadores MongoDB de `req.body`, `req.params`, `req.query`.
+- **`xss-clean`**: Escapa etiquetas `<script>` y similares.
+- **`hpp`**: Elimina parámetros duplicados en query string.
+- **`helmet`**: Inyecta 11 headers HTTP de seguridad (`CSP`, `HSTS`, `X-Frame-Options`, etc.).
+- **`express.json({ limit: '10kb' })`**: Rechaza payloads mayores de 10 KB para prevenir ataques de cuerpo grande.
+
+---
+
+### 🤖 Capa 3 — Detección de Comportamiento (Anti-Bot)
+
+El middleware `botDetection.js` analiza cada petición buscando señales de automatización:
+
+#### Señales detectadas
+
+| Señal | Acción | Penalización de score |
+|-------|--------|----------------------|
+| **User-Agent vacío o ausente** | `403 Forbidden` inmediato | -20 puntos |
+| **UA en blacklist** (Puppeteer, Selenium, HeadlessChrome, curl, wget, Scrapy, Python-requests…) | `403 Forbidden` | -25 puntos |
+| **Headers incompletos** (ausencia de `Accept`, `Accept-Language`, `Accept-Encoding`) | Bloqueo si IP ya tiene baja reputación | -10 puntos |
+| **Timing anomaly** (> 15 req en < 1 segundo desde la misma IP) | `429 Too Many Requests` con `Retry-After: 5` | -15 puntos |
+
+#### User-Agent blacklist completa
+
+```
+HeadlessChrome, PhantomJS, Selenium, Puppeteer, Playwright,
+Python-requests, Go-http-client, Java/<version>, libwww-perl,
+curl/<version>, wget/<version>, Scrapy, httpx, aiohttp,
+axios/<version>, OkHttp, bot*, crawler*, spider*
+```
+
+#### Tracker de timing en memoria
+
+El middleware mantiene un registro en memoria (`Map`) con el timestamp y contador de requests por IP. Se limpia automáticamente cada 60 segundos para evitar leaks de memoria. Las entradas de IPs sin actividad en los últimos 5 minutos se eliminan del map.
+
+---
+
+### 🛡️ Capa 5 — Seguridad Avanzada (IP Reputation + AuditLog)
+
+#### Sistema de Reputación de IPs
+
+**Colección MongoDB:** `ipReputations`
+
+Cada IP que interactúa con la plataforma tiene un registro de reputación:
+
+```js
+{
+  ip: "1.2.3.4",
+  score: 100,          // 0–100 (100 = limpia, 0 = bloqueada)
+  blockedUntil: null,  // null o Date en el futuro
+  manualBlock: false,  // bloqueo indefinido por admin
+  incidents: [         // historial de los últimos 50 incidentes
+    { type: "BOT_DETECTED", detail: "UA: HeadlessChrome/117", scoreDelta: -25 }
+  ],
+  totalIncidents: 3,
+  lastSeenAt: Date
+}
+```
+
+**Lógica de score:**
+
+| Score | Estado | Comportamiento |
+|-------|--------|----------------|
+| 60–100 | ✅ Normal | Tráfico permitido sin restricciones adicionales |
+| 30–59 | ⚠️ Sospechosa | Flag `req.lowReputationIp=true` → botDetection más agresivo |
+| 0–29 | 🚫 Bloqueada | `429` instantáneo antes de llegar a cualquier ruta |
+
+**Cache en memoria (5 minutos TTL):** Para no hacer una consulta a MongoDB en cada request, el middleware cachea el estado de cada IP durante 5 minutos. Al registrar un incidente nuevo, la entrada de cache se invalida inmediatamente para que la siguiente petición lea el estado actualizado.
+
+**Auto-expiración:** Las IPs limpias (score=100, sin incidentes) se eliminan automáticamente de MongoDB tras 30 días mediante un TTL index.
+
+#### Tipos de incidentes registrados
+
+| Tipo | Triggereado por | Penalización |
+|------|----------------|-------------|
+| `INJECTION_ATTEMPT` | Keys con `$`, `{`, `}`, `[`, `]` en req.body | -30 pts |
+| `BOT_DETECTED` | botDetection — UA blacklist | -25 pts |
+| `SUSPICIOUS_UA` | botDetection — UA vacío | -20 pts |
+| `TIMING_ANOMALY` | >15 req/s | -15 pts |
+| `RATE_LIMIT_HIT` | 429 en cualquier endpoint | -8 pts |
+| `FAILED_LOGIN` | 401 en `/api/auth/*` | -5 pts |
+| `INCOMPLETE_HEADERS` | Headers de browser faltantes | -10 pts |
+| `MANUAL_BLOCK` | Admin bloquea IP manualmente | Score → 0 |
+
+#### Security Logger
+
+El middleware `securityLogger.js` envuelve `res.json()` para observar las respuestas salientes sin bloquear el pipeline (usa `setImmediate` para escritura asíncrona):
+
+- **Injection probe detectada** → `AuditLog: SECURITY_INJECTION_ATTEMPT` + IP penalty -30
+- **401 en auth** → `AuditLog: FAILED_LOGIN_ATTEMPT` + IP penalty -5  
+- **429 rate limit** → `AuditLog: SECURITY_RATE_LIMIT_HIT` + IP penalty -8
+- **403 bot** → `AuditLog: SECURITY_BOT_DETECTED`
+
+#### AuditLog — Eventos de Seguridad
+
+La colección `AuditLog` registra ahora dos categorías de eventos:
+
+**Eventos de infraestructura** (previos):
+`CREATE_CONTAINER`, `STOP_CONTAINER`, `DELETE_CONTAINER`, `CREATED_SECRET`, `BACKUP_*`
+
+**Eventos de seguridad** (nuevos):
+`FAILED_LOGIN_ATTEMPT`, `SECURITY_INJECTION_ATTEMPT`, `SECURITY_RATE_LIMIT_HIT`, `SECURITY_BOT_DETECTED`, `SECURITY_IP_BLOCKED`, `SECURITY_IP_UNBLOCKED`
+
+---
+
+### 🖥️ Panel de Administración — Gestión de IPs
+
+Los administradores disponen de endpoints dedicados para gestionar la reputación de IPs desde el panel de control:
+
+```
+GET  /api/admin/security/ip-reputation        → Lista IPs con score < 80 (peores primero)
+POST /api/admin/security/ip-block             → Bloqueo manual indefinido de una IP
+DELETE /api/admin/security/ip-unblock/:ip     → Desbloquear IP y resetear score a 60
+GET  /api/admin/security/audit                → Últimos 200 eventos SECURITY_* del AuditLog
+```
+
+**Ejemplo de bloqueo manual:**
+```json
+POST /api/admin/security/ip-block
+{ "ip": "45.33.32.156", "reason": "Ataque de fuerza bruta detectado" }
+→ 200 { "message": "IP 45.33.32.156 has been manually blocked." }
+```
+
+Todas las acciones de bloqueo/desbloqueo quedan registradas en el AuditLog con el `userId` del administrador que las ejecutó.
+
+---
+
+### 📦 Nuevos archivos del sistema de seguridad
+
+| Archivo | Tipo | Función |
+|---------|------|---------|
+| `backend/config/schemas/auth.schemas.js` | Config | Schemas Zod para todos los endpoints de autenticación |
+| `backend/config/schemas/container.schemas.js` | Config | Schema Zod para creación/actualización de contenedores |
+| `backend/config/schemas/network.schemas.js` | Config | Schema Zod para creación de redes |
+| `backend/config/schemas/volume.schemas.js` | Config | Schema Zod para creación de volúmenes |
+| `backend/middleware/validate.js` | Middleware | Wrapper central de validación Zod (DTO factory) |
+| `backend/middleware/rateLimiters.js` | Middleware | Definiciones de todos los rate limiters granulares |
+| `backend/middleware/botDetection.js` | Middleware | Detección de automatización por UA, headers y timing |
+| `backend/middleware/ipReputation.js` | Middleware | Bloqueo por score + `recordIncident()` exportado |
+| `backend/middleware/securityLogger.js` | Middleware | Logger de respuestas que alimenta AuditLog e IpReputation |
+| `backend/models/IpReputation.js` | Model | Schema MongoDB del sistema de reputación de IPs |
+
+---
+
+_Documentación estructurada y consolidada para OrbitCloud SaaS_

@@ -4,6 +4,7 @@ import authMiddleware from '../middleware/auth.js';
 import Container from '../models/Container.js';
 import User from '../models/User.js';
 import Network from '../models/Network.js';
+import { aiLimiter } from '../middleware/rateLimiters.js';
 
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
@@ -32,7 +33,7 @@ CONVERSATION RULES:
 2. If asked something unrelated to Docker, politely say you only know about Docker.
 3. Keep answers very short and direct.`;
 
-router.post('/chat', authMiddleware, async (req, res) => {
+router.post('/chat', authMiddleware, aiLimiter, async (req, res) => {
     try {
         const { message, history } = req.body;
         const userId = req.user.userId;

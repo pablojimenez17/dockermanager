@@ -36,6 +36,10 @@ import mongoSanitize from 'express-mongo-sanitize';
 import xss from 'xss-clean';
 import hpp from 'hpp';
 import rateLimit from 'express-rate-limit';
+// ── Security Layer Middlewares ──
+import ipReputationMiddleware from './middleware/ipReputation.js';
+import botDetection from './middleware/botDetection.js';
+import securityLogger from './middleware/securityLogger.js';
 dotenv.config();
 
 const app = express();
@@ -47,13 +51,18 @@ app.set('trust proxy', 1);
 // 1. Set security HTTP headers
 app.use(helmet());
 
-// 2. Limit requests from the same IP
+// 2. Limit requests from the same IP (global backstop — granular limits applied per-route)
 const limiter = rateLimit({
-    max: 2000, // Limit each IP to 2000 requests per `window` (here, per hour)
+    max: 500,               // Tightened: 500 req/h per IP (down from 2000)
     windowMs: 60 * 60 * 1000, // 1 hour
+    standardHeaders: true,
+    legacyHeaders: false,
     message: 'Too many requests from this IP, please try again in an hour!'
 });
 app.use('/api', limiter);
+
+// 3. Security logger — intercepts res.json() to log malicious events to AuditLog
+app.use(securityLogger);
 
 // 3. Stripe webhook must receive the raw body to validate signatures.
 app.post('/api/billing/webhook', express.raw({ type: 'application/json' }), billingWebhookHandler);
@@ -69,6 +78,12 @@ app.use(xss());
 
 // 7. Prevent parameter pollution
 app.use(hpp());
+
+// 8. IP Reputation check — blocks blacklisted IPs (registered after body parsers)
+app.use(ipReputationMiddleware);
+
+// 9. Bot detection — blocks headless browsers, empty UAs, timing anomalies
+app.use(botDetection);
 
 // Set up HTTPS Server
 let server;

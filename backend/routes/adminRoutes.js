@@ -6,7 +6,9 @@ import User from '../models/User.js';
 import Container from '../models/Container.js';
 import AuditLog from '../models/AuditLog.js';
 import BackupConfig from '../models/BackupConfig.js';
+import IpReputation from '../models/IpReputation.js';
 import authMiddleware from '../middleware/auth.js';
+import { invalidateIpCache } from '../middleware/ipReputation.js';
 import { runBackup, runDbBackup, runServerBackup, runWebBackup, reloadScheduler } from '../services/backupService.js';
 import * as Minio from 'minio';
 
@@ -270,6 +272,99 @@ router.delete('/backup/:bucket/:filename', async (req, res) => {
         res.json({ message: `Backup "${filename}" deleted from ${bucket}.` });
     } catch (err) {
         res.status(500).json({ message: 'Failed to delete backup.', error: err.message });
+    }
+});
+
+// ── IP Reputation Management (Security Panel) ─────────────────────────────────
+
+// GET /api/admin/security/ip-reputation — list worst IPs (score < 80, sorted by score asc)
+router.get('/security/ip-reputation', async (req, res) => {
+    try {
+        const limit = Math.min(parseInt(req.query.limit) || 50, 200);
+        const ips = await IpReputation.find({ score: { $lt: 80 } })
+            .sort({ score: 1 })              // worst first
+            .limit(limit)
+            .lean();
+        res.json(ips);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching IP reputation data', error: err.message });
+    }
+});
+
+// POST /api/admin/security/ip-block — manually blacklist an IP indefinitely
+router.post('/security/ip-block', async (req, res) => {
+    const { ip, reason } = req.body;
+    if (!ip || typeof ip !== 'string' || ip.length > 45) {
+        return res.status(400).json({ message: 'Valid IP address is required' });
+    }
+    try {
+        await IpReputation.findOneAndUpdate(
+            { ip },
+            {
+                $set: { score: 0, manualBlock: true, lastSeenAt: new Date() },
+                $push: {
+                    incidents: {
+                        $each: [{ type: 'MANUAL_BLOCK', detail: reason || 'Manual block by admin', scoreDelta: -100 }],
+                        $slice: -50,
+                    },
+                },
+            },
+            { upsert: true, new: true }
+        );
+        invalidateIpCache(ip);
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'SECURITY_IP_BLOCKED',
+            resourceName: ip,
+            details: reason || 'Manual block by admin',
+        });
+        res.json({ message: `IP ${ip} has been manually blocked.` });
+    } catch (err) {
+        res.status(500).json({ message: 'Error blocking IP', error: err.message });
+    }
+});
+
+// DELETE /api/admin/security/ip-unblock/:ip — remove manual block and reset score
+router.delete('/security/ip-unblock/:ip', async (req, res) => {
+    const ip = decodeURIComponent(req.params.ip);
+    try {
+        await IpReputation.findOneAndUpdate(
+            { ip },
+            { $set: { score: 60, manualBlock: false, blockedUntil: null } }
+        );
+        invalidateIpCache(ip);
+        await AuditLog.create({
+            userId: req.user.userId,
+            action: 'SECURITY_IP_UNBLOCKED',
+            resourceName: ip,
+            details: 'Manual unblock by admin',
+        });
+        res.json({ message: `IP ${ip} has been unblocked. Score reset to 60.` });
+    } catch (err) {
+        res.status(500).json({ message: 'Error unblocking IP', error: err.message });
+    }
+});
+
+// GET /api/admin/security/audit — security events only (last 200)
+router.get('/security/audit', async (req, res) => {
+    try {
+        const logs = await AuditLog.find({
+            action: { $in: [
+                'FAILED_LOGIN_ATTEMPT',
+                'SECURITY_INJECTION_ATTEMPT',
+                'SECURITY_RATE_LIMIT_HIT',
+                'SECURITY_BOT_DETECTED',
+                'SECURITY_IP_BLOCKED',
+                'SECURITY_IP_UNBLOCKED',
+            ]}
+        })
+        .populate('userId', 'name email')
+        .sort({ createdAt: -1 })
+        .limit(200)
+        .lean();
+        res.json(logs);
+    } catch (err) {
+        res.status(500).json({ message: 'Error fetching security audit logs', error: err.message });
     }
 });
 

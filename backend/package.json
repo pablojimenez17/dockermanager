@@ -30,7 +30,8 @@
     "stripe": "^22.1.1",
     "tar-fs": "^3.1.2",
     "twilio": "^6.0.0",
-    "xss-clean": "^0.1.4"
+    "xss-clean": "^0.1.4",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "nodemon": "^3.1.0",

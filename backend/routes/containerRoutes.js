@@ -5,9 +5,10 @@ import User from '../models/User.js';
 import Secret, { decrypt } from '../models/Secret.js';
 import Registry, { decrypt as decryptRegistry } from '../models/Registry.js';
 import AuditLog from '../models/AuditLog.js';
-import Snapshot from '../models/Snapshot.js'; // Added this line
+import Snapshot from '../models/Snapshot.js';
 import authMiddleware from '../middleware/auth.js';
 import { checkPermission } from '../middleware/rbac.js';
+import { sensitiveOpsLimiter, generalLimiter } from '../middleware/rateLimiters.js';
 import path from 'path';
 import fs from 'fs';
 
@@ -322,7 +323,7 @@ router.get('/', async (req, res) => {
 });
 
 // Create a new container stack
-router.post('/', checkPermission('manageContainers'), async (req, res) => {
+router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async (req, res) => {
     try {
         const { stack } = req.body;
 
