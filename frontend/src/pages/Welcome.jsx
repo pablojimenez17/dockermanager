@@ -108,7 +108,6 @@ const Welcome = () => {
     { text: '1 GB RAM quota', included: true },
     { text: '1 CPU Core equivalent', included: true },
     { text: '1 GB Persistent Storage (1 Disk)', included: true },
-    { text: 'No Custom Domains', included: false },
     { text: 'Community Support', included: true }],
 
     cta: 'Start Free', highlighted: false
@@ -121,7 +120,6 @@ const Welcome = () => {
     { text: '8 GB RAM quota', included: true },
     { text: '4 CPU Cores equivalent', included: true },
     { text: '10 GB Persistent Storage (5 Disks)', included: true },
-    { text: '3 Custom Domains', included: true },
     { text: 'Priority Support', included: true },
     { text: 'Advanced Network Modes', included: true }],
 
@@ -134,7 +132,6 @@ const Welcome = () => {
     { text: '32 GB RAM quota', included: true },
     { text: '16 CPU Cores equivalent', included: true },
     { text: '100 GB Persistent Storage (20 Disks)', included: true },
-    { text: 'Unlimited Custom Domains', included: true },
     { text: '24/7 Dedicated Support', included: true },
     { text: 'Custom Node Mapping', included: true }],
 
@@ -497,7 +494,6 @@ const Welcome = () => {
               'RAM quota',
               'CPU Cores',
               'Persistent Storage',
-              'Custom Domains',
               'Support level',
               'Advanced Network Modes',
               'Custom Roles & RBAC'].
