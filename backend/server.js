@@ -106,6 +106,26 @@ function requestShutdown(reason, exitCode = 1) {
     });
 }
 
+let serverStarted = false;
+function startHttpServer() {
+    if (serverStarted) return;
+    serverStarted = true;
+
+    const PORT = process.env.PORT || 5000;
+    server.listen(PORT, () => {
+        console.log(`Server listening on port ${PORT}`);
+    });
+}
+
+async function warmUpModels() {
+    const models = Object.values(mongoose.models);
+    await Promise.all(models.map((model) =>
+        model.init().catch((err) => {
+            console.warn(`[MongoDB] Model warm-up skipped for ${model.modelName}: ${err.message}`);
+        })
+    ));
+}
+
 function healthHandler(_req, res) {
     const mem = process.memoryUsage();
     const rssMb = Math.round(mem.rss / 1024 / 1024);
@@ -194,6 +214,10 @@ app.use(xss());
 // 7. Prevent parameter pollution
 app.use(hpp());
 
+// Auth is latency-sensitive and already has its own brute-force limiter.
+// Keep it out of DB-backed reputation/bot middleware so first login is not a warm-up request.
+app.use('/api/auth', authRoutes);
+
 // 8. IP Reputation check — blocks blacklisted IPs (registered after body parsers)
 app.use(ipReputationMiddleware);
 
@@ -223,7 +247,6 @@ server.keepAliveTimeout = parseInt(process.env.SERVER_KEEPALIVE_TIMEOUT_MS || '6
 // Health check — no auth required, used by Docker healthcheck & load balancers
 // Returns memory stats to help diagnose VPS slowness
 // Routes
-app.use('/api/auth', authRoutes);
 app.use('/api/containers', containerRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/admin', adminRoutes);
@@ -270,6 +293,9 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
 
         // Memory watchdog — log a warning every 5 min if RSS is too high.
         // On a 1-2 GB VPS anything above 400 MB is a red flag for a memory leak.
+        await warmUpModels();
+        startHttpServer();
+
         const MEM_WARN_MB = parseInt(process.env.MEM_WARN_MB || '400');
         setInterval(() => {
             const rssMb = Math.round(process.memoryUsage().rss / 1024 / 1024);
@@ -313,10 +339,8 @@ mongoose.connect(process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/dockermanag
             console.error('Failed to start Backup Scheduler:', backupErr);
         }
     })
-    .catch((err) => console.error('Error connecting to MongoDB:', err));
-
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
-    console.log(`Server listening on port ${PORT}`);
-});
+    .catch((err) => {
+        console.error('Error connecting to MongoDB:', err);
+        setTimeout(() => process.exit(1), 1000).unref();
+    });
 

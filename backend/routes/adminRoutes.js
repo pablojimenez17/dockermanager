@@ -188,19 +188,32 @@ router.put('/backup/config', async (req, res) => {
     try {
         const { db, server, web, retention } = req.body;
         const cfg = await BackupConfig.getSingleton();
+        const now = new Date();
+        const updateSchedule = (typeCfg, incoming) => {
+            if (!incoming) return;
+            const wasEnabled = typeCfg.enabled;
+            const previousInterval = typeCfg.intervalMs;
 
-        if (db !== undefined) {
-            if (typeof db.enabled === 'boolean') cfg.db.enabled = db.enabled;
-            if (db.intervalMs && db.intervalMs >= 3600000) cfg.db.intervalMs = db.intervalMs; // min 1h
-        }
-        if (server !== undefined) {
-            if (typeof server.enabled === 'boolean') cfg.server.enabled = server.enabled;
-            if (server.intervalMs && server.intervalMs >= 3600000) cfg.server.intervalMs = server.intervalMs;
-        }
-        if (web !== undefined) {
-            if (typeof web.enabled === 'boolean') cfg.web.enabled = web.enabled;
-            if (web.intervalMs && web.intervalMs >= 3600000) cfg.web.intervalMs = web.intervalMs;
-        }
+            if (typeof incoming.enabled === 'boolean') typeCfg.enabled = incoming.enabled;
+            if (incoming.intervalMs && incoming.intervalMs >= 3600000) typeCfg.intervalMs = incoming.intervalMs;
+
+            const enabledChanged = wasEnabled !== typeCfg.enabled;
+            const intervalChanged = previousInterval !== typeCfg.intervalMs;
+
+            if (!typeCfg.enabled) {
+                typeCfg.nextRunAt = null;
+                return;
+            }
+
+            if (enabledChanged || intervalChanged || !typeCfg.nextRunAt) {
+                const base = typeCfg.lastRunAt ? new Date(typeCfg.lastRunAt) : now;
+                typeCfg.nextRunAt = new Date(base.getTime() + typeCfg.intervalMs);
+            }
+        };
+
+        updateSchedule(cfg.db, db);
+        updateSchedule(cfg.server, server);
+        updateSchedule(cfg.web, web);
         if (retention && retention >= 1) cfg.retention = retention;
 
         cfg.markModified('db');

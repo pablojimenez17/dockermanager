@@ -59,6 +59,7 @@ router.post('/', checkPermission('manageNetworks'), async (req, res) => {
             Labels: {
                 'dockermanager.vpc': 'true',
                 'dockermanager.owner': req.user.userId.toString(),
+                'dockermanager.created_at': new Date().toISOString(),
                 'dockermanager.display_name': name // Keep original name for UI display
             }
         };

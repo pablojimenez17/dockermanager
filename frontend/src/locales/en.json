@@ -555,6 +555,10 @@
     "backup_scheduler_config": "Scheduler Configuration",
     "interval_hours": "Interval (hours)",
     "backup_retention": "Copies to keep",
+    "last_run": "Last run",
+    "next_run": "Next run",
+    "not_scheduled": "Not scheduled",
+    "disabled": "Disabled",
     "save_config": "Save Config",
     "saving_": "Saving...",
     "loading_": "Loading...",
@@ -597,6 +601,7 @@
     "fresh_data_mode_description": "Disables volume reuse for this deployment and forces a clean initialization (useful when changing first-boot credentials).",
     "env_validation_required_value": "You cannot deploy with incomplete environment variables: if Secret is selected you must choose one, and Raw values cannot be empty.",
     "internet_enabled_warning": "When Internet access is enabled, your container can make external connections. Use it at your own risk.",
+    "internet_access_info": "Controls whether the container can initiate outbound internet connections. It does not publish the service or open external access; use Public Access for that.",
     "private_container_description": "Your container is fully isolated. It can only communicate with your other services."
   }
 }

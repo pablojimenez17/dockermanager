@@ -12,13 +12,13 @@ export const ToastProvider = ({ children }) => {
         setToasts(prev => prev.filter(t => t.id !== id));
     }, []);
 
-    const addToast = useCallback((title, message, type = 'info', actionLabel = null, onAction = null) => {
+    const addToast = useCallback((title, message, type = 'info', actionLabel = null, onAction = null, duration = 6000) => {
         console.log('[Toast System] Spawning toast:', title, message);
         const id = String(Date.now() + Math.random());
         setToasts(prev => [...prev, { id, title, message, type, actionLabel, onAction }]);
-        // Auto remove after 6 seconds unless it has an action
+        // Auto remove after the requested duration unless it has an action
         if (!actionLabel) {
-            setTimeout(() => removeToast(id), 6000);
+            setTimeout(() => removeToast(id), duration);
         }
     }, [removeToast]);
 

@@ -76,6 +76,13 @@ const AdminDashboard = () => {const { t } = useTranslation();
     }
   };
 
+  const formatScheduleDate = (value) => {
+    if (!value) return t('auto.not_scheduled');
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return t('auto.not_scheduled');
+    return date.toLocaleString();
+  };
+
   const saveBackupConfig = async () => {
     setConfigSaving(true);
     try {
@@ -377,6 +384,10 @@ const AdminDashboard = () => {const { t } = useTranslation();
                                 onChange={e=>setLocalConfig(p=>({...p,[key]:{...p[key],intervalH:parseInt(e.target.value)||1}}))}
                                 disabled={!localConfig[key].enabled}
                                 className="w-full px-3 py-1.5 text-sm border border-slate-200 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-slate-900 dark:text-white disabled:opacity-40 outline-none focus:ring-1 focus:ring-blue-500" />
+                              <div className="mt-3 space-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                <div>{t('auto.last_run')}: {formatScheduleDate(backupConfig?.[key]?.lastRunAt)}</div>
+                                <div>{t('auto.next_run')}: {localConfig[key].enabled ? formatScheduleDate(backupConfig?.[key]?.nextRunAt) : t('auto.disabled')}</div>
+                              </div>
                             </div>
                           ))}
                         </div>

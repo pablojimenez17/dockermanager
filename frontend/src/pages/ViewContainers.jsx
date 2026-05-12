@@ -92,12 +92,23 @@ const ViewContainers = () => {const { t } = useTranslation();
   }, [activeOrg]);
 
   const handleAction = async (id, action) => {
-    try {
-      const targetContainer = containers.find((c) => c._id === id);
-      const endpoint = action === 'delete' ? `/api/containers/${id}` : `/api/containers/${id}/${action}`;
+    const targetContainer = containers.find((c) => c._id === id || c.dockerId === id);
+    const runAction = (containerId) => {
+      const endpoint = action === 'delete' ? `/api/containers/${containerId}` : `/api/containers/${containerId}/${action}`;
       const method = action === 'delete' ? 'delete' : 'post';
+      return axios[method](endpoint, {});
+    };
 
-      await axios[method](endpoint, action === 'delete' ? {} : {});
+    try {
+      try {
+        await runAction(id);
+      } catch (err) {
+        if (err.response?.status === 404 && targetContainer?.dockerId && targetContainer.dockerId !== id) {
+          await runAction(targetContainer.dockerId);
+        } else {
+          throw err;
+        }
+      }
 
       if (action === 'start') addToast('Success', 'Container started successfully', 'success');else
       if (action === 'stop') addToast('Success', 'Container stopped', 'warning');else
@@ -105,7 +116,8 @@ const ViewContainers = () => {const { t } = useTranslation();
 
       fetchContainers();
     } catch (err) {
-      addToast('Error', `Could not ${action} container`, 'error');
+      const message = err.response?.data?.message || err.response?.data?.error || `Could not ${action} container`;
+      addToast('Error', message, 'error', null, null, 12000);
     }
   };
 

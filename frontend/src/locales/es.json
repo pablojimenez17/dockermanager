@@ -561,6 +561,10 @@
     "backup_scheduler_config": "Configuración del Programador",
     "interval_hours": "Intervalo (horas)",
     "backup_retention": "Copias a conservar",
+    "last_run": "Ultima ejecucion",
+    "next_run": "Proxima ejecucion",
+    "not_scheduled": "Sin programar",
+    "disabled": "Desactivado",
     "save_config": "Guardar Configuración",
     "saving_": "Guardando...",
     "loading_": "Cargando...",
@@ -603,6 +607,7 @@
     "fresh_data_mode_description": "Desactiva reutilizacion de volumenes para este despliegue y fuerza inicializacion limpia (util cuando cambias credenciales iniciales).",
     "env_validation_required_value": "No puedes desplegar con variables incompletas: si eliges Secret debes seleccionar uno, y en Raw el valor no puede estar vacio.",
     "internet_enabled_warning": "Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Usalo bajo tu responsabilidad.",
+    "internet_access_info": "Controla si el contenedor puede iniciar conexiones hacia internet. No publica el servicio ni abre acceso externo; para eso usa Acceso publico.",
     "private_container_description": "Tu contenedor esta completamente aislado. Solo puede comunicarse con tus otros servicios."
   }
 }

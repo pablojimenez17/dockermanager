@@ -19,6 +19,7 @@ const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_H
 const ORBIT_BASE_DOMAIN = process.env.ORBIT_BASE_DOMAIN || 'orbitcloud.app';
 const RESERVED_SUBDOMAINS = ['admin', 'api', 'www'];
 const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
+const ORPHAN_NETWORK_GRACE_MS = parseInt(process.env.ORPHAN_NETWORK_GRACE_HOURS || '24', 10) * 60 * 60 * 1000;
 
 router.use(authMiddleware);
 
@@ -50,6 +51,7 @@ const ensureUserVpc = async (userId, suffix = 'default_vlan', enableInternet = f
                     'dockermanager.vpc': 'true',
                     'dockermanager.owner': userId.toString(),
                     'dockermanager.internet': enableInternet ? 'true' : 'false',
+                    'dockermanager.created_at': new Date().toISOString(),
                 }
             });
         } else {
@@ -133,6 +135,15 @@ const pruneOrphanedVpcNetworks = async (userId) => {
                 );
 
                 if (userContainers.length === 0) {
+                    const createdAt = new Date(details.Labels?.['dockermanager.created_at'] || details.Created || 0);
+                    const ageMs = Date.now() - createdAt.getTime();
+
+                    if (Number.isFinite(ageMs) && ageMs < ORPHAN_NETWORK_GRACE_MS) {
+                        const hoursLeft = Math.ceil((ORPHAN_NETWORK_GRACE_MS - ageMs) / (60 * 60 * 1000));
+                        console.log(`[VPC Reaper] Keeping empty network ${netInfo.Name}; grace period has ${hoursLeft}h left.`);
+                        continue;
+                    }
+
                     // Detach lan-proxy first if it's the only remaining member
                     for (const c of containers) {
                         if (c.Name.includes('lan-proxy')) {
@@ -277,6 +288,23 @@ const buildTraefikAppId = (domain, fallbackName = 'app') => {
     const id = base.replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
     return id || `app${Date.now()}`;
 };
+
+const objectIdPattern = /^[0-9a-fA-F]{24}$/;
+
+const buildContainerLookup = (req, id) => {
+    const scope = req.organization
+        ? { organizationId: req.organization._id }
+        : { userId: req.user.userId, organizationId: { $exists: false } };
+
+    const idMatches = [{ dockerId: id }];
+    if (objectIdPattern.test(id)) {
+        idMatches.push({ _id: id });
+    }
+
+    return { ...scope, $or: idMatches };
+};
+
+const findScopedContainer = (req) => Container.findOne(buildContainerLookup(req, req.params.id));
 
 // Get all containers for the logged-in user or organization
 router.get('/', async (req, res) => {
@@ -739,11 +767,7 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
 // Stop a container
 router.post('/:id/stop', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const query = req.organization
-            ? { _id: req.params.id, organizationId: req.organization._id }
-            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
-
-        const dbContainer = await Container.findOne(query);
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -768,11 +792,7 @@ router.post('/:id/stop', checkPermission('manageContainers'), async (req, res) =
 // Start a mapped container
 router.post('/:id/start', checkPermission('manageContainers'), async (req, res) => {
     try {
-        const query = req.organization
-            ? { _id: req.params.id, organizationId: req.organization._id }
-            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
-
-        const dbContainer = await Container.findOne(query);
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -833,7 +853,7 @@ router.post('/:id/start', checkPermission('manageContainers'), async (req, res) 
 // PUT: Redeploy container (Zero-Downtime Blue/Green)
 router.put('/:id/redeploy', async (req, res) => {
     try {
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found or you do not have permission' });
         }
@@ -921,11 +941,7 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
             });
         }
 
-        const query = req.organization
-            ? { _id: req.params.id, organizationId: req.organization._id }
-            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
-
-        const dbContainer = await Container.findOne(query);
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found or you do not have permission' });
         }
@@ -1031,11 +1047,7 @@ router.put('/:id/edit', checkPermission('manageContainers'), async (req, res) =>
 // Remove a container
 router.delete('/:id', checkPermission('deleteContainers'), async (req, res) => {
     try {
-        const query = req.organization
-            ? { _id: req.params.id, organizationId: req.organization._id }
-            : { _id: req.params.id, userId: req.user.userId, organizationId: { $exists: false } };
-
-        const dbContainer = await Container.findOne(query);
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) return res.status(404).json({ message: 'Container not found' });
 
         const container = docker.getContainer(dbContainer.dockerId);
@@ -1056,10 +1068,10 @@ router.delete('/:id', checkPermission('deleteContainers'), async (req, res) => {
             }
         }
 
-        await Container.deleteOne({ _id: req.params.id });
+        await Container.deleteOne({ _id: dbContainer._id });
 
         // Prune any user VPC networks that are now empty
-        pruneOrphanedVpcNetworks(req.user.userId).catch(() => {});
+        pruneOrphanedVpcNetworks(req.organization?.ownerId || req.user.userId).catch(() => {});
 
         // Audit Log
         await AuditLog.create({
@@ -1077,7 +1089,7 @@ router.delete('/:id', checkPermission('deleteContainers'), async (req, res) => {
 // PUT: Redeploy container (Zero-Downtime Blue/Green)
 router.put('/:id/redeploy', async (req, res) => {
     try {
-        const dbContainer = await Container.findOne({ _id: req.params.id, userId: req.user.userId });
+        const dbContainer = await findScopedContainer(req);
         if (!dbContainer) {
             return res.status(404).json({ message: 'Container not found or you do not have permission' });
         }

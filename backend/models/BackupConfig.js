@@ -2,7 +2,11 @@ import mongoose from 'mongoose';
 
 const backupTypeSchema = new mongoose.Schema({
     enabled:    { type: Boolean, default: true },
-    intervalMs: { type: Number, default: 24 * 60 * 60 * 1000 } // 24h default
+    intervalMs: { type: Number, default: 24 * 60 * 60 * 1000 }, // 24h default
+    lastRunAt:  { type: Date, default: null },
+    nextRunAt:  { type: Date, default: null },
+    lastStatus: { type: String, enum: ['success', 'failed', 'running', null], default: null },
+    lastError:  { type: String, default: null }
 }, { _id: false });
 
 const backupConfigSchema = new mongoose.Schema({

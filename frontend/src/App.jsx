@@ -56,10 +56,34 @@ const getRequestTimeout = (config) => {
   return DEFAULT_REQUEST_TIMEOUT_MS;
 };
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldRetryRequest = (error) => {
+  const config = error.config || {};
+  const url = config.url || '';
+  const method = (config.method || 'get').toLowerCase();
+  const timedOut =
+    error.code === 'ECONNABORTED' ||
+    error.response?.status === 408 ||
+    error.response?.data?.code === 'REQUEST_TIMEOUT';
+
+  if (!timedOut || config.__retriedAfterTimeout) return false;
+  if (method === 'get') return true;
+  if (method === 'post' && url.includes('/api/auth/login')) return true;
+
+  return false;
+};
+
 // Interceptor to auto-logout on 401 Unauthorized, excluding auth check endpoints
 axios.interceptors.response.use(
   response => response,
-  error => {
+  async error => {
+    if (shouldRetryRequest(error)) {
+      error.config.__retriedAfterTimeout = true;
+      await wait(700);
+      return axios(error.config);
+    }
+
     if (error.code === 'ECONNABORTED') {
       error.response = error.response || {
         status: 408,

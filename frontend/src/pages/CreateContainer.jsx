@@ -361,7 +361,7 @@ const CreateContainer = () => {
                                     <div className="relative group/tooltip ml-2 flex items-center">
                                       <Info size={14} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 cursor-help" />
                                       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tooltip:block bg-slate-800 text-white text-[11px] p-2.5 rounded w-56 text-center z-[100] font-medium shadow-sm leading-relaxed">
-                                        {t("auto.permite_acceso_desde_fuera_de_tu_red_ais")}
+                                        {t("auto.internet_access_info")}
                                       </div>
                                     </div>
                                   </p>

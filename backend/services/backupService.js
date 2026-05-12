@@ -141,15 +141,83 @@ export const runBackup = async () => {
 };
 
 // ──────────────────────────────────────────────────────────────────────────────
-// Scheduler — 3 independent intervals, reloadable at runtime
+// Scheduler — persistent due-time checks, reloadable at runtime
 // ──────────────────────────────────────────────────────────────────────────────
 
-let _timers = { db: null, server: null, web: null };
+let _schedulerTimer = null;
+let _schedulerRunning = false;
 
 const clearTimers = () => {
-    Object.keys(_timers).forEach(k => {
-        if (_timers[k]) { clearInterval(_timers[k]); _timers[k] = null; }
-    });
+    if (_schedulerTimer) {
+        clearInterval(_schedulerTimer);
+        _schedulerTimer = null;
+    }
+};
+
+const backupRunners = {
+    db: runDbBackup,
+    server: runServerBackup,
+    web: runWebBackup
+};
+
+const backupLabels = {
+    db: 'DB',
+    server: 'Server',
+    web: 'Web'
+};
+
+const ensureNextRunAt = (backupCfg, now) => {
+    if (!backupCfg.nextRunAt) {
+        backupCfg.nextRunAt = backupCfg.lastRunAt
+            ? new Date(new Date(backupCfg.lastRunAt).getTime() + backupCfg.intervalMs)
+            : new Date(0);
+    }
+
+    return new Date(backupCfg.nextRunAt);
+};
+
+const runScheduledBackup = async (cfg, key, now) => {
+    const typeCfg = cfg[key];
+    if (!typeCfg?.enabled) return;
+
+    const nextRunAt = ensureNextRunAt(typeCfg, now);
+    if (nextRunAt > now) return;
+
+    console.log(`[Backup] ${backupLabels[key]} scheduled backup due. Running now...`);
+    typeCfg.lastStatus = 'running';
+    typeCfg.lastError = null;
+    cfg.markModified(key);
+    await cfg.save();
+
+    const result = await backupRunners[key](cfg.retention);
+    const finishedAt = new Date();
+
+    typeCfg.lastRunAt = finishedAt;
+    typeCfg.nextRunAt = new Date(finishedAt.getTime() + typeCfg.intervalMs);
+    typeCfg.lastStatus = result.success ? 'success' : 'failed';
+    typeCfg.lastError = result.success ? null : result.error || 'Backup failed';
+    cfg.markModified(key);
+    await cfg.save();
+
+    console.log(`[Backup] ${backupLabels[key]} scheduled backup ${result.success ? 'completed' : 'failed'}. Next run: ${typeCfg.nextRunAt.toISOString()}`);
+};
+
+const runDueBackups = async () => {
+    if (_schedulerRunning) return;
+    _schedulerRunning = true;
+
+    try {
+        const cfg = await BackupConfig.getSingleton();
+        const now = new Date();
+
+        await runScheduledBackup(cfg, 'db', now);
+        await runScheduledBackup(cfg, 'server', now);
+        await runScheduledBackup(cfg, 'web', now);
+    } catch (err) {
+        console.error('[Backup] Scheduler check failed:', err.message);
+    } finally {
+        _schedulerRunning = false;
+    }
 };
 
 export const reloadScheduler = async () => {
@@ -157,18 +225,20 @@ export const reloadScheduler = async () => {
     const cfg = await BackupConfig.getSingleton();
     console.log('[Backup] Scheduler reloaded from DB config.');
 
-    if (cfg.db.enabled) {
-        _timers.db = setInterval(() => runDbBackup(cfg.retention), cfg.db.intervalMs);
-        console.log(`[Backup] DB scheduler: every ${cfg.db.intervalMs / 3600000}h`);
+    for (const key of ['db', 'server', 'web']) {
+        const typeCfg = cfg[key];
+        if (typeCfg.enabled) {
+            ensureNextRunAt(typeCfg, new Date());
+            console.log(`[Backup] ${backupLabels[key]} scheduler: every ${typeCfg.intervalMs / 3600000}h. Next run: ${new Date(typeCfg.nextRunAt).toISOString()}`);
+        } else {
+            console.log(`[Backup] ${backupLabels[key]} scheduler: disabled`);
+        }
+        cfg.markModified(key);
     }
-    if (cfg.server.enabled) {
-        _timers.server = setInterval(() => runServerBackup(cfg.retention), cfg.server.intervalMs);
-        console.log(`[Backup] Server scheduler: every ${cfg.server.intervalMs / 3600000}h`);
-    }
-    if (cfg.web.enabled) {
-        _timers.web = setInterval(() => runWebBackup(cfg.retention), cfg.web.intervalMs);
-        console.log(`[Backup] Web scheduler: every ${cfg.web.intervalMs / 3600000}h`);
-    }
+    await cfg.save();
+
+    _schedulerTimer = setInterval(runDueBackups, 60 * 1000);
+    runDueBackups();
 };
 
 export const startBackupScheduler = () => {

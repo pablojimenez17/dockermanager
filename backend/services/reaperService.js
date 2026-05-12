@@ -9,6 +9,13 @@ const docker = new Docker(
       : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' }
 );
 
+const ORPHAN_NETWORK_GRACE_MS = parseInt(process.env.ORPHAN_NETWORK_GRACE_HOURS || '24', 10) * 60 * 60 * 1000;
+
+const getNetworkAgeMs = (details) => {
+    const createdAt = new Date(details.Labels?.['dockermanager.created_at'] || details.Created || 0);
+    return Date.now() - createdAt.getTime();
+};
+
 /**
  * Prune user VPC networks that are empty (no user containers attached).
  * Called after container stops/deletes both from the Reaper and DELETE route.
@@ -25,6 +32,13 @@ export const pruneUserVpcNetworks = async (userId) => {
                 const containers = Object.values(details.Containers || {});
                 const userContainers = containers.filter(c => !c.Name.includes('lan-proxy'));
                 if (userContainers.length === 0) {
+                    const ageMs = getNetworkAgeMs(details);
+                    if (Number.isFinite(ageMs) && ageMs < ORPHAN_NETWORK_GRACE_MS) {
+                        const hoursLeft = Math.ceil((ORPHAN_NETWORK_GRACE_MS - ageMs) / (60 * 60 * 1000));
+                        console.log(`[VPC Reaper] Keeping empty network ${netInfo.Name}; grace period has ${hoursLeft}h left.`);
+                        continue;
+                    }
+
                     for (const c of containers) {
                         if (c.Name.includes('lan-proxy')) {
                             try { await network.disconnect({ Container: c.Name, Force: true }); } catch (_) {}
