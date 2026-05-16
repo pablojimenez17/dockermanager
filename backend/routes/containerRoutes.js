@@ -331,51 +331,83 @@ router.get('/', async (req, res) => {
 
         const userContainers = await Container.find(query);
 
-        // Enrich with actual docker status
-        const enrichedContainers = await mapWithConcurrency(userContainers, DOCKER_LIST_CONCURRENCY, async (c) => {
-            try {
-                const dockerContainer = docker.getContainer(c.dockerId);
-                const info = await withTimeout(dockerContainer.inspect(), DOCKER_READ_TIMEOUT_MS, `Inspect ${c.name}`);
-                return {
-                    ...c.toObject(),
-                    state: info.State.Status,
-                    ports: info.NetworkSettings.Ports,
-                    restartInfo: {
-                        isRestarting: info.State.Status === 'restarting' || info.State.Restarting === true,
-                        exitCode: info.State.ExitCode,
-                        oomKilled: info.State.OOMKilled === true,
-                        error: info.State.Error || '',
-                        restartCount: info.RestartCount ?? info.State.RestartCount ?? 0
-                    },
-                    hostConfig: {
-                        Memory: info.HostConfig.Memory || 0,
-                        MemoryReservation: info.HostConfig.MemoryReservation || 0,
-                        NanoCPUs: info.HostConfig.NanoCPUs || 0
-                    },
-                    networkMode: info.HostConfig.NetworkMode,
-                    ipv4Address: Object.values(info.NetworkSettings.Networks || {})[0]?.IPAddress || '',
-                    routing: c.isPublic ? {
-                        domain: c.domain,
-                        internalPort: c.internalPort,
-                        targetNetwork: info.Config.Labels?.['traefik.docker.network'] || info.HostConfig.NetworkMode,
-                        enabled: info.Config.Labels?.['traefik.enable'] === 'true'
-                    } : undefined
-                };
-            } catch (err) {
-                if (err.statusCode === 404) {
+        // Fetch all containers from Docker daemon in ONE single call (O(1) instead of O(N))
+        // This prevents TCP socket exhaustion when users have many containers.
+        let allDockerContainers = [];
+        let listFailed = false;
+        try {
+            allDockerContainers = await withTimeout(docker.listContainers({ all: true }), DOCKER_READ_TIMEOUT_MS, 'List all containers');
+        } catch (err) {
+            console.error('[GET /api/containers] Docker listContainers failed:', err.message);
+            listFailed = true;
+        }
+
+        const enrichedContainers = [];
+
+        for (const c of userContainers) {
+            const dockerInfo = allDockerContainers.find(dc => dc.Id === c.dockerId || (dc.Id && dc.Id.startsWith(c.dockerId)));
+            
+            if (!dockerInfo) {
+                if (!listFailed) {
                     // Container was removed outside the app, silently clean up DB
                     await Container.deleteOne({ _id: c._id });
-                    return null;
+                    continue;
+                } else {
+                    enrichedContainers.push({
+                        ...c.toObject(),
+                        state: 'error/timeout',
+                        statusWarning: 'Could not reach Docker daemon'
+                    });
+                    continue;
                 }
-                return {
-                    ...c.toObject(),
-                    state: err.message?.includes('timed out') ? 'error/timeout' : 'error/not_found',
-                    statusWarning: err.message
-                };
             }
-        });
 
-        res.json(enrichedContainers.filter(c => c !== null));
+            // Convert array of ports from listContainers to the object map format expected by frontend
+            const formattedPorts = {};
+            if (dockerInfo.Ports && Array.isArray(dockerInfo.Ports)) {
+                for (const p of dockerInfo.Ports) {
+                    if (!p.PrivatePort) continue;
+                    const key = `${p.PrivatePort}/${p.Type || 'tcp'}`;
+                    if (!formattedPorts[key]) formattedPorts[key] = [];
+                    if (p.PublicPort) {
+                        formattedPorts[key].push({ HostIp: p.IP || '0.0.0.0', HostPort: p.PublicPort.toString() });
+                    }
+                }
+            }
+
+            // Network properties
+            const networks = dockerInfo.NetworkSettings?.Networks || {};
+            const firstNetwork = Object.values(networks)[0] || {};
+            const networkMode = dockerInfo.HostConfig?.NetworkMode || 'bridge';
+
+            enrichedContainers.push({
+                ...c.toObject(),
+                state: dockerInfo.State,
+                ports: formattedPorts,
+                restartInfo: {
+                    isRestarting: dockerInfo.State === 'restarting',
+                    exitCode: 0, // Not available in listContainers, fallback to 0
+                    oomKilled: false, // Not available in listContainers
+                    error: dockerInfo.Status?.includes('Exited') ? dockerInfo.Status : '',
+                    restartCount: 0 
+                },
+                hostConfig: {
+                    Memory: c.memory ? c.memory * 1024 * 1024 : 0,
+                    MemoryReservation: c.memory ? c.memory * 1024 * 1024 * 0.1 : 0,
+                    NanoCPUs: c.cpuCores ? c.cpuCores * 1e9 : 0
+                },
+                networkMode: networkMode,
+                ipv4Address: firstNetwork.IPAddress || '',
+                routing: c.isPublic ? {
+                    domain: c.domain,
+                    internalPort: c.internalPort,
+                    targetNetwork: dockerInfo.Labels?.['traefik.docker.network'] || networkMode,
+                    enabled: dockerInfo.Labels?.['traefik.enable'] === 'true'
+                } : undefined
+            });
+        }
+
+        res.json(enrichedContainers);
     } catch (error) {
         res.status(500).json({ message: 'Error retrieving containers', error: error.message });
     }
