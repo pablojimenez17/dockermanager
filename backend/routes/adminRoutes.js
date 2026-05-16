@@ -55,20 +55,25 @@ router.get('/system-containers', async (req, res) => {
 router.get('/containers', async (req, res) => {
     try {
         const dbContainers = await Container.find().populate('userId', 'name email');
-        const enrichedContainers = await Promise.all(dbContainers.map(async (c) => {
-            try {
-                const dockerContainer = docker.getContainer(c.dockerId);
-                const info = await withTimeout(dockerContainer.inspect(), 7000, `Admin inspect ${c.dockerId}`);
-                return {
-                    ...c.toObject(),
-                    state: info.State.Status,
-                    systemPorts: info.NetworkSettings.Ports,
-                    owner: c.userId?.name || 'Unknown'
-                };
-            } catch (err) {
-                return { ...c.toObject(), state: 'error/not_found', owner: c.userId?.name || 'Unknown' };
-            }
-        }));
+        
+        let allDockerContainers = [];
+        try {
+            allDockerContainers = await withTimeout(docker.listContainers({ all: true }), 7000, 'Admin listContainers');
+        } catch (err) {
+            console.error('[GET /api/admin/containers] Docker listContainers failed:', err.message);
+        }
+
+        const enrichedContainers = dbContainers.map(c => {
+            const dockerInfo = allDockerContainers.find(dc => dc.Id === c.dockerId || (dc.Id && dc.Id.startsWith(c.dockerId)));
+            
+            return {
+                ...c.toObject(),
+                state: dockerInfo ? dockerInfo.State : 'error/not_found',
+                systemPorts: dockerInfo ? dockerInfo.Ports : [],
+                owner: c.userId?.name || 'Unknown'
+            };
+        });
+        
         res.json(enrichedContainers);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching global containers', error: error.message });
@@ -247,8 +252,10 @@ router.get('/backup/list', async (req, res) => {
         const allObjects = [];
         for (const bucket of BUCKETS) {
             try {
-                const exists = await minioClient.bucketExists(bucket);
+                // withTimeout prevents 120s TCP hang if MinIO container is offline or booting
+                const exists = await withTimeout(minioClient.bucketExists(bucket), 5000, `MinIO check ${bucket}`);
                 if (!exists) continue;
+                
                 const stream = minioClient.listObjects(bucket, '', true);
                 for await (const obj of stream) {
                     allObjects.push({
