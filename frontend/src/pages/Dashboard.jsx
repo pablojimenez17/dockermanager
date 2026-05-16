@@ -15,7 +15,7 @@ const Dashboard = () => {const { t } = useTranslation();
 
   // Mock history data for sparklines
   const cpuHistory = [{ val: 10 }, { val: 25 }, { val: 15 }, { val: 40 }, { val: Math.max(metrics.cpu, 5) }];
-  const memHistory = [{ val: 20 }, { val: 22 }, { val: 25 }, { val: 30 }, { val: Math.max(metrics.mem / 1024 / 1024, 5) }];
+  const memHistory = [{ val: 20 }, { val: 22 }, { val: 25 }, { val: 30 }, { val: Math.max(metrics.memLimit / 1024 / 1024, 5) }];
 
   useEffect(() => {
     const fetchSummary = async () => {
@@ -30,25 +30,16 @@ const Dashboard = () => {const { t } = useTranslation();
           stopped: containers.length - running.length
         });
 
-        let totalCpu = 0;
-        let totalMem = 0;
-        let totalMemLimit = 0;
+        const totalCpuLimit = containers.reduce(
+          (sum, c) => sum + ((c.hostConfig?.NanoCPUs || 0) / 1e9),
+          0
+        );
+        const totalMemLimit = containers.reduce(
+          (sum, c) => sum + (c.hostConfig?.Memory || 0),
+          0
+        );
 
-        if (running.length > 0) {
-          const metricsPromises = running.map((c) =>
-          axios.get(`/api/stats/${c._id}`).catch(() => null)
-          );
-          const metricsResults = await Promise.all(metricsPromises);
-          metricsResults.forEach((m) => {
-            if (m && m.data) {
-              totalCpu += parseFloat(m.data.cpuPercent) || 0;
-              totalMem += parseFloat(m.data.memUsage) || 0;
-              totalMemLimit += parseFloat(m.data.memLimit) || 0;
-            }
-          });
-        }
-
-        setMetrics({ cpu: totalCpu.toFixed(1), mem: totalMem, memLimit: totalMemLimit });
+        setMetrics({ cpu: totalCpuLimit.toFixed(1), mem: 0, memLimit: totalMemLimit });
 
       } catch (err) {
         console.error('Failed to parse dashboard stats', err);
@@ -136,8 +127,8 @@ const Dashboard = () => {const { t } = useTranslation();
                         <table className="w-full text-sm text-left">
                             <tbody>
                                 <tr className="border-b border-gray-100 dark:border-slate-700/50">
-                                    <td className="py-4 font-medium text-gray-700 dark:text-slate-300 w-1/4">{t("auto.cpu_usage")}</td>
-                                    <td className="py-4 w-1/4 font-mono">{metrics.cpu}%</td>
+                                    <td className="py-4 font-medium text-gray-700 dark:text-slate-300 w-1/4">{t("auto.cpu")}</td>
+                                    <td className="py-4 w-1/4 font-mono">{metrics.cpu} {t("auto.vcpu")}</td>
                                     <td className="py-4 w-1/2">
                                         <div className="h-10 w-full">
                                             <ResponsiveContainer width="100%" height="100%">
@@ -151,7 +142,7 @@ const Dashboard = () => {const { t } = useTranslation();
                                 <tr>
                                     <td className="py-4 font-medium text-gray-700 dark:text-slate-300 w-1/4">{t("auto.memory")}</td>
                                     <td className="py-4 w-1/4 font-mono">
-                                        {metrics.mem > 0 ? (metrics.mem / 1024 / 1024).toFixed(0) : 0} {t("auto.mb")}
+                                        {metrics.memLimit > 0 ? (metrics.memLimit / 1024 / 1024).toFixed(0) : 0} {t("auto.mb")}
                                     </td>
                                     <td className="py-4 w-1/2">
                                         <div className="h-10 w-full">

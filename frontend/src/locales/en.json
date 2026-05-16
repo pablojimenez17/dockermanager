@@ -602,6 +602,10 @@
     "env_validation_required_value": "You cannot deploy with incomplete environment variables: if Secret is selected you must choose one, and Raw values cannot be empty.",
     "internet_enabled_warning": "When Internet access is enabled, your container can make external connections. Use it at your own risk.",
     "internet_access_info": "Controls whether the container can initiate outbound internet connections. It does not publish the service or open external access; use Public Access for that.",
-    "private_container_description": "Your container is fully isolated. It can only communicate with your other services."
+    "private_container_description": "Your container is fully isolated. It can only communicate with your other services.",
+    "base_os_public_access_warning": "Base images like Ubuntu do not start Apache automatically. Public Access only routes to the selected port; an HTTP process must be listening inside the container.",
+    "startup_command_optional": "Startup command (optional)",
+    "startup_command_placeholder": "apachectl -D FOREGROUND",
+    "startup_command_help": "Runs as sh -lc. Useful for keeping servers such as Apache/Nginx in the foreground inside base images."
   }
 }

@@ -13,6 +13,7 @@ const getEmptyContainer = () => ({
   memory: '512',
   cpu: '1',
   restartPolicy: 'no',
+  startupCommand: '',
   networkMode: 'bridge',
   enableInternet: false,
   extraNetworks: [],       // additional networks to connect after creation
@@ -144,6 +145,11 @@ const CreateContainer = () => {
     return env.value.trim() === '';
   };
 
+  const isBaseOsImage = (image) => {
+    const imageName = image.split(':')[0].split('/').pop().toLowerCase();
+    return ['ubuntu', 'debian', 'alpine', 'centos', 'kali-rolling', 'kali'].includes(imageName);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -168,6 +174,7 @@ const CreateContainer = () => {
           memory: c.memory,
           cpu: c.cpu,
           restartPolicy: c.restartPolicy,
+          command: c.startupCommand.trim() || undefined,
           networkMode: c.networkMode,
           enableInternet: c.enableInternet === true,
           extraNetworks: c.extraNetworks || [],
@@ -288,17 +295,24 @@ const CreateContainer = () => {
                     </button>
                   </div>
                   {c.isPublic && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.internal_app_port")}</label>
-                      <input
-                        type="number"
-                        min="1"
-                        required={c.isPublic}
-                        value={c.internalPort}
-                        onChange={(e) => updateContainer(c.id, 'internalPort', e.target.value)}
-                        placeholder={t("auto.e_g_3000")}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-brand-500 outline-none text-sm font-mono"
-                      />
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.internal_app_port")}</label>
+                        <input
+                          type="number"
+                          min="1"
+                          required={c.isPublic}
+                          value={c.internalPort}
+                          onChange={(e) => updateContainer(c.id, 'internalPort', e.target.value)}
+                          placeholder={t("auto.e_g_3000")}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 focus:ring-1 focus:ring-brand-500 outline-none text-sm font-mono"
+                        />
+                      </div>
+                      {isBaseOsImage(c.image) && (
+                        <div className="text-xs rounded border border-amber-200 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 p-3 leading-relaxed">
+                          {t("auto.base_os_public_access_warning")}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -322,6 +336,18 @@ const CreateContainer = () => {
                           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.cpu_limit_cores_")}</label>
                           <input type="number" step="0.1" value={c.cpu} onChange={(e) => updateContainer(c.id, 'cpu', e.target.value)} className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono" />
                         </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t("auto.startup_command_optional")}</label>
+                        <input
+                          type="text"
+                          value={c.startupCommand}
+                          onChange={(e) => updateContainer(c.id, 'startupCommand', e.target.value)}
+                          placeholder={t("auto.startup_command_placeholder")}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-slate-600 rounded bg-white dark:bg-slate-900 text-sm font-mono"
+                        />
+                        <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">{t("auto.startup_command_help")}</p>
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -19,6 +19,7 @@ const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_H
 const ORBIT_BASE_DOMAIN = process.env.ORBIT_BASE_DOMAIN || 'orbitcloud.app';
 const RESERVED_SUBDOMAINS = ['admin', 'api', 'www'];
 const DOCKER_READ_TIMEOUT_MS = parseInt(process.env.DOCKER_READ_TIMEOUT_MS || '7000', 10);
+const DOCKER_LIST_CONCURRENCY = parseInt(process.env.DOCKER_LIST_CONCURRENCY || '4', 10);
 const ORPHAN_NETWORK_GRACE_MS = parseInt(process.env.ORPHAN_NETWORK_GRACE_HOURS || '24', 10) * 60 * 60 * 1000;
 
 router.use(authMiddleware);
@@ -306,6 +307,21 @@ const buildContainerLookup = (req, id) => {
 
 const findScopedContainer = (req) => Container.findOne(buildContainerLookup(req, req.params.id));
 
+const mapWithConcurrency = async (items, limit, mapper) => {
+    const results = new Array(items.length);
+    let nextIndex = 0;
+    const workerCount = Math.max(1, Math.min(limit, items.length));
+
+    await Promise.all(Array.from({ length: workerCount }, async () => {
+        while (nextIndex < items.length) {
+            const currentIndex = nextIndex++;
+            results[currentIndex] = await mapper(items[currentIndex], currentIndex);
+        }
+    }));
+
+    return results;
+};
+
 // Get all containers for the logged-in user or organization
 router.get('/', async (req, res) => {
     try {
@@ -316,7 +332,7 @@ router.get('/', async (req, res) => {
         const userContainers = await Container.find(query);
 
         // Enrich with actual docker status
-        const enrichedContainers = await Promise.all(userContainers.map(async (c) => {
+        const enrichedContainers = await mapWithConcurrency(userContainers, DOCKER_LIST_CONCURRENCY, async (c) => {
             try {
                 const dockerContainer = docker.getContainer(c.dockerId);
                 const info = await withTimeout(dockerContainer.inspect(), DOCKER_READ_TIMEOUT_MS, `Inspect ${c.name}`);
@@ -333,8 +349,17 @@ router.get('/', async (req, res) => {
                     },
                     hostConfig: {
                         Memory: info.HostConfig.Memory || 0,
+                        MemoryReservation: info.HostConfig.MemoryReservation || 0,
                         NanoCPUs: info.HostConfig.NanoCPUs || 0
-                    }
+                    },
+                    networkMode: info.HostConfig.NetworkMode,
+                    ipv4Address: Object.values(info.NetworkSettings.Networks || {})[0]?.IPAddress || '',
+                    routing: c.isPublic ? {
+                        domain: c.domain,
+                        internalPort: c.internalPort,
+                        targetNetwork: info.Config.Labels?.['traefik.docker.network'] || info.HostConfig.NetworkMode,
+                        enabled: info.Config.Labels?.['traefik.enable'] === 'true'
+                    } : undefined
                 };
             } catch (err) {
                 if (err.statusCode === 404) {
@@ -348,7 +373,7 @@ router.get('/', async (req, res) => {
                     statusWarning: err.message
                 };
             }
-        }));
+        });
 
         res.json(enrichedContainers.filter(c => c !== null));
     } catch (error) {
@@ -449,7 +474,7 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
         // Deploy sequentially to respect implicit dependencies
         for (const config of stack) {
             console.log(`[DEBUG] Processing config for image: ${config.image} `);
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, isPublic, internalPort, volumeName, volumeMountPath } = config;
+            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, isPublic, internalPort, volumeName, volumeMountPath, command } = config;
             const publishPublicly = isPublic === true;
             const resolvedInternalPort = publishPublicly ? parseInt(internalPort, 10) : undefined;
             if (publishPublicly && (!resolvedInternalPort || Number.isNaN(resolvedInternalPort) || resolvedInternalPort <= 0)) {
@@ -658,8 +683,13 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
             }
 
             // Keep OS base images alive so they don't appear as "exited" instantly
+            const normalizedCommand = typeof command === 'string' ? command.trim() : '';
+            if (normalizedCommand) {
+                containerConfig.Cmd = ['sh', '-lc', normalizedCommand];
+            }
+
             const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos', 'kalilinux/kali-rolling', 'kali'];
-            if (keepsAlive.some(img => image.includes(img))) {
+            if (!normalizedCommand && keepsAlive.some(img => image.includes(img))) {
                 containerConfig.Cmd = ['tail', '-f', '/dev/null'];
             }
 
@@ -667,6 +697,13 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
             // Create and start container
             let container;
             try {
+                if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
+                    const proxyAttached = await attachProxyToVpc(safeNetworkMode);
+                    if (!proxyAttached) {
+                        throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
+                    }
+                }
+
                 container = await docker.createContainer(containerConfig);
                 console.log(`[DEBUG] Container created ID: ${container.id}`);
 
@@ -674,7 +711,7 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
                 console.log(`[DEBUG] Container ${container.id} started successfully`);
 
                 // ── VPC Proxy Attach ────────────────────────────────────────────
-                // Only attach the lan-proxy if the user intends to expose a domain.
+                // Only attach the public proxy if the user intends to expose a domain.
                 // This is the single controlled ingress point into the user's VPC.
                 if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
                     const proxyAttached = await attachProxyToVpc(safeNetworkMode);

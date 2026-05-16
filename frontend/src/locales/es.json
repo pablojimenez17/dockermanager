@@ -608,6 +608,10 @@
     "env_validation_required_value": "No puedes desplegar con variables incompletas: si eliges Secret debes seleccionar uno, y en Raw el valor no puede estar vacio.",
     "internet_enabled_warning": "Al habilitar internet aceptas que tu contenedor puede realizar conexiones externas. Usalo bajo tu responsabilidad.",
     "internet_access_info": "Controla si el contenedor puede iniciar conexiones hacia internet. No publica el servicio ni abre acceso externo; para eso usa Acceso publico.",
-    "private_container_description": "Tu contenedor esta completamente aislado. Solo puede comunicarse con tus otros servicios."
+    "private_container_description": "Tu contenedor esta completamente aislado. Solo puede comunicarse con tus otros servicios.",
+    "base_os_public_access_warning": "Las imagenes base como Ubuntu no arrancan Apache automaticamente. Public Access solo enruta al puerto indicado; necesitas que un proceso HTTP quede escuchando dentro del contenedor.",
+    "startup_command_optional": "Comando de arranque (opcional)",
+    "startup_command_placeholder": "apachectl -D FOREGROUND",
+    "startup_command_help": "Se ejecuta como sh -lc. Util para mantener servidores como Apache/Nginx en primer plano dentro de imagenes base."
   }
 }

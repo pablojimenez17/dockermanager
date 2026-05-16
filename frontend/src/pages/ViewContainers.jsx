@@ -40,12 +40,6 @@ const ViewContainers = () => {const { t } = useTranslation();
       setRefreshing(true);
       const res = await axios.get('/api/containers');
       setContainers(res.data);
-
-      const userRes = await axios.get('/api/auth/me', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      setUserLimits(resolveLimits(userRes.data));
-
       setError('');
     } catch (err) {
       setError(err.response?.data?.message || 'Error fetching containers');
@@ -57,6 +51,12 @@ const ViewContainers = () => {const { t } = useTranslation();
 
   useEffect(() => {
     fetchContainers();
+    axios.get('/api/auth/me', {
+      headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+    }).then((userRes) => {
+      setUserLimits(resolveLimits(userRes.data));
+    }).catch(() => {});
+
     const interval = setInterval(fetchContainers, 30000);
 
     // Auto-reconnect: backend restarts won't force the user to log out
@@ -284,6 +284,14 @@ const ViewContainers = () => {const { t } = useTranslation();
                                             {container.ports && Object.keys(container.ports).length > 0 ?
                   Object.keys(container.ports).map((p) => p.split('/')[0]).join(', ') :
                   '-'}
+                                            {container.domain &&
+                  <div className="mt-1">
+                                                    <a href={`https://${container.domain}`} target="_blank" rel="noreferrer" className="text-brand-600 dark:text-brand-400 hover:underline">
+                                                        {container.domain}
+                                                    </a>
+                                                    {container.internalPort && <span className="text-gray-400"> :{container.internalPort}</span>}
+                                                </div>
+                  }
                                         </td>
                                         <td className="text-right whitespace-nowrap">
                                             <div className="flex items-center justify-end space-x-2">
