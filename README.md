@@ -14,9 +14,6 @@ La infraestructura de OrbitCloud ejecuta en producción integrando de forma cont
 | **Monitorización (Grafana + Loki)**       | https://grafana.orbitcloud.app | |
 | **Bóveda de Backups (MinIO)**             | *Sin acceso público*           | Solo accesible vía SSH Tunnel al puerto 9001 del VPS |
 
-> [!TIP]
-> Para acceder a la consola de MinIO en producción sin exponerla públicamente: `ssh -L 9001:orbitcloud-minio:9001 root@167.99.252.155`
-
 ---
 
 ## 🚀 2. Guía de Despliegue y CI/CD
