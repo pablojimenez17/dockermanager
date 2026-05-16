@@ -591,7 +591,13 @@ const Marketplace = () => {
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => setIsPublic((v) => !v)}
+                                          onClick={() => {
+                                            const newIsPublic = !isPublic;
+                                            setIsPublic(newIsPublic);
+                                            if (newIsPublic && !internalPort && selectedTemplate?.containers?.[0]?.ports?.[0]?.container) {
+                                              setInternalPort(selectedTemplate.containers[0].ports[0].container.toString());
+                                            }
+                                          }}
                                           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isPublic ? 'bg-brand-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                                         >
                                           <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${isPublic ? 'translate-x-6' : 'translate-x-1'}`} />
