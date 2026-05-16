@@ -688,8 +688,15 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
                 containerConfig.Cmd = ['sh', '-lc', normalizedCommand];
             }
 
+            const getBaseImageName = (fullImage) => {
+                const withoutTag = fullImage.split(':')[0];
+                const parts = withoutTag.split('/');
+                return parts[parts.length - 1].toLowerCase();
+            };
+            const baseImg = getBaseImageName(image);
+
             const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos', 'kalilinux/kali-rolling', 'kali'];
-            if (!normalizedCommand && keepsAlive.some(img => image.includes(img))) {
+            if (!normalizedCommand && keepsAlive.includes(baseImg)) {
                 containerConfig.Cmd = ['tail', '-f', '/dev/null'];
             }
 
