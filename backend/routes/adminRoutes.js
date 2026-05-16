@@ -11,6 +11,7 @@ import authMiddleware from '../middleware/auth.js';
 import { invalidateIpCache } from '../middleware/ipReputation.js';
 import { runBackup, runDbBackup, runServerBackup, runWebBackup, reloadScheduler } from '../services/backupService.js';
 import * as Minio from 'minio';
+import { withTimeout } from '../utils/timeout.js';
 
 const router = express.Router();
 const docker = new Docker(process.env.DOCKER_HOST ? { host: process.env.DOCKER_HOST.split(':')[1].replace('//', ''), port: process.env.DOCKER_HOST.split(':').pop() } : { socketPath: process.platform === 'win32' ? '//./pipe/docker_engine' : '/var/run/docker.sock' });
@@ -43,7 +44,7 @@ router.get('/users', async (req, res) => {
 // Get all system infrastructure containers (directly from Docker)
 router.get('/system-containers', async (req, res) => {
     try {
-        const containers = await docker.listContainers({ all: true });
+        const containers = await withTimeout(docker.listContainers({ all: true }), 7000, 'Admin listContainers');
         res.json(containers);
     } catch (error) {
         res.status(500).json({ message: 'Error fetching system containers', error: error.message });
@@ -57,7 +58,7 @@ router.get('/containers', async (req, res) => {
         const enrichedContainers = await Promise.all(dbContainers.map(async (c) => {
             try {
                 const dockerContainer = docker.getContainer(c.dockerId);
-                const info = await dockerContainer.inspect();
+                const info = await withTimeout(dockerContainer.inspect(), 7000, `Admin inspect ${c.dockerId}`);
                 return {
                     ...c.toObject(),
                     state: info.State.Status,
