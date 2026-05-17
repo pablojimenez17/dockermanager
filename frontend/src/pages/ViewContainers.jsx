@@ -147,12 +147,13 @@ const ViewContainers = () => {const { t } = useTranslation();
     e.preventDefault();
     try {
       setSnapshotModalOpen(false);
+      addToast('Info', 'Creating snapshot (this may take a minute)...', 'info');
       await axios.post(`/api/containers/${snapshotContainer.dockerId}/snapshot`, {
         snapshotName: snapshotName
       });
       addToast('Success', 'Snapshot created.', 'success');
     } catch (err) {
-      addToast('Error', 'Snapshot failed.', 'error');
+      addToast('Error', err.response?.data?.message || 'Snapshot failed.', 'error');
     }
   };
 

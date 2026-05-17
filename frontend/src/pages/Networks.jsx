@@ -41,6 +41,7 @@ const Networks = () => {const { t } = useTranslation();
   const handleCreateNetwork = async (e) => {
     e.preventDefault();
     try {
+      addToast('Info', 'Creating network...', 'info');
       await axios.post('/api/networks', formData);
       addToast(`Network ${formData.name} created successfully!`, 'success');
       setShowCreateModal(false);

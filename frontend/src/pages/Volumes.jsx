@@ -54,6 +54,7 @@ const Volumes = () => {const { t } = useTranslation();
     setError('');
     setActionLoading(true);
     try {
+      addToast('Info', 'Creating volume...', 'info');
       await axios.post('/api/volumes', { name: newVolumeName });
       setNewVolumeName('');
       await fetchVolumes();
