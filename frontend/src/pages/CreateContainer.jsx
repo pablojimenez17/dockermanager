@@ -178,6 +178,22 @@ const CreateContainer = () => {
           restartPolicy: c.restartPolicy,
           command: c.startupCommand.trim() || undefined,
           networkMode: c.networkMode,
+          enableInternet: c.enableInternet === true,
+          extraNetworks: c.extraNetworks || [],
+          ipv4Address: c.networkMode !== 'bridge' && c.networkMode !== 'host' && c.networkMode !== 'none' ? c.ipv4Address : undefined,
+          isPublic: c.isPublic === true,
+          internalPort: c.isPublic ? c.internalPort : undefined,
+          volumeName: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeName : undefined),
+          volumeMountPath: c.freshData ? undefined : (c.volumeName && c.volumeMountPath ? c.volumeMountPath : undefined)
+        };
+      });
+      addToast('Info', t("auto.deploying_stack_") || 'Deploying container...', 'info');
+      await axios.post('/api/containers', { stack: payload });
+      setLoading(false);
+    } catch (err) {
+      setError(err.response?.data?.error || err.response?.data?.message || 'Deploy failed');
+      setLoading(false);
+    }
   };
 
   const reqContainers = containers.length;
