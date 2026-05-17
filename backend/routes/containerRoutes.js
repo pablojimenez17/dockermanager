@@ -12,6 +12,8 @@ import { sensitiveOpsLimiter, generalLimiter } from '../middleware/rateLimiters.
 import { withTimeout } from '../utils/timeout.js';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
+import { getIo } from '../websockets.js';
 
 const router = express.Router();
 // Use Dockerode connected to local socket
@@ -491,351 +493,358 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
         const userVpcName = await ensureUserVpc(ownerId);
 
         // For multi-container stacks create a dedicated internal stack bridge
-        // so all nodes in the same template see each other by name, but still
-        // cannot escape to the internet.
         let networkName = null;
         if (stack.length > 1) {
             const stackSuffix = `stack_${Math.random().toString(36).substring(7)}_net`;
             networkName = await ensureUserVpc(ownerId, stackSuffix);
         }
 
-        const createdRecords = [];
-
-        console.log(`[DEBUG] Attempting to create stack of length ${stack.length} `);
-
-        // Deploy sequentially to respect implicit dependencies
-        for (const config of stack) {
-            console.log(`[DEBUG] Processing config for image: ${config.image} `);
-            const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, isPublic, internalPort, volumeName, volumeMountPath, command } = config;
-            const publishPublicly = isPublic === true;
-            const resolvedInternalPort = publishPublicly ? parseInt(internalPort, 10) : undefined;
-            if (publishPublicly && (!resolvedInternalPort || Number.isNaN(resolvedInternalPort) || resolvedInternalPort <= 0)) {
-                throw new Error(`Container "${name}" requires a valid internalPort when public access is enabled`);
-            }
-
-            let domain;
-            if (publishPublicly) {
-                const userScope = buildUserScope(user.email, ownerId);
-                domain = await generateUniqueDomain({ name, userScope });
-            }
-
-            // Ensure image exists or pull it using private registry if available
-            try {
-                let imageExists = false;
-                try {
-                    await docker.getImage(image).inspect();
-                    imageExists = true;
-                } catch (_) { }
-
-                if (!imageExists) {
-                    const authconfig = await resolveRegistryAuth(image, ownerId);
-                    console.log(`[DEBUG] Pulling ${image}...`);
-                    await pullImageSync(image, authconfig);
-                }
-
-                // Crucial for Docker Desktop on Windows: Wait for image to be indexed
-                await waitForImage(image);
-            } catch (err) {
-                console.warn(`[DEBUG] Pull failed for ${image}: ${err.message}`);
-                // Throw so the API aborts and returns a 400/500 to the frontend with the real reason
-                throw new Error(`Failed to pull image ${image}: ${err.message}`);
-            }
-
-            const instanceName = name;
-            console.log(`[DEBUG] Spawning ${name} -> ${instanceName}`);
-
-            // Prepare port bindings
-            const PortBindings = {};
-            const ExposedPorts = {};
-            if (ports && ports.length > 0) {
-                ports.forEach(p => {
-                    const [hostPort, containerPort] = p.split(':');
-                    if (hostPort && containerPort) {
-                        PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
-                        ExposedPorts[`${containerPort}/tcp`] = {};
-                    }
-                });
-            }
-
-            // --- Secret Manager Interception ---
-            const finalEnv = [];
-            if (env && env.length > 0) {
-                for (let envStr of env) {
-                    const secretMatch = envStr.match(/^(.*?)=\{\{SECRET:(.*?)\}\}$/);
-                    if (secretMatch) {
-                        const envKey = secretMatch[1];
-                        const secretName = secretMatch[2];
-                        try {
-                            const secretQuery = req.organization
-                                ? { organizationId: req.organization._id, name: secretName }
-                                : { userId: ownerId, organizationId: { $exists: false }, name: secretName };
-                            const secretDoc = await Secret.findOne(secretQuery);
-                            if (secretDoc) {
-                                const decryptedValue = decrypt(secretDoc.encryptedValue, secretDoc.iv);
-                                finalEnv.push(`${envKey}=${decryptedValue}`);
-                            } else {
-                                console.warn(`Secret ${secretName} not found for user. Skipping injection.`);
-                            }
-                        } catch (err) {
-                            console.error(`Error decrypting secret ${secretName}:`, err);
-                        }
-                    } else {
-                        finalEnv.push(envStr); // raw env value
-                    }
-                }
-            }
-            // -----------------------------------
-
-            // ── VPC Network Resolution ────────────────────────────────────────
-            // 'none' is preserved as-is (air-gapped container)
-            // Everything else is redirected to the user's private VPC
-            let safeNetworkMode;
-            const enableInternet = config.enableInternet === true;
-
-            if (networkMode === 'none') {
-                // Air-gapped: no network at all
-                safeNetworkMode = 'none';
-
-            } else if (networkName) {
-                // Multi-container stack: use dedicated internal stack network
-                safeNetworkMode = networkName;
-
-            } else if (networkMode && networkMode !== 'bridge' && networkMode !== 'lan_net' && networkMode !== 'dockermanager_lan_net') {
-                // User explicitly picked one of their own custom networks.
-                // Docker does NOT allow changing the Internal flag of an existing network.
-                // Strategy: if internet is requested, use/create a '_open' sibling of that network.
-                //           if private, use the network as-is.
-                if (enableInternet) {
-                    const baseName = networkMode.endsWith('_open')
-                        ? networkMode.slice(0, -5) // strip existing _open to get base
-                        : networkMode;
-                    const openSuffix = `${baseName}_open`.replace(`${ownerId}_`, '');
-                    safeNetworkMode = await ensureUserVpc(ownerId, openSuffix, true);
-                } else {
-                    safeNetworkMode = networkMode;
-                }
-
-            } else {
-                // Default / bridge / lan_net → redirect to user's private VPC.
-                // IMPORTANT: We use two separate permanent networks to avoid the Docker
-                // limitation of not being able to change Internal flag on existing networks:
-                //   - default_vlan      → Internal:true  (isolated, no internet)
-                //   - default_vlan_open → Internal:false (internet allowed)
-                if (enableInternet) {
-                    safeNetworkMode = await ensureUserVpc(ownerId, 'default_vlan_open', true);
-                } else {
-                    safeNetworkMode = userVpcName; // always Internal:true
-                }
-            }
-            console.log(`[VPC] Container '${name}' will use network: ${safeNetworkMode} (internet=${enableInternet})`);
-
-            // Expose app port for reverse proxy if not otherwise exposed
-            if (publishPublicly && resolvedInternalPort) {
-                if (!PortBindings[`${resolvedInternalPort}/tcp`]) {
-                    ExposedPorts[`${resolvedInternalPort}/tcp`] = {};
-                }
-            }
-
-            // Build Advanced Host Configuration
-            // Memory works like a VM dynamic disk — no pre-allocation:
-            //   - Memory: hard ceiling enforced by cgroup only when actually reached (no upfront reservation)
-            //   - MemorySwap: -1 disables Docker's default swap limit (Memory*2) which fails if limit > physical RAM
-            const memoryBytes = memory ? parseInt(memory) * 1024 * 1024 : 0;
-            const baseHostConfig = {
-                PortBindings,
-                ...(memoryBytes > 0 && {
-                    Memory: memoryBytes,
-                    MemorySwap: -1, // CRITICAL: prevents Docker from failing when Memory > physical RAM
-                }),
-                ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
-                ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
-                NetworkMode: safeNetworkMode,
-                ...(volumeName && volumeMountPath && { Binds: [`${volumeName}:${volumeMountPath}`] })
-            };
-
-            const containerConfig = {
-                Image: image,
-                name: instanceName,
-                Env: finalEnv,
-                ExposedPorts,
-                HostConfig: baseHostConfig,
-                Labels: {}
-            };
-
-            // Inject generated domain labels only for public containers
-            if (publishPublicly && domain && resolvedInternalPort) {
-                const appId = buildTraefikAppId(domain, name);
-                containerConfig.Labels = {
-                    'traefik.enable': 'true',
-                    'traefik.constraint-label': 'dmz-proxy',
-                    [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
-                    [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
-                    [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
-                    [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${resolvedInternalPort}`,
-                    'traefik.docker.network': safeNetworkMode,
-                };
-            }
-
-            // Inject custom IP if user provided one and we are on a custom network (not default bridge/host/none)
-            if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
-                containerConfig.NetworkingConfig = {
-                    EndpointsConfig: {
-                        [safeNetworkMode]: {
-                            IPAMConfig: {
-                                IPv4Address: ipv4Address
-                            }
-                        }
-                    }
-                };
-            }
-            // WordPress Template specific environment injection (if they used the preset)
-            // If the user deployed WordPress and MySQL together via the preset:
-            if (image.includes('wordpress')) {
-                // Find DB in stack
-                const dbConfig = stack.find(c => c.image.includes('mysql') || c.image.includes('mariadb'));
-                if (dbConfig) {
-                    containerConfig.Env = [
-                        ...containerConfig.Env,
-                        `WORDPRESS_DB_HOST=${dbConfig.name}:3306`,
-                        `WORDPRESS_DB_USER=wordpress`,
-                        `WORDPRESS_DB_PASSWORD=somewordpress`,
-                        `WORDPRESS_DB_NAME=wordpress`
-                    ];
-                }
-            }
-
-            if (image.includes('mysql') && stack.some(c => c.image.includes('wordpress'))) {
-                containerConfig.Env = [
-                    ...containerConfig.Env,
-                    `MYSQL_ROOT_PASSWORD=somewordpress`,
-                    `MYSQL_DATABASE=wordpress`,
-                    `MYSQL_USER=wordpress`,
-                    `MYSQL_PASSWORD=somewordpress`
-                ];
-            }
-
-            // Keep OS base images alive so they don't appear as "exited" instantly
-            const normalizedCommand = typeof command === 'string' ? command.trim() : '';
-            if (normalizedCommand) {
-                containerConfig.Cmd = ['sh', '-lc', normalizedCommand];
-            }
-
-            const getBaseImageName = (fullImage) => {
-                const withoutTag = fullImage.split(':')[0];
-                const parts = withoutTag.split('/');
-                return parts[parts.length - 1].toLowerCase();
-            };
-            const baseImg = getBaseImageName(image);
-
-            const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos', 'kalilinux/kali-rolling', 'kali'];
-            if (!normalizedCommand && keepsAlive.includes(baseImg)) {
-                containerConfig.Cmd = ['tail', '-f', '/dev/null'];
-            }
-
-            console.log(`[DEBUG] Pulling ${image}...`);
-            // Create and start container
-            let container;
-            try {
-                if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
-                    const proxyAttached = await attachProxyToVpc(safeNetworkMode);
-                    if (!proxyAttached) {
-                        throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
-                    }
-                }
-
-                container = await docker.createContainer(containerConfig);
-                console.log(`[DEBUG] Container created ID: ${container.id}`);
-
-                await container.start();
-                console.log(`[DEBUG] Container ${container.id} started successfully`);
-
-                // ── VPC Proxy Attach ────────────────────────────────────────────
-                // Only attach the public proxy if the user intends to expose a domain.
-                // This is the single controlled ingress point into the user's VPC.
-                if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
-                    const proxyAttached = await attachProxyToVpc(safeNetworkMode);
-                    if (!proxyAttached) {
-                        throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
-                    }
-                }
-
-                // ── Extra Networks ──────────────────────────────────────────────
-                // If the user selected additional networks, connect the running
-                // container to each one after creation.
-                // This is the Docker Compose-equivalent of multi-network membership:
-                // a container can be on the private VPC (Internal:true) AND
-                const extraNetworks = config.extraNetworks || [];
-                for (const extraNet of extraNetworks) {
-                    try {
-                        // Skip if this is the same as the primary network
-                        if (extraNet === safeNetworkMode) continue;
-
-                        // Ensure the network exists. If it's 'bridge' use Docker's default.
-                        let resolvedExtra = extraNet;
-                        if (extraNet !== 'bridge') {
-                            // Treat as a user-named network - ensure it exists (do NOT change Internal flag)
-                            const existingNets = await docker.listNetworks({ filters: { name: [extraNet] } });
-                            const exactMatch = existingNets.find(n => n.Name === extraNet);
-                            if (!exactMatch) {
-                                console.warn(`[VPC] Extra network '${extraNet}' not found, skipping.`);
-                                continue;
-                            }
-                        }
-
-                        console.log(`[VPC] Connecting container '${instanceName}' to extra network: ${resolvedExtra}`);
-                        await docker.getNetwork(resolvedExtra).connect({ Container: container.id });
-                    } catch (netErr) {
-                        // Non-fatal: log and continue - don't fail the whole deployment
-                        console.error(`[VPC] Failed to connect '${instanceName}' to extra network '${extraNet}':`, netErr.message);
-                    }
-                }
-
-                // Save to database
-                const containerData = {
-                    name: instanceName,
-                    image,
-                    dockerId: container.id,
-                    userId: req.user.userId,
-                    status: 'running',
-                    domain: publishPublicly && domain ? domain.trim() : undefined,
-                    isPublic: publishPublicly,
-                    internalPort: publishPublicly ? resolvedInternalPort : undefined
-                };
-                if (req.organization) {
-                    containerData.organizationId = req.organization._id;
-                }
-
-                const dbContainer = new Container(containerData);
-
-                await dbContainer.save();
-                createdRecords.push(dbContainer);
-                console.log(`[DEBUG] Record saved to DB for ${instanceName}`);
-            } catch (err) {
-                if (container) {
-                    try {
-                        console.log(`[DEBUG] Cleaning up orphaned container ${container.id} after failure...`);
-                        await container.remove({ force: true });
-                    } catch (cleanupErr) {
-                        console.error(`[ERROR] Failed to clean up orphaned container:`, cleanupErr.message);
-                    }
-                }
-                throw err;
-            }
-        } // End of stack loop
-
-        console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
-        res.status(201).json(createdRecords);
-
-        // Audit log
-        await AuditLog.create({
-            userId: req.user.userId,
-            action: 'CREATE_CONTAINER',
-            resourceName: req.body.stackName || 'Custom Stack',
-            details: `Created ${createdRecords.length} containers`
+        const jobId = crypto.randomUUID();
+        
+        // Return 202 Accepted immediately
+        res.status(202).json({ 
+            jobId, 
+            message: 'Deployment started in background', 
+            status: 'processing' 
         });
 
+        // ── ASYNCHRONOUS BACKGROUND EXECUTION ──────────
+        setImmediate(async () => {
+            const createdRecords = [];
+            let io;
+            try {
+                io = getIo();
+            } catch (e) {
+                console.warn('[VPC] getIo failed, sockets may not be initialized');
+            }
+
+            const emitProgress = (msg, details = null) => {
+                if (io) {
+                    io.to(ownerId.toString()).emit('deploy_progress', { jobId, status: msg, details });
+                }
+            };
+
+            try {
+                console.log(`[DEBUG] Attempting to create stack of length ${stack.length} for job ${jobId}`);
+                
+                // Deploy sequentially to respect implicit dependencies
+                for (const config of stack) {
+                    console.log(`[DEBUG] Processing config for image: ${config.image} `);
+                    const { name, image, env, ports, memory, cpu, restartPolicy, networkMode, ipv4Address, isPublic, internalPort, volumeName, volumeMountPath, command } = config;
+                    
+                    emitProgress(`Initializing container: ${name}`);
+
+                    const publishPublicly = isPublic === true;
+                    const resolvedInternalPort = publishPublicly ? parseInt(internalPort, 10) : undefined;
+                    if (publishPublicly && (!resolvedInternalPort || Number.isNaN(resolvedInternalPort) || resolvedInternalPort <= 0)) {
+                        throw new Error(`Container "${name}" requires a valid internalPort when public access is enabled`);
+                    }
+
+                    let domain;
+                    if (publishPublicly) {
+                        const userScope = buildUserScope(user.email, ownerId);
+                        domain = await generateUniqueDomain({ name, userScope });
+                    }
+
+                    // Ensure image exists or pull it using private registry if available
+                    try {
+                        let imageExists = false;
+                        try {
+                            await docker.getImage(image).inspect();
+                            imageExists = true;
+                        } catch (_) { }
+
+                        if (!imageExists) {
+                            const authconfig = await resolveRegistryAuth(image, ownerId);
+                            emitProgress(`Pulling image ${image}... (This may take several minutes)`);
+                            console.log(`[DEBUG] Pulling ${image}...`);
+                            await pullImageSync(image, authconfig);
+                        }
+
+                        // Crucial for Docker Desktop on Windows: Wait for image to be indexed
+                        await waitForImage(image);
+                    } catch (err) {
+                        console.warn(`[DEBUG] Pull failed for ${image}: ${err.message}`);
+                        throw new Error(`Failed to pull image ${image}: ${err.message}`);
+                    }
+
+                    const instanceName = name;
+                    console.log(`[DEBUG] Spawning ${name} -> ${instanceName}`);
+                    emitProgress(`Creating container ${name}...`);
+
+                    // Prepare port bindings
+                    const PortBindings = {};
+                    const ExposedPorts = {};
+                    if (ports && ports.length > 0) {
+                        ports.forEach(p => {
+                            const [hostPort, containerPort] = p.split(':');
+                            if (hostPort && containerPort) {
+                                PortBindings[`${containerPort}/tcp`] = [{ HostPort: hostPort }];
+                                ExposedPorts[`${containerPort}/tcp`] = {};
+                            }
+                        });
+                    }
+
+                    // --- Secret Manager Interception ---
+                    const finalEnv = [];
+                    if (env && env.length > 0) {
+                        for (let envStr of env) {
+                            const secretMatch = envStr.match(/^(.*?)=\{\{SECRET:(.*?)\}\}$/);
+                            if (secretMatch) {
+                                const envKey = secretMatch[1];
+                                const secretName = secretMatch[2];
+                                try {
+                                    const secretQuery = { userId: ownerId, organizationId: { $exists: false }, name: secretName };
+                                    if (req.organization) {
+                                        secretQuery.organizationId = req.organization._id;
+                                        delete secretQuery.userId;
+                                    }
+                                    const secretDoc = await Secret.findOne(secretQuery);
+                                    if (secretDoc) {
+                                        const decryptedValue = decrypt(secretDoc.encryptedValue, secretDoc.iv);
+                                        finalEnv.push(`${envKey}=${decryptedValue}`);
+                                    } else {
+                                        console.warn(`Secret ${secretName} not found for user. Skipping injection.`);
+                                    }
+                                } catch (err) {
+                                    console.error(`Error decrypting secret ${secretName}:`, err);
+                                }
+                            } else {
+                                finalEnv.push(envStr); // raw env value
+                            }
+                        }
+                    }
+                    // -----------------------------------
+
+                    // ── VPC Network Resolution ────────────────────────────────────────
+                    let safeNetworkMode;
+                    const enableInternet = config.enableInternet === true;
+
+                    if (networkMode === 'none') {
+                        safeNetworkMode = 'none';
+                    } else if (networkName) {
+                        safeNetworkMode = networkName;
+                    } else if (networkMode && networkMode !== 'bridge' && networkMode !== 'lan_net' && networkMode !== 'dockermanager_lan_net') {
+                        if (enableInternet) {
+                            const baseName = networkMode.endsWith('_open')
+                                ? networkMode.slice(0, -5)
+                                : networkMode;
+                            const openSuffix = `${baseName}_open`.replace(`${ownerId}_`, '');
+                            safeNetworkMode = await ensureUserVpc(ownerId, openSuffix, true);
+                        } else {
+                            safeNetworkMode = networkMode;
+                        }
+                    } else {
+                        if (enableInternet) {
+                            safeNetworkMode = await ensureUserVpc(ownerId, 'default_vlan_open', true);
+                        } else {
+                            safeNetworkMode = userVpcName;
+                        }
+                    }
+                    console.log(`[VPC] Container '${name}' will use network: ${safeNetworkMode} (internet=${enableInternet})`);
+
+                    if (publishPublicly && resolvedInternalPort) {
+                        if (!PortBindings[`${resolvedInternalPort}/tcp`]) {
+                            ExposedPorts[`${resolvedInternalPort}/tcp`] = {};
+                        }
+                    }
+
+                    const memoryBytes = memory ? parseInt(memory) * 1024 * 1024 : 0;
+                    const baseHostConfig = {
+                        PortBindings,
+                        ...(memoryBytes > 0 && {
+                            Memory: memoryBytes,
+                            MemorySwap: -1,
+                        }),
+                        ...(cpu && { NanoCPUs: parseInt(parseFloat(cpu) * 1e9) }),
+                        ...(restartPolicy && restartPolicy !== 'no' && { RestartPolicy: { Name: restartPolicy } }),
+                        NetworkMode: safeNetworkMode,
+                        ...(volumeName && volumeMountPath && { Binds: [`${volumeName}:${volumeMountPath}`] })
+                    };
+
+                    const containerConfig = {
+                        Image: image,
+                        name: instanceName,
+                        Env: finalEnv,
+                        ExposedPorts,
+                        HostConfig: baseHostConfig,
+                        Labels: {}
+                    };
+
+                    if (publishPublicly && domain && resolvedInternalPort) {
+                        const appId = buildTraefikAppId(domain, name);
+                        containerConfig.Labels = {
+                            'traefik.enable': 'true',
+                            'traefik.constraint-label': 'dmz-proxy',
+                            [`traefik.http.routers.${appId}.rule`]: `Host(\`${domain.trim()}\`)`,
+                            [`traefik.http.routers.${appId}.entrypoints`]: 'web,websecure',
+                            [`traefik.http.routers.${appId}.tls.certresolver`]: 'letsencrypt',
+                            [`traefik.http.services.${appId}.loadbalancer.server.port`]: `${resolvedInternalPort}`,
+                            'traefik.docker.network': safeNetworkMode,
+                        };
+                    }
+
+                    if (ipv4Address && safeNetworkMode !== 'bridge' && safeNetworkMode !== 'host' && safeNetworkMode !== 'none') {
+                        containerConfig.NetworkingConfig = {
+                            EndpointsConfig: {
+                                [safeNetworkMode]: {
+                                    IPAMConfig: {
+                                        IPv4Address: ipv4Address
+                                    }
+                                }
+                            }
+                        };
+                    }
+
+                    if (image.includes('wordpress')) {
+                        const dbConfig = stack.find(c => c.image.includes('mysql') || c.image.includes('mariadb'));
+                        if (dbConfig) {
+                            containerConfig.Env = [
+                                ...containerConfig.Env,
+                                `WORDPRESS_DB_HOST=${dbConfig.name}:3306`,
+                                `WORDPRESS_DB_USER=wordpress`,
+                                `WORDPRESS_DB_PASSWORD=somewordpress`,
+                                `WORDPRESS_DB_NAME=wordpress`
+                            ];
+                        }
+                    }
+
+                    if (image.includes('mysql') && stack.some(c => c.image.includes('wordpress'))) {
+                        containerConfig.Env = [
+                            ...containerConfig.Env,
+                            `MYSQL_ROOT_PASSWORD=somewordpress`,
+                            `MYSQL_DATABASE=wordpress`,
+                            `MYSQL_USER=wordpress`,
+                            `MYSQL_PASSWORD=somewordpress`
+                        ];
+                    }
+
+                    const normalizedCommand = typeof command === 'string' ? command.trim() : '';
+                    if (normalizedCommand) {
+                        containerConfig.Cmd = ['sh', '-lc', normalizedCommand];
+                    }
+
+                    const getBaseImageName = (fullImage) => {
+                        const withoutTag = fullImage.split(':')[0];
+                        const parts = withoutTag.split('/');
+                        return parts[parts.length - 1].toLowerCase();
+                    };
+                    const baseImg = getBaseImageName(image);
+
+                    const keepsAlive = ['ubuntu', 'node', 'alpine', 'debian', 'centos', 'kalilinux/kali-rolling', 'kali'];
+                    if (!normalizedCommand && keepsAlive.includes(baseImg)) {
+                        containerConfig.Cmd = ['tail', '-f', '/dev/null'];
+                    }
+
+                    // Create and start container
+                    let container;
+                    try {
+                        if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
+                            emitProgress(`Attaching public routing proxy...`);
+                            const proxyAttached = await attachProxyToVpc(safeNetworkMode);
+                            if (!proxyAttached) {
+                                throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
+                            }
+                        }
+
+                        container = await docker.createContainer(containerConfig);
+                        console.log(`[DEBUG] Container created ID: ${container.id}`);
+
+                        emitProgress(`Starting container ${name}...`);
+                        await container.start();
+                        console.log(`[DEBUG] Container ${container.id} started successfully`);
+
+                        if (publishPublicly && domain && resolvedInternalPort && safeNetworkMode !== 'none') {
+                            const proxyAttached = await attachProxyToVpc(safeNetworkMode);
+                            if (!proxyAttached) {
+                                throw new Error(`Public routing failed: proxy could not reach network ${safeNetworkMode}`);
+                            }
+                        }
+
+                        const extraNetworks = config.extraNetworks || [];
+                        for (const extraNet of extraNetworks) {
+                            try {
+                                if (extraNet === safeNetworkMode) continue;
+                                let resolvedExtra = extraNet;
+                                if (extraNet !== 'bridge') {
+                                    const existingNets = await docker.listNetworks({ filters: { name: [extraNet] } });
+                                    const exactMatch = existingNets.find(n => n.Name === extraNet);
+                                    if (!exactMatch) {
+                                        console.warn(`[VPC] Extra network '${extraNet}' not found, skipping.`);
+                                        continue;
+                                    }
+                                }
+                                console.log(`[VPC] Connecting container '${instanceName}' to extra network: ${resolvedExtra}`);
+                                await docker.getNetwork(resolvedExtra).connect({ Container: container.id });
+                            } catch (netErr) {
+                                console.error(`[VPC] Failed to connect '${instanceName}' to extra network '${extraNet}':`, netErr.message);
+                            }
+                        }
+
+                        // Save to database
+                        const containerData = {
+                            name: instanceName,
+                            image,
+                            dockerId: container.id,
+                            userId: ownerId,
+                            status: 'running',
+                            domain: publishPublicly && domain ? domain.trim() : undefined,
+                            isPublic: publishPublicly,
+                            internalPort: publishPublicly ? resolvedInternalPort : undefined
+                        };
+                        if (req.organization) {
+                            containerData.organizationId = req.organization._id;
+                            delete containerData.userId;
+                        }
+
+                        const dbContainer = new Container(containerData);
+
+                        await dbContainer.save();
+                        createdRecords.push(dbContainer);
+                        console.log(`[DEBUG] Record saved to DB for ${instanceName}`);
+                    } catch (err) {
+                        if (container) {
+                            try {
+                                console.log(`[DEBUG] Cleaning up orphaned container ${container.id} after failure...`);
+                                await container.remove({ force: true });
+                            } catch (cleanupErr) {
+                                console.error(`[ERROR] Failed to clean up orphaned container:`, cleanupErr.message);
+                            }
+                        }
+                        throw err;
+                    }
+                } // End of stack loop
+
+                console.log(`[DEBUG] Stack creation completed successfully with ${createdRecords.length} records`);
+                
+                // Audit log
+                await AuditLog.create({
+                    userId: ownerId,
+                    action: 'CREATE_CONTAINER',
+                    resourceName: req.body.stackName || 'Custom Stack',
+                    details: `Created ${createdRecords.length} containers`
+                });
+
+                if (io) {
+                    io.to(ownerId.toString()).emit('deploy_success', { 
+                        jobId, 
+                        containers: createdRecords 
+                    });
+                }
+
+            } catch (error) {
+                console.error(`[ERROR] Background Job Exception during stack creation:`, error);
+                if (io) {
+                    io.to(ownerId.toString()).emit('deploy_error', { 
+                        jobId, 
+                        error: error.message 
+                    });
+                }
+            }
+        }); // End of setImmediate
+
     } catch (error) {
-        console.error(`[ERROR] API Exception during stack creation:`, error);
+        console.error(`[ERROR] API Exception during stack creation initiation:`, error);
         res.status(500).json({ message: 'Error creating stack', error: error.message, stack: error.stack });
     }
 });

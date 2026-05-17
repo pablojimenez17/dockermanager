@@ -13,6 +13,7 @@ export const NotificationProvider = ({ children }) => {
     const [invites, setInvites] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [socket, setSocket] = useState(null);
+    const [activeDeployment, setActiveDeployment] = useState(null);
     const { addToast } = useToast();
 
     // Fetch initial invites
@@ -54,6 +55,19 @@ export const NotificationProvider = ({ children }) => {
             addToast('New Invitation', `You have been invited to join ${inviteData.organizationName}`, 'info');
         });
 
+        newSocket.on('deploy_progress', (data) => {
+            setActiveDeployment(prev => ({ ...prev, ...data, isFinished: false, isError: false }));
+        });
+
+        newSocket.on('deploy_success', (data) => {
+            setActiveDeployment(prev => ({ ...prev, ...data, isFinished: true, isError: false, status: 'Completed successfully!' }));
+        });
+
+        newSocket.on('deploy_error', (data) => {
+            setActiveDeployment(prev => ({ ...prev, ...data, isFinished: true, isError: true, status: 'Deployment failed.' }));
+            addToast('Deployment Error', data.error || 'Failed to deploy container', 'error');
+        });
+
         newSocket.on('connect_error', (err) => {
             console.error('[NotificationSocket] Connection Error:', err.message);
         });
@@ -91,13 +105,19 @@ export const NotificationProvider = ({ children }) => {
         }
     };
 
+    const clearDeployment = () => {
+        setActiveDeployment(null);
+    };
+
     return (
         <NotificationContext.Provider value={{
             invites,
             unreadCount,
             acceptInvite,
             declineInvite,
-            refreshInvites: fetchInvites
+            refreshInvites: fetchInvites,
+            activeDeployment,
+            clearDeployment
         }}>
             {children}
         </NotificationContext.Provider>

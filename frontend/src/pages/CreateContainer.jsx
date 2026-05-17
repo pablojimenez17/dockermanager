@@ -186,7 +186,7 @@ const CreateContainer = () => {
         };
       });
       await axios.post('/api/containers', { stack: payload });
-      navigate('/app/containers');
+      setLoading(false);
     } catch (err) {
       setError(err.response?.data?.error || err.response?.data?.message || 'Deploy failed');
       setLoading(false);

@@ -287,8 +287,6 @@ const Marketplace = () => {
       });
 
       await axios.post('/api/containers', { stack });
-
-      addToast(`${selectedTemplate.name} deployed successfully!`, 'success');
       closeModal();
     } catch (err) {
       addToast(err.response?.data?.message || 'Deployment failed', 'error');

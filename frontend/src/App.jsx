@@ -27,6 +27,7 @@ import { ToastProvider } from './components/ToastContext';
 import { OrgProvider, useOrg } from './context/OrgContext';
 import { NotificationProvider } from './context/NotificationContext';
 import ChatAssistant from './components/ChatAssistant';
+import DeploymentModal from './components/DeploymentModal';
 
 // Global Axios config for HTTP-Only Cookies
 axios.defaults.withCredentials = true;
@@ -37,7 +38,7 @@ axios.defaults.headers.common['Pragma'] = 'no-cache';
 axios.defaults.headers.common['Expires'] = '0';
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 30000;
-const LONG_REQUEST_TIMEOUT_MS = 120000;
+const LONG_REQUEST_TIMEOUT_MS = 300000;
 const AI_REQUEST_TIMEOUT_MS = 60000;
 
 const getRequestTimeout = (config) => {
@@ -214,6 +215,7 @@ const App = () => {
 
             {/* Global Chat Assistant rendered outside of all router layout contexts */}
             <ChatAssistant />
+            <DeploymentModal />
           </NotificationProvider>
         </OrgProvider>
       </ToastProvider>
