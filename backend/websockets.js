@@ -21,7 +21,11 @@ export const setupSockets = (server) => {
             ],
             methods: ['GET', 'POST'],
             credentials: true
-        }
+        },
+        pingInterval: 10000,
+        pingTimeout: 5000,
+        connectTimeout: 10000,
+        transports: ['websocket']
     });
 
     ioInstance = io;

@@ -568,7 +568,8 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
                         throw new Error(`Failed to pull image ${image}: ${err.message}`);
                     }
 
-                    const instanceName = name;
+                    const randomSuffix = Math.random().toString(36).substring(2, 8);
+                    const instanceName = `${name}-${ownerId.toString().substring(0, 4)}-${randomSuffix}`;
                     console.log(`[DEBUG] Spawning ${name} -> ${instanceName}`);
                     emitProgress(`Creating container ${name}...`);
 
@@ -662,17 +663,25 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
                         ...(volumeName && volumeMountPath && { Binds: [`${volumeName}:${volumeMountPath}`] })
                     };
 
+                    const EndpointsConfig = {};
+                    if (safeNetworkMode && safeNetworkMode !== 'none' && safeNetworkMode !== 'host') {
+                        EndpointsConfig[safeNetworkMode] = {
+                            Aliases: [name]
+                        };
+                    }
+
                     const containerConfig = {
                         Image: image,
                         name: instanceName,
                         Env: finalEnv,
                         ExposedPorts,
                         HostConfig: baseHostConfig,
+                        NetworkingConfig: { EndpointsConfig },
                         Labels: {}
                     };
 
                     if (publishPublicly && domain && resolvedInternalPort) {
-                        const appId = buildTraefikAppId(domain, name);
+                        const appId = buildTraefikAppId(domain, instanceName);
                         containerConfig.Labels = {
                             'traefik.enable': 'true',
                             'traefik.constraint-label': 'dmz-proxy',
@@ -774,8 +783,11 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
                                         continue;
                                     }
                                 }
-                                console.log(`[VPC] Connecting container '${instanceName}' to extra network: ${resolvedExtra}`);
-                                await docker.getNetwork(resolvedExtra).connect({ Container: container.id });
+                                console.log(`[VPC] Connecting container '${instanceName}' to extra network: ${resolvedExtra} with alias '${name}'`);
+                                await docker.getNetwork(resolvedExtra).connect({ 
+                                    Container: container.id,
+                                    EndpointConfig: { Aliases: [name] }
+                                });
                             } catch (netErr) {
                                 console.error(`[VPC] Failed to connect '${instanceName}' to extra network '${extraNet}':`, netErr.message);
                             }
@@ -783,7 +795,7 @@ router.post('/', sensitiveOpsLimiter, checkPermission('manageContainers'), async
 
                         // Save to database
                         const containerData = {
-                            name: instanceName,
+                            name: name, // Keep user-friendly name
                             image,
                             dockerId: container.id,
                             userId: ownerId,
@@ -1443,10 +1455,17 @@ router.post('/template', async (req, res) => {
 router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, res) => {
     try {
         const { id } = req.params;
-        const { snapshotName } = req.body; // e.g., 'myapp-backup:v1'
+        let { snapshotName } = req.body; // e.g., 'myapp-backup:v1'
 
         if (!snapshotName) {
             return res.status(400).json({ message: 'snapshotName is required.' });
+        }
+
+        // Docker image names must be lowercase and cannot contain spaces or special characters
+        snapshotName = snapshotName.toLowerCase().replace(/[^a-z0-9-_.:]/g, '');
+
+        if (!snapshotName) {
+            return res.status(400).json({ message: 'snapshotName must contain valid characters (a-z, 0-9, -, _, ., :).' });
         }
 
         // 1. Verify Ownership & Get limits
@@ -1481,7 +1500,7 @@ router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, re
         const container = docker.getContainer(id);
         const commitResult = await container.commit({
             repo: snapshotName,
-            comment: `Snapshot created via Docker Manager by ${user.email}`
+            comment: `Snapshot created via Docker Manager by ${user?.email || 'System'}`
         });
 
         // 3. Save to database for tracking

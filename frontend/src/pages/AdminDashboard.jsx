@@ -139,8 +139,10 @@ const AdminDashboard = () => {const { t } = useTranslation();
       transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1500,
-      reconnectionDelayMax: 15000,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5,
+      timeout: 20000,
     });
     socket.on('connect', () => fetchData());
 

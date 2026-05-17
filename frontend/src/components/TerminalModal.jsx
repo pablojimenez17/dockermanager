@@ -16,7 +16,14 @@ const TerminalModal = ({ containerId, containerName, onClose }) => {
 
   useEffect(() => {
     // Initialize socket connection
-    socketRef.current = io('', { transports: ['websocket'], withCredentials: true });
+    socketRef.current = io('', { 
+      transports: ['websocket'], 
+      withCredentials: true,
+      timeout: 20000,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      randomizationFactor: 0.5
+    });
 
     // Initialize xterm.js
     const term = new Terminal({

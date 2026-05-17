@@ -41,7 +41,11 @@ export const NotificationProvider = ({ children }) => {
             withCredentials: true,
             auth: {
                 token: localStorage.getItem('token')
-            }
+            },
+            timeout: 20000,
+            reconnectionDelay: 1000,
+            reconnectionDelayMax: 5000,
+            randomizationFactor: 0.5
         });
 
         newSocket.on('connect', () => {
