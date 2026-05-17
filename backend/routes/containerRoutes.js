@@ -1532,7 +1532,7 @@ router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, re
         if (error.code === 11000) {
             return res.status(400).json({ message: 'A snapshot with this exact name already exists.' });
         }
-        res.status(500).json({ message: 'Failed to create snapshot', error: error.message });
+        res.status(500).json({ message: `Snapshot failed: ${error.message}` });
     }
 });
 

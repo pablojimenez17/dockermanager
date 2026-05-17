@@ -24,8 +24,7 @@ export const setupSockets = (server) => {
         },
         pingInterval: 10000,
         pingTimeout: 5000,
-        connectTimeout: 10000,
-        transports: ['websocket']
+        connectTimeout: 10000
     });
 
     ioInstance = io;
