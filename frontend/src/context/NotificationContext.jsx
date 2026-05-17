@@ -36,6 +36,7 @@ export const NotificationProvider = ({ children }) => {
 
         // Setup Socket
         const newSocket = io('', {
+            transports: ['websocket'],
             withCredentials: true,
             auth: {
                 token: localStorage.getItem('token')

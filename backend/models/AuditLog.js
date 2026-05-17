@@ -23,6 +23,8 @@ const auditLogSchema = new mongoose.Schema({
             'BACKUP_DB_COMPLETED',
             'BACKUP_SERVER_COMPLETED',
             'BACKUP_WEB_COMPLETED',
+            'BACKUP_CONFIG_UPDATED',
+            'BACKUP_DELETED',
             // ── Security events ────────────────────────────────────────────
             'FAILED_LOGIN_ATTEMPT',
             'SECURITY_INJECTION_ATTEMPT',

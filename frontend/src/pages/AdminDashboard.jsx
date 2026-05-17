@@ -1,4 +1,4 @@
-﻿import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
+import { useTranslation } from "react-i18next";import React, { useEffect, useState, useRef } from 'react';
 import { Users, Server, ShieldAlert, Trash2, MonitorPlay, Terminal, FileText, Clock, DatabaseBackup, RefreshCw, CheckCircle, AlertCircle, Database, Box, Globe, Settings2, ToggleLeft, ToggleRight, Save } from 'lucide-react';
 import axios from 'axios';
 import { io } from 'socket.io-client';
@@ -136,6 +136,7 @@ const AdminDashboard = () => {const { t } = useTranslation();
 
     // Auto-reconnect socket — backend restarts won't force logout
     const socket = io('', {
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1500,
