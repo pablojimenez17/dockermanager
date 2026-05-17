@@ -134,6 +134,7 @@ services:
       - VOLUMES=1 # Allow volume create
       - EXEC=1 # Allow exec (terminals)
       - BUILD=1
+      - COMMIT=1 # Allow container commits (snapshots)
       - EVENTS=1 # Allow autoheal to watch Docker health events
       - POST=1 # Allow POST requests like create, start, stop, kill, pull
       - DELETE=1 # Allow DELETE requests like rm

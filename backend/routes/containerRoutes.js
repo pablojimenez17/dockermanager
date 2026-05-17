@@ -1512,7 +1512,7 @@ router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, re
             containerId: id,
             containerName: dbContainer.name,
             snapshotName: snapshotName,
-            imageId: commitResult.Id
+            imageId: commitResult.Id || commitResult.ID || commitResult.id || 'unknown'
         };
         if (req.organization) {
             snapshotData.organizationId = req.organization._id;
