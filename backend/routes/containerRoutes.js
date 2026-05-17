@@ -1471,7 +1471,7 @@ router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, re
         // 1. Verify Ownership & Get limits
         const ownerId = req.organization ? req.organization.ownerId : req.user.userId;
         const user = await User.findById(ownerId);
-        const maxSnapshots = user.limits?.maxSnapshots || 0;
+        const maxSnapshots = user?.limits?.maxSnapshots || 0;
 
         if (maxSnapshots === 0) {
             return res.status(403).json({ message: 'Snapshots are only available on Professional and Enterprise plans.' });
@@ -1498,8 +1498,11 @@ router.post('/:id/snapshot', checkPermission('manageContainers'), async (req, re
 
         // 2. Perform Docker Commit
         const container = docker.getContainer(id);
+        const [repoPart, tagPart] = snapshotName.split(':');
+        
         const commitResult = await container.commit({
-            repo: snapshotName,
+            repo: repoPart,
+            tag: tagPart || 'latest',
             comment: `Snapshot created via Docker Manager by ${user?.email || 'System'}`
         });
 
