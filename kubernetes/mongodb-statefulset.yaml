@@ -1,0 +1,69 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dockermanager-mongo-headless
+  namespace: dockermanager
+  labels:
+    app: dockermanager-mongo
+spec:
+  ports:
+  - port: 27017
+    name: mongodb
+  clusterIP: None
+  selector:
+    app: dockermanager-mongo
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dockermanager-mongo
+  namespace: dockermanager
+spec:
+  ports:
+  - port: 27017
+    targetPort: 27017
+    name: mongodb
+  selector:
+    app: dockermanager-mongo
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: dockermanager-mongo
+  namespace: dockermanager
+spec:
+  serviceName: dockermanager-mongo-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dockermanager-mongo
+  template:
+    metadata:
+      labels:
+        app: dockermanager-mongo
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:latest
+        ports:
+        - containerPort: 27017
+          name: mongodb
+        resources:
+          limits:
+            cpu: "1"
+            memory: 1Gi
+          requests:
+            cpu: 200m
+            memory: 512Mi
+        volumeMounts:
+        - name: mongo-data
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-data
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: "do-block-storage" # DigitalOcean CSI
+      resources:
+        requests:
+          storage: 10Gi

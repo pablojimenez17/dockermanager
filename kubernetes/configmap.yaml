@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dockermanager-config
+  namespace: dockermanager
+data:
+  PORT: "5000"
+  MONGO_URI: "mongodb://dockermanager-mongo:27017/dockermanager"
+  DOCKER_HOST: "tcp://dockermanager-socket-proxy:2375"
+  MINIO_ENDPOINT: "dockermanager-minio"
+  MINIO_PORT: "9000"
+  MONGO_CONTAINER_NAME: "dockermanager-mongo"
+  API_TIMEOUT_MS: "15000"
+  API_LONG_TIMEOUT_MS: "120000"
+  API_AI_TIMEOUT_MS: "60000"
+  AUTH_DB_TIMEOUT_MS: "8000"
+  DOCKER_READ_TIMEOUT_MS: "7000"
+  TIMEOUT_RESTART_THRESHOLD: "3"
+  TIMEOUT_RESTART_WINDOW_MS: "60000"
+  TIMEOUT_RESTART_COOLDOWN_MS: "120000"
+  SENDGRID_FROM_EMAIL: "noreply@orbitcloud.app"
+  ORBIT_BASE_DOMAIN: "orbitcloud.app"

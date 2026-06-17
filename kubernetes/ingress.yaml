@@ -1,0 +1,76 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dockermanager-ingress
+  namespace: dockermanager
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+    # Habilitar sticky sessions (afinidad de sesión) para Socket.io (WebSockets)
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+    
+    # Aumentar límites de tamaño para carga de archivos/snapshots
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    
+    # Aumentar timeouts para evitar 504s en deploys lentos o llamadas de IA
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+spec:
+  tls:
+  - hosts:
+    - orbitcloud.app
+    - www.orbitcloud.app
+    secretName: dockermanager-tls
+  rules:
+  - host: orbitcloud.app
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-backend
+            port:
+              number: 5000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-backend
+            port:
+              number: 5000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-frontend
+            port:
+              number: 80
+  - host: www.orbitcloud.app
+    http:
+      paths:
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-backend
+            port:
+              number: 5000
+      - path: /socket.io
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-backend
+            port:
+              number: 5000
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: dockermanager-frontend
+            port:
+              number: 80
