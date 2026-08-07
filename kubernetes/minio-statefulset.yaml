@@ -69,7 +69,7 @@ spec:
       name: minio-data
     spec:
       accessModes: [ "ReadWriteOnce" ]
-      storageClassName: "do-block-storage" # DigitalOcean Block Storage CSI
+      storageClassName: "local-path" # k3s default storage class
       resources:
         requests:
           storage: 10Gi
