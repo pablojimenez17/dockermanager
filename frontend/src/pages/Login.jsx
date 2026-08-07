@@ -9,8 +9,6 @@ const Login = () => {const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [step, setStep] = useState('login'); // 'login' or 'verify'
-  const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -26,16 +24,11 @@ const Login = () => {const { t } = useTranslation();
         { email, password },
         { timeout: REQUEST_TIMEOUT_MS }
       );
-      if (res.data.requireVerification) {
-        setStep('verify');
-      } else {
-        // Fallback if verification not needed (though backend always requires it now)
-        localStorage.setItem('name', res.data.name);
-        localStorage.setItem('email', res.data.email);
-        localStorage.setItem('role', res.data.role);
-        localStorage.setItem('planType', res.data.planType || 'free');
-        window.location.href = '/app';
-      }
+      localStorage.setItem('name', res.data.name);
+      localStorage.setItem('email', res.data.email);
+      localStorage.setItem('role', res.data.role);
+      localStorage.setItem('planType', res.data.planType || 'free');
+      window.location.href = '/app';
     } catch (err) {
       if (err.code === 'ECONNABORTED') {
         setError('Login timed out. Please try again in a few seconds.');
@@ -45,39 +38,6 @@ const Login = () => {const { t } = useTranslation();
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post(
-        '/api/auth/verify-code',
-        { email, code: verificationCode },
-        { timeout: REQUEST_TIMEOUT_MS }
-      );
-      localStorage.setItem('name', res.data.name);
-      localStorage.setItem('email', res.data.email);
-      localStorage.setItem('role', res.data.role);
-      localStorage.setItem('planType', res.data.planType || 'free');
-      window.location.href = '/app';
-    } catch (err) {
-      if (err.code === 'ECONNABORTED') {
-        setError('Verification timed out. Please try again.');
-      } else {
-        setError(err.response?.data?.message || 'Verification failed. Please check your code.');
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleBackToLogin = () => {
-    setStep('login');
-    setVerificationCode('');
-    setError('');
-    setLoading(false);
   };
 
   return (
@@ -163,19 +123,13 @@ const Login = () => {const { t } = useTranslation();
                     {/* Header */}
                     <div className="mb-8">
                         <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-1.5">
-                            {step === 'login' ? 'Welcome back' : 'Verification Required'}
+                            Welcome back
                         </h2>
                         <p className="text-sm text-slate-500 dark:text-slate-500">
-                            {step === 'login' ?
-              <>
-                                    {t("auto.don_t_have_an_account_")}{' '}
-                                    <Link to="/register" className="text-brand-500 dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 font-medium transition-colors">
-                                        {t("auto.sign_up_free")}
-                                    </Link>
-                                </> :
-
-              `We sent a 6-digit code to ${email}`
-              }
+                            {t("auto.don_t_have_an_account_")}{' '}
+                            <Link to="/register" className="text-brand-500 dark:text-brand-400 hover:text-brand-600 dark:hover:text-brand-300 font-medium transition-colors">
+                                {t("auto.sign_up_free")}
+                            </Link>
                         </p>
                     </div>
 
@@ -187,8 +141,7 @@ const Login = () => {const { t } = useTranslation();
           }
 
                     {/* Form */}
-                    {step === 'login' ?
-          <form onSubmit={handleLogin} className="space-y-4">
+                    <form onSubmit={handleLogin} className="space-y-4">
                             {/* Email */}
                             <div className="space-y-1.5">
                                 <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
@@ -209,17 +162,7 @@ const Login = () => {const { t } = useTranslation();
                                                dark:focus:bg-white/8 focus:bg-slate-50
                                                shadow-sm dark:shadow-none
                                                transition-all"
-
-
-
-
-
-
-
-
-
                 placeholder={t("auto.you_example_com")} />
-              
                             </div>
 
                             {/* Password */}
@@ -248,22 +191,11 @@ const Login = () => {const { t } = useTranslation();
                                                    dark:focus:bg-white/8 focus:bg-slate-50
                                                    shadow-sm dark:shadow-none
                                                    transition-all"
-
-
-
-
-
-
-
-
-
                   placeholder={t("auto._")} />
-                
                                     <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 transition-colors">
-                  
                                         {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                                     </button>
                                 </div>
@@ -278,11 +210,6 @@ const Login = () => {const { t } = useTranslation();
                                            shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
                                            transition-all disabled:opacity-60 disabled:cursor-not-allowed
                                            active:scale-[0.98]">
-
-
-
-
-              
                                 {loading ?
               <>
                                         <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
@@ -291,81 +218,10 @@ const Login = () => {const { t } = useTranslation();
                                         </svg>
                                         {t("auto.signing_in_")}
                                     </> :
-
               <>{t("auto.sign_in")} <ArrowRight size={16} /></>
               }
                             </button>
-                        </form> :
-
-          <form onSubmit={handleVerify} className="space-y-4">
-                            <div className="space-y-1.5">
-                                <label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
-                                    {t("auto.6_digit_code")}
-                                </label>
-                                <input
-                type="text"
-                required
-                maxLength={6}
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                className="w-full px-4 py-3 rounded-sm
-                                               bg-white dark:bg-white/5
-                                               border border-slate-200 dark:border-white/10
-                                               text-slate-900 dark:text-white
-                                               placeholder-slate-400 dark:placeholder-slate-600
-                                               text-center text-2xl tracking-[0.5em] font-mono
-                                               focus:outline-none focus:border-brand-500/60 focus:ring-1 focus:ring-brand-500/30
-                                               dark:focus:bg-white/8 focus:bg-slate-50
-                                               shadow-sm dark:shadow-none
-                                               transition-all"
-
-
-
-
-
-
-
-
-
-                placeholder={t("auto._")} />
-              
-                            </div>
-
-                            <button
-              type="submit"
-              disabled={loading || verificationCode.length !== 6}
-              className="w-full mt-2 flex justify-center items-center gap-2 py-3 px-4 rounded-sm
-                                           bg-brand-500 hover:bg-brand-400 text-white font-semibold text-sm
-                                           shadow-sm shadow-brand-500/20 hover:shadow-brand-500/30
-                                           transition-all disabled:opacity-60 disabled:cursor-not-allowed
-                                           active:scale-[0.98]">
-
-
-
-
-              
-                                {loading ?
-              <>
-                                        <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                        </svg>
-                                        {t("auto.verifying_")}
-                                    </> :
-
-              <>{t("auto.verify_enter")} <ArrowRight size={16} /></>
-              }
-                            </button>
-                            
-                            <button
-              type="button"
-              onClick={handleBackToLogin}
-              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">
-                                {t("auto.back_to_login")}
-                            
-            </button>
                         </form>
-          }
 
                     {/* Divider */}
                     <div className="relative my-6">

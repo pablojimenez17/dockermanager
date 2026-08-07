@@ -1,0 +1,33 @@
+---
+# ClusterIssuer para Let's Encrypt — TLS automático para orbitcloud.app
+# Aplicar DESPUÉS de instalar cert-manager en el cluster
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: a22pabjimpri@inspedralbes.cat
+    privateKeySecretRef:
+      name: letsencrypt-prod-private-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx
+---
+# Staging para pruebas (sin límite de rate, certificados no válidos en browser)
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: a22pabjimpri@inspedralbes.cat
+    privateKeySecretRef:
+      name: letsencrypt-staging-private-key
+    solvers:
+    - http01:
+        ingress:
+          ingressClassName: nginx

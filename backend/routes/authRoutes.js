@@ -80,29 +80,34 @@ router.post('/register', authLimiter, validate(registerSchema), async (req, res)
         } : {};
 
         const user = new User({ name, email, password, role, ...(role === 'admin' ? { planType: 'enterprise', limits: extraLimits } : {}) });
-        
-        const code = generateOTP();
-        user.verificationCode = code;
-        user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
         await user.save();
 
-        // Do not block signup response on email provider latency/failures.
-        Promise.allSettled([
-            sendWelcomeEmail(user.email, user.name),
-            sendVerificationCode(user.email, code)
-        ]).then((results) => {
-            results.forEach((result, idx) => {
-                if (result.status === 'rejected') {
-                    const label = idx === 0 ? 'welcome email' : 'verification email';
-                    console.error(`Register ${label} failed:`, result.reason?.message || result.reason);
-                }
-            });
+        // Send welcome email without blocking the response
+        sendWelcomeEmail(user.email, user.name).catch((err) => {
+            console.error('Register welcome email failed:', err.message || err);
         });
 
-        res.status(201).json({ 
-            message: 'User created successfully. Verification required.', 
-            requireVerification: true,
-            email: user.email
+        const token = jwt.sign(
+            { userId: user._id, role: user.role, planType: user.planType },
+            process.env.JWT_SECRET || 'fallback_secret',
+            { expiresIn: '7d' }
+        );
+
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        });
+
+        res.status(201).json({
+            message: 'User created successfully.',
+            requireVerification: false,
+            token,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            planType: user.planType
         });
     } catch (error) {
         res.status(500).json({ message: 'Error creating user', error: error.message });
@@ -127,40 +132,26 @@ router.post('/login', authLimiter, validate(loginSchema), async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
-        if (user.email === 'admin@orbitcloud.app') {
-            const token = jwt.sign({ userId: user._id, role: user.role, planType: user.planType }, process.env.JWT_SECRET || 'fallback_secret', { expiresIn: '7d' });
-            
-            res.cookie('token', token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax',
-                maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-            });
+        const token = jwt.sign(
+            { userId: user._id, role: user.role, planType: user.planType },
+            process.env.JWT_SECRET || 'fallback_secret',
+            { expiresIn: '7d' }
+        );
 
-            return res.json({ 
-                requireVerification: false,
-                token, 
-                role: user.role, 
-                name: user.name,
-                email: user.email,
-                planType: user.planType
-            });
-        }
-
-        const code = generateOTP();
-        user.verificationCode = code;
-        user.verificationCodeExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
-        await withTimeout(user.save(), AUTH_DB_TIMEOUT_MS, 'Login verification save');
-
-        // Do not block login response on email provider latency/failures.
-        sendVerificationCode(user.email, code).catch((error) => {
-            console.error('Login verification email failed:', error.message || error);
+        res.cookie('token', token, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
         });
 
         res.json({
-            message: 'Verification required.',
-            requireVerification: true,
-            email: user.email
+            requireVerification: false,
+            token,
+            role: user.role,
+            name: user.name,
+            email: user.email,
+            planType: user.planType
         });
     } catch (error) {
         if (error.message?.includes('timed out')) {

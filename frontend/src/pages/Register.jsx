@@ -13,8 +13,6 @@ const Register = () => {const { t } = useTranslation();
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [step, setStep] = useState('register'); // 'register' or 'verify'
-  const [verificationCode, setVerificationCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -41,40 +39,14 @@ const Register = () => {const { t } = useTranslation();
 
     try {
       const res = await axios.post('/api/auth/register', { name, email, password });
-
-      if (res.data.requireVerification) {
-        setStep('verify');
-        setSuccess(`Code sent to ${email}`);
-      } else {
-        // Auto login fallback
-        localStorage.setItem('name', res.data.name);
-        localStorage.setItem('email', res.data.email);
-        localStorage.setItem('role', res.data.role);
-
-        setSuccess('Registration successful. Accessing dashboard...');
-        setTimeout(() => window.location.href = '/app', 1000);
-      }
-    } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post('/api/auth/verify-code', { email, code: verificationCode });
       localStorage.setItem('name', res.data.name);
       localStorage.setItem('email', res.data.email);
       localStorage.setItem('role', res.data.role);
       localStorage.setItem('planType', res.data.planType || 'free');
-      setSuccess('Verification successful. Accessing dashboard...');
+      setSuccess('Registration successful. Accessing dashboard...');
       setTimeout(() => window.location.href = '/app', 1000);
     } catch (err) {
-      setError(err.response?.data?.message || 'Verification failed. Please check your code.');
+      setError(err.response?.data?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -140,8 +112,7 @@ const Register = () => {const { t } = useTranslation();
 
             <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
                 <div className="bg-white dark:bg-slate-800/50 py-8 px-4 shadow-md shadow-slate-200/50 dark:shadow-black/50 sm:rounded-sm sm:px-10 border border-slate-200 dark:border-slate-700 backdrop-blur-xl">
-                    {step === 'register' ?
-          <form className="space-y-6" onSubmit={handleRegister}>
+                    <form className="space-y-6" onSubmit={handleRegister}>
                             {error &&
             <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-sm text-center">
                                     {error}
@@ -270,79 +241,7 @@ const Register = () => {const { t } = useTranslation();
                                         </>
               }
                                 </button>
-                        </form> :
-
-          <form onSubmit={handleVerify} className="space-y-6">
-                            {error &&
-            <div className="bg-red-50 border border-red-200 text-red-600 dark:bg-red-500/10 dark:border-red-500/50 dark:text-red-500 text-sm py-3 px-4 rounded-sm text-center">
-                                    {error}
-                                </div>
-            }
-                            {success &&
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/50 dark:text-emerald-500 text-sm py-3 px-4 rounded-sm text-center">
-                                    {success}
-                                </div>
-            }
-                            
-                            <div>
-                                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 text-center mb-4">
-                                    {t("auto.enter_the_6_digit_code_sent_to_your_emai")}
-                                </label>
-                                <input
-                type="text"
-                required
-                maxLength={6}
-                value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, ''))}
-                className="w-full px-4 py-3 rounded-sm
-                                               bg-white dark:bg-slate-900
-                                               border border-slate-300 dark:border-slate-600
-                                               text-slate-900 dark:text-white
-                                               placeholder-slate-400 dark:placeholder-slate-500
-                                               text-center text-2xl tracking-[0.5em] font-mono
-                                               focus:outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500
-                                               shadow-sm transition-all"
-
-
-
-
-
-
-
-                placeholder={t("auto._")} />
-              
-                            </div>
-
-                            <button
-              type="submit"
-              disabled={loading || verificationCode.length !== 6}
-              className="w-full flex justify-center items-center space-x-2 py-3 px-4 border border-transparent rounded-sm shadow-sm text-sm font-semibold text-white bg-brand-500 hover:bg-brand-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 focus:ring-offset-slate-50 dark:focus:ring-offset-slate-900 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-              
-                                {loading ?
-              <>
-                                        <svg className="animate-spin h-4 w-4 mr-2" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                                        </svg>
-                                        {t("auto.verifying_")}
-                                    </> :
-
-              <>
-                                        <span>{t("auto.verify_enter")}</span>
-                                        <ArrowRight size={18} />
-                                    </>
-              }
-                            </button>
-                            
-                            <button
-              type="button"
-              onClick={() => setStep('register')}
-              className="w-full py-2 text-sm text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 text-center block">
-                                {t("auto.back_to_registration")}
-                            
-            </button>
                         </form>
-          }
                 </div>
             </div>
         </div>);

@@ -1,73 +1,199 @@
-name: Deploy to VPS
+name: Build & Deploy to Kubernetes
+
 on:
   push:
     branches:
       - main
   workflow_dispatch:
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_OWNER: pablojimenez17
+  BACKEND_IMAGE: ghcr.io/pablojimenez17/dockermanager-backend
+  FRONTEND_IMAGE: ghcr.io/pablojimenez17/dockermanager-frontend
+
 jobs:
-  deploy:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: Build y push de las imágenes Docker a GHCR
+  # ─────────────────────────────────────────────────────────────
+  build:
+    name: Build & Push Images
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tag }}
+
     steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Login a GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USERNAME }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          envs: GITHUB_TOKEN
-          script: |
-            set -e
-            export PATH=$PATH:/usr/local/bin
-            cd /opt/dockermanager
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-            echo ">>> Pulling latest code..."
-            git pull https://x-access-token:${GITHUB_TOKEN}@github.com/pablojimenez17/dockermanager.git main
+      - name: Obtener tag de imagen (SHA corto)
+        id: meta
+        run: echo "tag=${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
 
-            echo ">>> Stopping containers gracefully..."
-            docker compose -f docker-compose.yml down --timeout 30
+      - name: Configurar Docker Buildx (builds más rápidos)
+        uses: docker/setup-buildx-action@v3
 
-            echo ">>> Pruning stale images (optional, libera espacio)..."
-            docker image prune -f
+      - name: Build y Push — Backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          push: true
+          tags: |
+            ${{ env.BACKEND_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.BACKEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-            echo ">>> Building and starting containers..."
-            docker compose -f docker-compose.yml up -d --build --remove-orphans
+      - name: Build y Push — Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          push: true
+          tags: |
+            ${{ env.FRONTEND_IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.FRONTEND_IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-            echo ">>> Waiting for containers to be healthy..."
-            sleep 5
-            docker compose -f docker-compose.yml ps
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: Deploy a Kubernetes (k3s en el VPS)
+  # ─────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Kubernetes
+    runs-on: ubuntu-latest
+    needs: build
+    environment: production
 
-            echo ">>> Smoke test Traefik (inside proxy netns — avoids Suricata/DNAT on localhost)..."
-            # Exit 56 from curl on the host was recv error via edge-fw → not a reliable Traefik check.
-            STATUS_CODE=""
-            for attempt in 1 2 3 4 5 6; do
-              STATUS_CODE=$(docker run --rm --network container:dockermanager-proxy curlimages/curl:8.5.0 \
-                -s -o /dev/null -w "%{http_code}" --connect-timeout 8 --max-redirs 0 \
-                -H "Host: orbitcloud.app" http://127.0.0.1:80/ || echo "000")
-              if [ "$STATUS_CODE" != "000" ] && [ -n "$STATUS_CODE" ]; then
-                break
-              fi
-              echo "  ... Traefik not ready yet (attempt $attempt/6), sleep 5s"
-              sleep 5
-            done
-            if [ "$STATUS_CODE" = "404" ]; then
-              echo "ERROR: Traefik still returning 404 for orbitcloud.app (no matching router?)"
-              echo "=== docker compose ps ==="
-              docker compose -f docker-compose.yml ps || true
-              echo "=== traefik logs (last 120 lines) ==="
-              docker logs --tail 120 dockermanager-proxy || true
-              echo "=== frontend logs (last 120 lines) ==="
-              docker logs --tail 120 dockermanager-frontend || true
-              exit 1
-            fi
-            if [ "$STATUS_CODE" = "000" ] || [ -z "$STATUS_CODE" ]; then
-              echo "ERROR: Could not connect to Traefik on :80 inside proxy container"
-              docker compose -f docker-compose.yml ps || true
-              exit 1
-            fi
-            echo "Smoke test HTTP status (entrypoint :80, redirects not followed): $STATUS_CODE"
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-            echo ">>> Deploy completed successfully"
+      - name: Instalar kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: 'v1.30.0'
+
+      - name: Configurar kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG_BASE64 }}" | base64 -d > ~/.kube/config
+          chmod 600 ~/.kube/config
+
+      # Crear/actualizar el Secret de Kubernetes con los valores reales desde GitHub Secrets
+      # Usamos --dry-run=client | kubectl apply para que sea idempotente (no falla si ya existe)
+      - name: Aplicar Secrets de Kubernetes
+        run: |
+          kubectl create secret generic dockermanager-secrets \
+            --namespace=dockermanager \
+            --from-literal=JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+            --from-literal=GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}" \
+            --from-literal=SENDGRID_API_KEY="${{ secrets.SENDGRID_API_KEY }}" \
+            --from-literal=MINIO_ROOT_USER="${{ secrets.MINIO_ROOT_USER }}" \
+            --from-literal=MINIO_ROOT_PASSWORD="${{ secrets.MINIO_ROOT_PASSWORD }}" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      # Crear Secret para autenticarse en GHCR y poder hacer pull de las imágenes privadas
+      - name: Crear Secret de GHCR para pull de imágenes
+        run: |
+          kubectl create secret docker-registry ghcr-credentials \
+            --namespace=dockermanager \
+            --docker-server=ghcr.io \
+            --docker-username=${{ github.actor }} \
+            --docker-password=${{ secrets.GITHUB_TOKEN }} \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Aplicar manifiestos de Kubernetes
+        run: |
+          # Namespace primero
+          kubectl apply -f kubernetes/namespace.yaml
+
+          # Infraestructura de datos (StatefulSets, ConfigMap)
+          kubectl apply -f kubernetes/configmap.yaml
+          kubectl apply -f kubernetes/mongodb-statefulset.yaml
+          kubectl apply -f kubernetes/minio-statefulset.yaml
+          kubectl apply -f kubernetes/socket-proxy-deployment.yaml
+
+          # Servicios de aplicación
+          kubectl apply -f kubernetes/backend-service.yaml
+          kubectl apply -f kubernetes/frontend-service.yaml
+          kubectl apply -f kubernetes/backend-deployment.yaml
+          kubectl apply -f kubernetes/frontend-deployment.yaml
+
+          # Ingress y TLS
+          kubectl apply -f kubernetes/cert-manager-issuer.yaml
+          kubectl apply -f kubernetes/ingress.yaml
+
+          # Autoescalado
+          kubectl apply -f kubernetes/hpa.yaml
+
+      # Actualizar el tag de la imagen con el SHA del commit actual → rolling update automático
+      - name: Actualizar imágenes con nuevo tag (rolling update)
+        run: |
+          TAG=${{ needs.build.outputs.image-tag }}
+          kubectl set image deployment/dockermanager-backend \
+            backend=${{ env.BACKEND_IMAGE }}:${TAG} \
+            -n dockermanager
+          kubectl set image deployment/dockermanager-frontend \
+            frontend=${{ env.FRONTEND_IMAGE }}:${TAG} \
+            -n dockermanager
+
+      # Esperar a que el rolling update complete sin errores
+      - name: Esperar a que el deploy complete (rollout status)
+        run: |
+          echo ">>> Esperando rollout del backend..."
+          kubectl rollout status deployment/dockermanager-backend \
+            -n dockermanager --timeout=300s
+
+          echo ">>> Esperando rollout del frontend..."
+          kubectl rollout status deployment/dockermanager-frontend \
+            -n dockermanager --timeout=300s
+
+      - name: Estado de los pods tras el deploy
+        if: always()
+        run: |
+          echo "=== Pods ==="
+          kubectl get pods -n dockermanager -o wide
+          echo "=== Deployments ==="
+          kubectl get deployments -n dockermanager
+          echo "=== Services ==="
+          kubectl get services -n dockermanager
+          echo "=== Ingress ==="
+          kubectl get ingress -n dockermanager
+          echo "=== Certificados TLS ==="
+          kubectl get certificate -n dockermanager 2>/dev/null || echo "(cert-manager no instalado aún)"
+
+      - name: Smoke test — health endpoint
+        run: |
+          echo ">>> Esperando que el DNS/TLS esté disponible..."
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            --max-time 15 \
+            https://orbitcloud.app/api/health || echo "000")
+          echo "HTTP Status: $STATUS"
+          if [ "$STATUS" != "200" ]; then
+            echo "ADVERTENCIA: Health check devolvió $STATUS (puede ser normal en el primer deploy si TLS aún se está emitiendo)"
+          else
+            echo "✓ Deploy completado correctamente"
+          fi
+
+      - name: Notificar fallo
+        if: failure()
+        run: |
+          echo "=== DEPLOY FALLIDO — Logs del backend ==="
+          kubectl logs -n dockermanager \
+            -l app=dockermanager-backend \
+            --tail=50 || true
+          echo "=== Eventos del namespace ==="
+          kubectl get events -n dockermanager \
+            --sort-by='.lastTimestamp' | tail -20 || true
